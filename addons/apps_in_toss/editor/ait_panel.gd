@@ -20,6 +20,8 @@ func _ready() -> void:
 
 
 func _build_ui() -> void:
+	size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	size_flags_vertical = Control.SIZE_EXPAND_FILL
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
 	var background := ColorRect.new()
@@ -165,7 +167,9 @@ func _run_cli(args: PackedStringArray, label: String) -> bool:
 	_append_log("▶ %s (ait-godot %s)" % [label, " ".join(args)])
 
 	var output: Array = []
-	var exit_code := OS.execute(cli_bin, args, output, true, true)
+	# open_console=false 필수: true면 macOS에서 출력이 별도 콘솔 창으로 새어나가
+	# output 배열이 비어버린다(로그 패널에 아무것도 안 쌓이던 버그의 원인).
+	var exit_code := OS.execute(cli_bin, args, output, true, false)
 	_append_log("\n".join(output))
 
 	var success := exit_code == 0
