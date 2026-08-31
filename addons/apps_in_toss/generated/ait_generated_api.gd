@@ -13,6 +13,12 @@ func app_login() -> int:
 func get_anonymous_key() -> int:
     return _core.invoke("getAnonymousKey", [])
 
+func get_user_key_for_game() -> int:
+    return _core.invoke("getUserKeyForGame", [])
+
+func get_is_toss_login_integrated_service() -> int:
+    return _core.invoke("getIsTossLoginIntegratedService", [])
+
 func get_platform_os() -> int:
     return _core.invoke("getPlatformOS", [])
 

@@ -1,12 +1,16 @@
 import { defineConfig } from 'vite';
-import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const bridgeRoot = fileURLToPath(new URL('.', import.meta.url));
+const bridgeEntry = fileURLToPath(new URL('./src/index.ts', import.meta.url));
 
 export default defineConfig({
+  root: bridgeRoot,
   build: {
     lib: {
-      entry: resolve(__dirname, 'src/index.ts'),
+      entry: bridgeEntry,
       name: 'AppsInTossGodotBridge',
-      formats: ['es'],
+      formats: ['iife'],
       fileName: () => 'apps-in-toss-godot-bridge.js',
     },
     outDir: 'dist',

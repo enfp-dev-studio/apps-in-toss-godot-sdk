@@ -1,6 +1,8 @@
 [
   {"name":"app_login","path":"appLogin","args":[]},
   {"name":"get_anonymous_key","path":"getAnonymousKey","args":[]},
+  {"name":"get_user_key_for_game","path":"getUserKeyForGame","args":[]},
+  {"name":"get_is_toss_login_integrated_service","path":"getIsTossLoginIntegratedService","args":[]},
   {"name":"get_platform_os","path":"getPlatformOS","args":[]},
   {"name":"get_network_status","path":"getNetworkStatus","args":[]},
   {"name":"get_permission","path":"getPermission","args":["permission"]},

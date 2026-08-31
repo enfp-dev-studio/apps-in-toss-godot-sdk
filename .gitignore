@@ -1,0 +1,5 @@
+node_modules
+bridge/dist
+bridge/dist-ssr
+*.local
+.DS_Store

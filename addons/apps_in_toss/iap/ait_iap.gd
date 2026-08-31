@@ -24,7 +24,23 @@ func get_completed_or_refunded_orders() -> int:
     return _core.invoke("IAP.getCompletedOrRefundedOrders")
 
 func complete_product_grant(order_id: String) -> int:
-    return _core.invoke("IAP.completeProductGrant", [{"orderId": order_id}])
+    return _core.invoke("IAP.completeProductGrant", [{"params": {"orderId": order_id}}])
+
+func get_product_item_list_and_wait(timeout_ms: int = 0) -> Dictionary:
+    return await _core.invoke_and_wait("IAP.getProductItemList", [], timeout_ms)
+
+func get_pending_orders_and_wait(timeout_ms: int = 0) -> Dictionary:
+    return await _core.invoke_and_wait("IAP.getPendingOrders", [], timeout_ms)
+
+func get_completed_or_refunded_orders_and_wait(timeout_ms: int = 0) -> Dictionary:
+    return await _core.invoke_and_wait("IAP.getCompletedOrRefundedOrders", [], timeout_ms)
+
+func complete_product_grant_and_wait(order_id: String, timeout_ms: int = 0) -> Dictionary:
+    return await _core.invoke_and_wait(
+        "IAP.completeProductGrant",
+        [{"params": {"orderId": order_id}}],
+        timeout_ms
+    )
 
 func create_one_time_purchase_order(sku: String) -> int:
     var subscription_id := _core.create_subscription_id()
