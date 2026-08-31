@@ -155,6 +155,11 @@ func _refresh_status() -> void:
 
 ## OS.execute로 CLI를 동기 실행한다(Unity Build & Package도 에디터를 블로킹하며
 ## 진행되는 것과 동일한 UX). 결과와 exit code를 로그에 누적 출력한다.
+##
+## GUI로 실행된 Godot.app은 터미널과 달리 최소 PATH만 상속받는 경우가 많아
+## (node가 ~/.local/bin, nvm 등 비표준 경로에 있으면) 셔뱅(#!/usr/bin/env node)
+## 해석이 조용히 실패할 수 있다. 로그인 셸(zsh -lc)로 감싸 .zprofile/.zshrc의
+## PATH를 상속받아 실행한다.
 func _run_cli(args: PackedStringArray, label: String) -> bool:
 	if _busy:
 		return false
@@ -166,11 +171,16 @@ func _run_cli(args: PackedStringArray, label: String) -> bool:
 	_set_busy(true, "%s 실행 중..." % label)
 	_append_log("▶ %s (ait-godot %s)" % [label, " ".join(args)])
 
+	var quoted_args := PackedStringArray()
+	for arg in args:
+		quoted_args.append("'%s'" % arg.replace("'", "'\\''"))
+	var command_line := "'%s' %s" % [cli_bin.replace("'", "'\\''"), " ".join(quoted_args)]
+
 	var output: Array = []
 	# open_console=false 필수: true면 macOS에서 출력이 별도 콘솔 창으로 새어나가
-	# output 배열이 비어버린다(로그 패널에 아무것도 안 쌓이던 버그의 원인).
-	var exit_code := OS.execute(cli_bin, args, output, true, false)
-	_append_log("\n".join(output))
+	# output 배열이 비어버린다. 로그인 셸(-l)로 실행해 PATH를 온전히 상속받는다.
+	var exit_code := OS.execute("/bin/zsh", ["-lc", command_line], output, true, false)
+	_append_log("\n".join(output) if not output.is_empty() else "(출력 없음)")
 
 	var success := exit_code == 0
 	_append_log("◀ %s %s (exit %d)\n" % [label, "성공" if success else "실패", exit_code])
