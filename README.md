@@ -1,45 +1,110 @@
-# Apps in Toss Godot SDK workspace
+# Apps in Toss Godot SDK
 
-이 디렉터리는 플랫폼 개발 중 사용하는 Godot SDK 계층입니다.
-`addons/apps_in_toss`가 현재 checkout의 원본이고, `bridge`는 Godot Web export에
-주입하는 TypeScript 브리지입니다. 공개 SDK 리포지토리를 canonical source로
-승격한 뒤에는 이 디렉터리를 두 번째 원본으로 수정하지 말고 release bundle로
-소비하세요. 실제 게임 코드는 게임마다 별도 private 리포지토리에 둡니다.
+Godot 4 Web 게임에서 Apps in Toss(앱인토스) 기능을 쓰게 해주는 커뮤니티 SDK입니다.
+공식 Unity SDK와 같은 레이어 구조를 따릅니다: 게임에서는 `AIT` 오톨로드만 호출하면
+로그인·결제·광고·게임센터가 토스 앱과 연결됩니다.
 
-```text
-godot-sdk/
-  addons/apps_in_toss/  Godot 애드온 원본 (AIT Autoload, 인증, 결제, 광고, 진단)
-  bridge/               Web Framework transport와 export patch 도구
-godot/                  SDK smoke-test용 Godot 게임
-src/                    기존 Apps in Toss 웹 게임 화면
-```
+> **상태: community early preview.** Web export와 `.ait` 패키징은 검증되어 있지만
+> 로그인·결제·광고는 샌드박스 앱과 실제 토스 앱에서 최종 검증이 필요합니다.
 
-플랫폼의 호환 조합은 루트의 `.ait/platform.lock.json`에서 관리합니다. Godot,
-addon, bridge, Web Framework, Node/npm, Unity SDK commit을 임의로 섞지 말고 lock에
-기록된 조합으로 개발·빌드하세요.
+## 지원 요약
 
-샘플 프로젝트의 `godot/addons/apps_in_toss`는 SDK 원본의 작업 복사본입니다. 다음
-명령으로 항상 원본과 맞출 수 있습니다.
+- Godot 4.x (현재 릴리스 기준 4.7.2), Compatibility renderer, Web export
+- API 27종: 토스 로그인 3종, 게임 사용자 키, 환경·권한·저장소·클립보드·햅틱,
+  전면 광고, 인앱결제 4종, 게임센터 3종, AdMob 3종
+- 빌드 파이프라인: 검사(d doctor) → Web export → 브리지 주입 → `.ait` 패키징
+- 브라우저 Dev Server: 토스 앱 없이 mock SDK + DevTools 패널로 개발 · API 테스트
+
+## 빠른 시작 (3분)
+
+게임 리포지토리 루트에서:
 
 ```bash
-npm run godot:sdk:sync
-npm run godot:sdk:sync -- --check
+# 1. 플랫폼 릴리스의 lock과 매니페스트 예시를 게임에 복사
+mkdir -p .ait
+cp <플랫폼-리포>/.ait/platform.lock.json .ait/
+cp <플랫폼-리포>/.ait/game.manifest.example.json .ait/game.manifest.json
+#    → gameId, gameVersion, displayName, brand.primaryColor, releaseChannel 채우기
+
+# 2. 애드온 설치 (SDK 원본에서 복사 + autoload 등록)
+ait-godot addon:install --force
+
+# 3. 검사 후 첫 빌드
+ait-godot doctor --strict
+ait-godot build        # → <게임>.ait 산출물
 ```
 
-실제 게임 프로젝트에 설치할 때는 다음 명령이 이 원본만 복사합니다.
+개발 중에는 브라우저만으로 테스트합니다:
 
 ```bash
-npm run godot:addon:install -- /absolute/path/to/my-godot-game
+ait-godot build:dev    # mock 브리지 + DevTools 패널이 붙은 개발 번들
+# 로컬 서버로 build/godot-web 를 서빙 → 브라우저에서 API 목테스트
 ```
 
-SDK를 별도 checkout으로 관리하는 경우에는 `GODOT_SDK_DIR`만 지정하면 됩니다.
+로그인·결제·광고 실동작 확인은 `npm run deploy`(=`ait deploy`)로 업로드 후
+샌드박스 앱/토스 앱 QR 테스트에서 합니다 — 브리지는 토스 앱 안에서만 살아 있습니다.
+
+## 게임 코드에서 쓰기
+
+`AIT` 오톨로드 하나로 전부 접근합니다. Unity의 `AIT.*` 정적 API에 대응합니다.
+
+```gdscript
+func _ready() -> void:
+    if not AIT.is_available():
+        return  # 에디터/일반 브라우저 — 네이티브 API 없음
+
+    # 사용자 식별 (로그인 UI 없이)
+    var res := await AIT.get_user_key_for_game(15_000)
+    if response_ok(res):
+        print(res.result.hash)
+
+    # 전면 광고
+    AIT.ads.ad_loaded.connect(_on_ad_loaded)
+    AIT.ads.load_full_screen_ad({"adGroupId": "광고그룹ID"})
+
+    # 게임센터 (플랫폼 0.2.0+)
+    AIT.invoke_and_wait("Game", 15_000)  # 자세한 건 아래 표 참고
+
+func response_ok(res: Dictionary) -> bool:
+    return bool(res.get("ok", false))
+```
+
+전체 API 목록은 `addons/apps_in_toss/generated/ait_generated_catalog.gd`(자동
+생성)가 단일 출처입니다. 자세한 사용 pattern(로그인 서버 연동, 결제 지급/복구,
+전면 광고)은 플랫폼 리포 [`docs/godot-integration.md`](https://github.com/enfp-dev-studio/toss-web-game/blob/main/docs/godot-integration.md)를 참고하세요.
+
+## 빌드
+
+이 SDK 리포지토리는 부품(애드온+브리지) 공장입니다. 게임 빌드는 플랫폼 리포의
+`ait-godot` CLI가 수행합니다:
 
 ```bash
-GODOT_SDK_DIR=/absolute/path/to/apps-in-toss-godot-sdk \
-  npm run godot:addon:install -- /absolute/path/to/my-godot-game
+# 게임 리포에서 (플랫폼 리포가 옆에 checkout돼 있거나, lock 커밋에서 자동 클론)
+ait-godot doctor          # 호환성 검사 (sandbox는 advisory 허용, canary/production은 strict 강제)
+ait-godot build           # 검사→Godot Web export→브리지 주입→검증→.ait
+ait-godot build:dev       # mock 개발 빌드 (브라우저 테스트용)
 ```
 
-Godot SDK 코드는 플랫폼 API를 직접 구현하지 않습니다. `bridge`가
-`@apps-in-toss/web-framework`를 호출하고, Godot `JavaScriptBridge`가 양방향 요청과
-이벤트를 전달합니다. 따라서 웹 게임 코드와 Godot SDK를 같은 저장소에서 빌드하되,
-각각 독립적으로 재사용할 수 있습니다.
+빌드 산출물에는 `ait-platform-manifest.json`이 포함되어 어떤 조합으로
+만들어졌는지 기록됩니다 — 롤백·재현에 사용하세요.
+
+## 문서
+
+플랫폼 리포지토리(`enfp-dev-studio/toss-web-game`)의 `docs/`에서:
+
+- Unity 플로우 대응 현황: `unity-flow-parity.md`
+- 연동 가이드(로그인/결제/광고 코드): `godot-integration.md`
+- 공개/비공개 리포 구조와 업데이트 흐름: `platform-architecture.md`
+- 릴리스 호환 매트릭스: `platform-compatibility.md`
+
+## Unity SDK 업데이트 따라잡기
+
+플랫폼 리포의 `npm run godot:check:unity`가 upstream API surface 변화를 감시하고,
+`godot:sync:unity`가 포팅·생성·smoke test를 한 번에 실행합니다. 새 API는
+매핑 검토 후 카탈로그에 반영됩니다(SemVer: additive는 minor, 호환 깨짐은 major).
+
+## 라이선스·상태
+
+토스 공식 SDK가 아닌 **커뮤니티 포트(early preview)**입니다. 배포 전 샌드박스·
+실기기 테스트가 필수이고, 로딩·Web export는 검증됐지만 결제 지급 흐름은 실제
+토스 앱에서 최종 확인해야 합니다.
