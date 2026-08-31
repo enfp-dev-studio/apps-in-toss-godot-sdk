@@ -223,12 +223,15 @@ func _prompt_node_path() -> void:
 func _refresh_status() -> void:
 	var has_manifest := FileAccess.file_exists(_project_dir().path_join(".ait/game.manifest.json"))
 	var has_cli := not _find_cli_entry().is_empty()
-	var has_node := not _find_node_executable().is_empty()
+	var found_node := _find_node_executable()
+	var has_node := not found_node.is_empty()
+	print("[AIT panel] node search result: '%s' (found=%s)" % [found_node, has_node])
 	var parts: Array[String] = []
 	parts.append("node: %s" % ("찾음" if has_node else "없음"))
 	parts.append("CLI: %s" % ("설치됨" if has_cli else "없음 (npm i -D @enfp-dev/ait-godot)"))
 	parts.append(".ait/: %s" % ("있음" if has_manifest else "없음 (npx ait-godot init)"))
 	_status.text = " | ".join(parts)
+	print("[AIT panel] status text set to: ", _status.text)
 
 
 ## node 실행 파일 절대 경로로 CLI 진입점(.js)을 직접 실행한다. 셸을 거치지
