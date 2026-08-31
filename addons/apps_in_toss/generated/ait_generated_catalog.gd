@@ -23,4 +23,10 @@ const APIS: Array[Dictionary] = [
 	{"name": "iap_get_pending_orders", "path": "IAP.getPendingOrders", "args": []},
 	{"name": "iap_get_completed_or_refunded_orders", "path": "IAP.getCompletedOrRefundedOrders", "args": []},
 	{"name": "iap_complete_product_grant", "path": "IAP.completeProductGrant", "args": ["options"]},
+	{"name": "game_open_leaderboard", "path": "Game.openLeaderboard", "args": []},
+	{"name": "game_set_leaderboard_score", "path": "Game.setLeaderboardScore", "args": ["options"]},
+	{"name": "game_get_user_profile", "path": "Game.getUserProfile", "args": []},
+	{"name": "admob_load", "path": "GoogleAdMob.loadAppsInTossAdMob", "args": ["options"]},
+	{"name": "admob_show", "path": "GoogleAdMob.showAppsInTossAdMob", "args": ["options"]},
+	{"name": "admob_is_loaded", "path": "GoogleAdMob.isAppsInTossAdMobLoaded", "args": ["options"]},
 ]

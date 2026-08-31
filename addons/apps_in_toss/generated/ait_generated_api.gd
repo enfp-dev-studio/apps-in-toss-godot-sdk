@@ -69,3 +69,21 @@ func iap_get_completed_or_refunded_orders() -> int:
 
 func iap_complete_product_grant(options: Variant) -> int:
     return _core.invoke("IAP.completeProductGrant", [options])
+
+func game_open_leaderboard() -> int:
+    return _core.invoke("Game.openLeaderboard", [])
+
+func game_set_leaderboard_score(options: Variant) -> int:
+    return _core.invoke("Game.setLeaderboardScore", [options])
+
+func game_get_user_profile() -> int:
+    return _core.invoke("Game.getUserProfile", [])
+
+func admob_load(options: Variant) -> int:
+    return _core.invoke("GoogleAdMob.loadAppsInTossAdMob", [options])
+
+func admob_show(options: Variant) -> int:
+    return _core.invoke("GoogleAdMob.showAppsInTossAdMob", [options])
+
+func admob_is_loaded(options: Variant) -> int:
+    return _core.invoke("GoogleAdMob.isAppsInTossAdMobLoaded", [options])
