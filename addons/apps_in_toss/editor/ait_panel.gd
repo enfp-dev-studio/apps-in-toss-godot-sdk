@@ -1,18 +1,12 @@
 @tool
 extends Control
-## Apps in Toss 통합 패널 — Unity SDK의 AIT 메뉴 전체를 하나의 도킹 패널로 통합한다.
-## 다른 Godot 애드온(Git, GitHub Actions 등)처럼 하단 패널에 상주하며,
-## 버튼 클릭 → CLI 실행 → 로그 누적 표시의 단일 흐름을 제공한다.
+## Apps in Toss 메인 스크린 탭 — 2D/3D/Script/AssetLib 옆에 추가되는
+## 상단 탭 화면. Unity SDK의 AIT 메뉴 전체(Configuration/Doctor/Dev Server/
+## Build & Package/Publish)를 여기 하나로 통합한다.
 ##
-## 개별 Tool 메뉴 항목 + 매번 뜨는 모달 다이얼로그 대신, 상태·로그가 계속
-## 보이는 패널 하나로 통합했다 (이전 버전의 6개 메뉴 항목을 대체).
-
-const LOCK_LABELS := {
-	"doctor": "Doctor",
-	"doctor_strict": "Doctor --strict",
-	"dev_server": "Dev Server (mock build)",
-	"build": "Build & Package",
-}
+## AdMob·Firebase·Dialogue Manager류의 "가끔 여는 외부 연결 설정" 애드온이
+## 흔히 쓰는 패턴(상단 메인 스크린 탭)을 따른다 — 상시 조작용 하단 패널과는
+## 다른 자리다.
 
 var _log: TextEdit
 var _status: Label
@@ -26,29 +20,37 @@ func _ready() -> void:
 
 
 func _build_ui() -> void:
-	custom_minimum_size = Vector2(0, 220)
+	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
-	var root := VBoxContainer.new()
-	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	root.add_theme_constant_override("separation", 6)
-	add_child(root)
+	var background := ColorRect.new()
+	background.color = get_theme_color("dark_color_2", "Editor") if has_theme_color("dark_color_2", "Editor") else Color(0.14, 0.15, 0.17)
+	background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(background)
 
 	var margin := MarginContainer.new()
-	margin.add_theme_constant_override("margin_left", 8)
-	margin.add_theme_constant_override("margin_top", 8)
-	margin.add_theme_constant_override("margin_right", 8)
-	margin.add_theme_constant_override("margin_bottom", 8)
-	margin.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	root.add_child(margin)
+	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	for side in ["left", "top", "right", "bottom"]:
+		margin.add_theme_constant_override("margin_" + side, 16)
+	add_child(margin)
 
-	var inner := VBoxContainer.new()
-	inner.add_theme_constant_override("separation", 6)
-	margin.add_child(inner)
+	var root := VBoxContainer.new()
+	root.add_theme_constant_override("separation", 10)
+	margin.add_child(root)
+
+	var title := Label.new()
+	title.text = "Apps in Toss"
+	title.add_theme_font_size_override("font_size", 20)
+	root.add_child(title)
+
+	var subtitle := Label.new()
+	subtitle.text = "Unity SDK의 AIT 메뉴(Configuration / Dev Server / Build & Package / Publish)에 대응합니다."
+	subtitle.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
+	root.add_child(subtitle)
 
 	var toolbar := HFlowContainer.new()
-	toolbar.add_theme_constant_override("h_separation", 6)
-	toolbar.add_theme_constant_override("v_separation", 6)
-	inner.add_child(toolbar)
+	toolbar.add_theme_constant_override("h_separation", 8)
+	toolbar.add_theme_constant_override("v_separation", 8)
+	root.add_child(toolbar)
 
 	_add_button(toolbar, "Configuration 열기", _open_configuration)
 	_add_button(toolbar, "Doctor", _run_doctor)
@@ -60,19 +62,23 @@ func _build_ui() -> void:
 
 	_status = Label.new()
 	_status.text = "대기 중"
-	inner.add_child(_status)
+	root.add_child(_status)
+
+	var log_panel := PanelContainer.new()
+	log_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	root.add_child(log_panel)
 
 	_log = TextEdit.new()
 	_log.editable = false
 	_log.wrap_mode = TextEdit.LINE_WRAPPING_BOUNDARY
-	_log.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_log.placeholder_text = "명령을 실행하면 결과가 여기 누적됩니다."
-	inner.add_child(_log)
+	log_panel.add_child(_log)
 
 
 func _add_button(parent: Control, text: String, handler: Callable) -> void:
 	var button := Button.new()
 	button.text = text
+	button.custom_minimum_size = Vector2(0, 36)
 	button.pressed.connect(handler)
 	parent.add_child(button)
 	_buttons.append(button)
@@ -146,7 +152,7 @@ func _refresh_status() -> void:
 
 
 ## OS.execute로 CLI를 동기 실행한다(Unity Build & Package도 에디터를 블로킹하며
-## 진행되는 것과 동일한 UX). 결과와 exit code를 로그 패널에 누적 출력한다.
+## 진행되는 것과 동일한 UX). 결과와 exit code를 로그에 누적 출력한다.
 func _run_cli(args: PackedStringArray, label: String) -> bool:
 	if _busy:
 		return false
