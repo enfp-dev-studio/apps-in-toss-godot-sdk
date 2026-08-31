@@ -61,6 +61,7 @@ func _build_ui() -> void:
 	_add_button(toolbar, "Build & Package", _run_build)
 	_add_button(toolbar, "Publish 안내", _show_publish_hint)
 	_add_button(toolbar, "로그 지우기", _clear_log)
+	_add_button(toolbar, "node 경로 지정...", _prompt_node_path)
 
 	_status = Label.new()
 	_status.text = "대기 중"
@@ -137,49 +138,125 @@ func _project_dir() -> String:
 	return ProjectSettings.globalize_path("res://")
 
 
-func _find_cli_bin() -> String:
-	var candidate := _project_dir().path_join("node_modules/.bin/ait-godot")
-	if FileAccess.file_exists(candidate):
-		return candidate
+## npm이 만드는 node_modules/.bin 셔뱅 스크립트를 직접 실행하는 대신, package.json의
+## "bin" 필드에서 실제 JS 진입점 경로를 읽어 절대 경로로 반환한다. 셔뱅(#!/usr/bin/env
+## node) 해석에 PATH가 필요 없게 되어, 이후 node 실행 파일도 애드온이 직접 찾은
+## 절대 경로로 호출하면 셸이나 사용자의 PATH 설정에 전혀 의존하지 않는다.
+func _find_cli_entry() -> String:
+	var package_dir := _project_dir().path_join("node_modules/@enfp-dev/ait-godot")
+	var package_json_path := package_dir.path_join("package.json")
+	if not FileAccess.file_exists(package_json_path):
+		return ""
+	var file := FileAccess.open(package_json_path, FileAccess.READ)
+	var parsed: Variant = JSON.parse_string(file.get_as_text())
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return ""
+	var bin_field: Variant = parsed.get("bin")
+	var rel_path := ""
+	if typeof(bin_field) == TYPE_STRING:
+		rel_path = bin_field
+	elif typeof(bin_field) == TYPE_DICTIONARY:
+		rel_path = String(bin_field.get("ait-godot", ""))
+	if rel_path.is_empty():
+		return ""
+	return package_dir.path_join(rel_path)
+
+
+## node 실행 파일의 절대 경로를 애드온이 직접 찾는다 — 셸(zsh -lc 등)에 위임하지
+## 않는다. Godot.app을 Finder/Dock에서 실행하면 최소 PATH만 상속되어 사용자의
+## .zshrc에 등록된 node(nvm, volta, ~/.local/bin 등)를 못 찾는 문제를 피한다.
+## 우선순위: EditorSettings에 저장된 수동 지정 → 흔한 설치 위치 → 현재 PATH.
+func _find_node_executable() -> String:
+	var settings := EditorInterface.get_editor_settings()
+	const SETTING_KEY := "apps_in_toss/node_executable_path"
+	if settings.has_setting(SETTING_KEY):
+		var manual := String(settings.get_setting(SETTING_KEY))
+		if not manual.is_empty() and FileAccess.file_exists(manual):
+			return manual
+
+	var home := OS.get_environment("HOME")
+	var candidates := PackedStringArray([
+		"/opt/homebrew/bin/node",
+		"/usr/local/bin/node",
+		"/usr/bin/node",
+		home.path_join(".local/bin/node"),
+		home.path_join(".volta/bin/node"),
+	])
+	for candidate in candidates:
+		if FileAccess.file_exists(candidate):
+			return candidate
+
+	# nvm은 버전별 디렉터리라 고정 경로가 없다 — 설치된 버전 중 하나를 찾는다.
+	var nvm_dir := home.path_join(".nvm/versions/node")
+	if DirAccess.dir_exists_absolute(nvm_dir):
+		var dir := DirAccess.open(nvm_dir)
+		if dir:
+			for entry in dir.get_directories():
+				var node_path := nvm_dir.path_join(entry).path_join("bin/node")
+				if FileAccess.file_exists(node_path):
+					return node_path
+
+	# 마지막 수단: 현재 프로세스가 이미 PATH에서 node를 상속받은 경우
+	# (터미널에서 실행된 Godot일 때) 그대로 사용한다.
+	for path_entry in OS.get_environment("PATH").split(":"):
+		var candidate := path_entry.path_join("node")
+		if FileAccess.file_exists(candidate):
+			return candidate
+
 	return ""
+
+
+func _prompt_node_path() -> void:
+	var dialog := FileDialog.new()
+	dialog.file_mode = FileDialog.FILE_MODE_OPEN_FILE
+	dialog.access = FileDialog.ACCESS_FILESYSTEM
+	dialog.title = "node 실행 파일 선택"
+	dialog.file_selected.connect(func(path: String) -> void:
+		EditorInterface.get_editor_settings().set_setting("apps_in_toss/node_executable_path", path)
+		_append_log("node 경로를 저장했습니다: %s" % path)
+		_refresh_status()
+	)
+	EditorInterface.get_base_control().add_child(dialog)
+	dialog.popup_centered_ratio(0.6)
 
 
 func _refresh_status() -> void:
 	var has_manifest := FileAccess.file_exists(_project_dir().path_join(".ait/game.manifest.json"))
-	var has_cli := not _find_cli_bin().is_empty()
+	var has_cli := not _find_cli_entry().is_empty()
+	var has_node := not _find_node_executable().is_empty()
 	var parts: Array[String] = []
+	parts.append("node: %s" % ("찾음" if has_node else "없음"))
 	parts.append("CLI: %s" % ("설치됨" if has_cli else "없음 (npm i -D @enfp-dev/ait-godot)"))
 	parts.append(".ait/: %s" % ("있음" if has_manifest else "없음 (npx ait-godot init)"))
 	_status.text = " | ".join(parts)
 
 
-## OS.execute로 CLI를 동기 실행한다(Unity Build & Package도 에디터를 블로킹하며
-## 진행되는 것과 동일한 UX). 결과와 exit code를 로그에 누적 출력한다.
-##
-## GUI로 실행된 Godot.app은 터미널과 달리 최소 PATH만 상속받는 경우가 많아
-## (node가 ~/.local/bin, nvm 등 비표준 경로에 있으면) 셔뱅(#!/usr/bin/env node)
-## 해석이 조용히 실패할 수 있다. 로그인 셸(zsh -lc)로 감싸 .zprofile/.zshrc의
-## PATH를 상속받아 실행한다.
+## node 실행 파일 절대 경로로 CLI 진입점(.js)을 직접 실행한다. 셸을 거치지
+## 않으므로 사용자의 dotfile·PATH 설정과 무관하게 동작한다.
 func _run_cli(args: PackedStringArray, label: String) -> bool:
 	if _busy:
 		return false
-	var cli_bin := _find_cli_bin()
-	if cli_bin.is_empty():
+
+	var entry := _find_cli_entry()
+	if entry.is_empty():
 		_append_log("[%s] ait-godot CLI를 찾을 수 없습니다. 터미널에서: npm i -D @enfp-dev/ait-godot" % label)
 		return false
 
-	_set_busy(true, "%s 실행 중..." % label)
-	_append_log("▶ %s (ait-godot %s)" % [label, " ".join(args)])
+	var node_exe := _find_node_executable()
+	if node_exe.is_empty():
+		_append_log(
+			"[%s] node 실행 파일을 찾지 못했습니다. 아래 버튼으로 직접 지정해 주세요." % label,
+		)
+		_prompt_node_path()
+		return false
 
-	var quoted_args := PackedStringArray()
-	for arg in args:
-		quoted_args.append("'%s'" % arg.replace("'", "'\\''"))
-	var command_line := "'%s' %s" % [cli_bin.replace("'", "'\\''"), " ".join(quoted_args)]
+	_set_busy(true, "%s 실행 중..." % label)
+	_append_log("▶ %s (%s %s %s)" % [label, node_exe, entry, " ".join(args)])
 
 	var output: Array = []
 	# open_console=false 필수: true면 macOS에서 출력이 별도 콘솔 창으로 새어나가
-	# output 배열이 비어버린다. 로그인 셸(-l)로 실행해 PATH를 온전히 상속받는다.
-	var exit_code := OS.execute("/bin/zsh", ["-lc", command_line], output, true, false)
+	# output 배열이 비어버린다.
+	var exit_code := OS.execute(node_exe, [entry] + Array(args), output, true, false)
 	_append_log("\n".join(output) if not output.is_empty() else "(출력 없음)")
 
 	var success := exit_code == 0
