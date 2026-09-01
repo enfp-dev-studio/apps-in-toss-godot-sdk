@@ -12,6 +12,7 @@ var _log: TextEdit
 var _status: Label
 var _buttons: Array[Button] = []
 var _busy := false
+var _dev_server_pid := 0
 
 
 func _ready() -> void:
@@ -58,6 +59,7 @@ func _build_ui() -> void:
 	_add_button(toolbar, "Doctor", _run_doctor)
 	_add_button(toolbar, "Doctor --strict", _run_doctor_strict)
 	_add_button(toolbar, "Dev Server", _run_dev_server)
+	_add_button(toolbar, "서버 정지", _stop_dev_server)
 	_add_button(toolbar, "Build & Package", _run_build)
 	_add_button(toolbar, "Publish 안내", _show_publish_hint)
 	_add_button(toolbar, "로그 지우기", _clear_log)
@@ -107,12 +109,62 @@ func _run_doctor_strict() -> void:
 
 
 func _run_dev_server() -> void:
+	# Unity Dev Server 대응: build:dev(동기) → preview 서버(비동기) → 브라우저 자동 오픈.
+	# preview는 종료하지 않는 서버라 OS.execute(동기)로는 못 띄우고 OS.create_process로
+	# 백그라운드 프로세스로 띄워야 에디터도 멈추지 않는다.
 	var ok := _run_cli(["build:dev"], "Dev Server (mock build)")
-	if ok:
-		_append_log(
-			"Dev 빌드 완료. 터미널에서 계속 실행하세요: npx ait-godot preview\n" +
-			"브라우저가 열리면 API 테스터와 DevTools 패널을 확인하세요.",
-		)
+	if not ok:
+		return
+
+	var node_exe := _require_node("Preview server")
+	if node_exe.is_empty():
+		return
+	var entry := _find_cli_entry()
+	var export_dir := _project_dir().path_join("build/godot-web")
+
+	var pid := OS.create_process(node_exe, [entry, "preview", export_dir])
+	if pid == -1:
+		_append_log("[Preview] 서버 시작 실패 (OS.create_process)")
+		return
+	_dev_server_pid = pid
+	_append_log("[Preview] 개발 서버 시작 (PID %d). 브라우저 주소는 출력 패널/로그에서 확인하세요." % pid)
+
+	# 서버가 몇 초 내에 뜨면 vite가 localhost:<port>를 출력한다 — 폴링해서 자동 오픈.
+	_wait_and_open_browser(pid)
+
+
+func _wait_and_open_browser(pid: int) -> void:
+	for attempt in 20:  # 최대 20초 빌드+서버 기동 대기
+		await get_tree().create_timer(1.0).timeout
+		if not OS.is_process_running(pid):
+			_append_log("[Preview] 서버 프로세스가 조기 종료됐습니다. 로그를 확인하세요.")
+			_dev_server_pid = 0
+			return
+		for port in [5173, 5174, 5175, 5176, 5177]:
+			if await _http_probe("http://localhost:%d/" % port):
+				_append_log("[Preview] 응답 확인: http://localhost:%d/ → 브라우저를 엽니다." % port)
+				OS.shell_open("http://localhost:%d/" % port)
+				return
+	_append_log("[Preview] 서버 포트를 자동으로 찾지 못했습니다. 프로세스는 살아 있어요.")
+
+
+func _http_probe(url: String) -> bool:
+	var http := HTTPRequest.new()
+	http.timeout = 1.5
+	add_child(http)
+	http.request(url)
+	var result: Array = await http.request_completed
+	http.queue_free()
+	return result[0] == HTTPRequest.RESULT_SUCCESS
+
+
+func _stop_dev_server() -> void:
+	if _dev_server_pid == 0:
+		return
+	if OS.is_process_running(_dev_server_pid):
+		OS.kill(_dev_server_pid)
+		_append_log("[Preview] 개발 서버를 종료했습니다.")
+	_dev_server_pid = 0
 
 
 func _run_build() -> void:
