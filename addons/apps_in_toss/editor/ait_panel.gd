@@ -234,6 +234,21 @@ func _refresh_status() -> void:
 	print("[AIT panel] status text set to: ", _status.text)
 
 
+## node 미탐색 시: FileDialog를 자동으로 띄우지 않고 로그로 안내만 한다(실패 처리).
+## 유저가 node를 설치했는데 못 찾은 경우엔 "node 경로 지정..." 버튼으로 수동 지정.
+func _require_node(label: String) -> String:
+	var node_exe := _find_node_executable()
+	if not node_exe.is_empty():
+		return node_exe
+	_append_log(
+		"[%s] 실패: Node.js를 찾을 수 없습니다.\n" % label +
+		"  이 파이프라인은 Node.js(>=24)가 필요합니다. https://nodejs.org 에서 설치하거나,\n" +
+		"  nvm/volta 등으로 설치한 뒤 Godot을 재시작하세요.\n" +
+		"  비표준 위치에 설치했다면 \"node 경로 지정...\" 버튼으로 직접 지정할 수 있습니다.",
+	)
+	return ""
+
+
 ## node 실행 파일 절대 경로로 CLI 진입점(.js)을 직접 실행한다. 셸을 거치지
 ## 않으므로 사용자의 dotfile·PATH 설정과 무관하게 동작한다.
 func _run_cli(args: PackedStringArray, label: String) -> bool:
@@ -242,15 +257,11 @@ func _run_cli(args: PackedStringArray, label: String) -> bool:
 
 	var entry := _find_cli_entry()
 	if entry.is_empty():
-		_append_log("[%s] ait-godot CLI를 찾을 수 없습니다. 터미널에서: npm i -D @enfp-dev/ait-godot" % label)
+		_append_log("[%s] 실패: ait-godot CLI가 설치되어 있지 않습니다. 게임 리포에서:\n  npm i -D @enfp-dev/ait-godot" % label)
 		return false
 
-	var node_exe := _find_node_executable()
+	var node_exe := _require_node(label)
 	if node_exe.is_empty():
-		_append_log(
-			"[%s] node 실행 파일을 찾지 못했습니다. 아래 버튼으로 직접 지정해 주세요." % label,
-		)
-		_prompt_node_path()
 		return false
 
 	_set_busy(true, "%s 실행 중..." % label)
