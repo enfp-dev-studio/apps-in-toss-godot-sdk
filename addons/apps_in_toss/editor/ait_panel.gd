@@ -94,7 +94,7 @@ func _add_button(parent: Control, text: String, handler: Callable) -> void:
 func _open_configuration() -> void:
 	var manifest_path := _project_dir().path_join(".ait/game.manifest.json")
 	if not FileAccess.file_exists(manifest_path):
-		_append_log("[game.manifest.json 없음] 터미널에서 먼저 실행하세요: npx ait-godot init <gameId> \"<이름>\"")
+		_append_log("[game.manifest.json 없음] 터미널에서 먼저 실행하세요: node addons/apps_in_toss/tools/ait-godot.mjs init <gameId> \"<이름>\"")
 		return
 	OS.shell_open(manifest_path)
 	_append_log("game.manifest.json을 기본 편집기로 열었습니다.")
@@ -122,7 +122,7 @@ func _run_dev_server() -> void:
 	var entry := _find_cli_entry()
 	var export_dir := _project_dir().path_join("build/godot-web")
 
-	var pid := OS.create_process(node_exe, [entry, "preview", export_dir])
+	var pid := OS.create_process(node_exe, [entry, "preview", export_dir], false, _pipeline_env())
 	if pid == -1:
 		_append_log("[Preview] 서버 시작 실패 (OS.create_process)")
 		return
@@ -194,7 +194,14 @@ func _project_dir() -> String:
 ## "bin" 필드에서 실제 JS 진입점 경로를 읽어 절대 경로로 반환한다. 셔뱅(#!/usr/bin/env
 ## node) 해석에 PATH가 필요 없게 되어, 이후 node 실행 파일도 애드온이 직접 찾은
 ## 절대 경로로 호출하면 셸이나 사용자의 PATH 설정에 전혀 의존하지 않는다.
+##
+## 내장 모드: CLI가 SDK 애드온(addons/apps_in_toss/tools/ait-godot.mjs)에 포함되어
+## 있으므로 npm 패키지 설치 없이 res:// 경로에서 바로 찾는다.
 func _find_cli_entry() -> String:
+	var embedded := _project_dir().path_join("addons/apps_in_toss/tools/ait-godot.mjs")
+	if FileAccess.file_exists(embedded):
+		return embedded
+	# 레거시: npm 패키지(@enfp-dev/ait-godot)로 설치된 경우
 	var package_dir := _project_dir().path_join("node_modules/@enfp-dev/ait-godot")
 	var package_json_path := package_dir.path_join("package.json")
 	if not FileAccess.file_exists(package_json_path):
@@ -280,8 +287,8 @@ func _refresh_status() -> void:
 	print("[AIT panel] node search result: '%s' (found=%s)" % [found_node, has_node])
 	var parts: Array[String] = []
 	parts.append("node: %s" % ("찾음" if has_node else "없음"))
-	parts.append("CLI: %s" % ("설치됨" if has_cli else "없음 (npm i -D @enfp-dev/ait-godot)"))
-	parts.append(".ait/: %s" % ("있음" if has_manifest else "없음 (npx ait-godot init)"))
+	parts.append("CLI: %s" % ("내장" if has_cli else "없음 (애드온 재설치 필요)"))
+	parts.append(".ait/: %s" % ("있음" if has_manifest else "없음 (ait-godot init)"))
 	_status.text = " | ".join(parts)
 	print("[AIT panel] status text set to: ", _status.text)
 
@@ -309,7 +316,7 @@ func _run_cli(args: PackedStringArray, label: String) -> bool:
 
 	var entry := _find_cli_entry()
 	if entry.is_empty():
-		_append_log("[%s] 실패: ait-godot CLI가 설치되어 있지 않습니다. 게임 리포에서:\n  npm i -D @enfp-dev/ait-godot" % label)
+		_append_log("[%s] 실패: ait-godot CLI를 찾을 수 없습니다. 애드온을 다시 설치하세요." % label)
 		return false
 
 	var node_exe := _require_node(label)
@@ -322,7 +329,7 @@ func _run_cli(args: PackedStringArray, label: String) -> bool:
 	var output: Array = []
 	# open_console=false 필수: true면 macOS에서 출력이 별도 콘솔 창으로 새어나가
 	# output 배열이 비어버린다.
-	var exit_code := OS.execute(node_exe, [entry] + Array(args), output, true, false)
+	var exit_code := OS.execute(node_exe, [entry] + Array(args), output, true, false, _pipeline_env())
 	_append_log("\n".join(output) if not output.is_empty() else "(출력 없음)")
 
 	var success := exit_code == 0
@@ -330,6 +337,21 @@ func _run_cli(args: PackedStringArray, label: String) -> bool:
 	_set_busy(false, "%s %s" % [label, "완료" if success else "실패"])
 	_refresh_status()
 	return success
+
+
+## 내장 CLI(addons/apps_in_toss/tools)가 자기 자신을 SDK로 인식하도록 env를 만든다.
+## Godot 4.4+의 OS.execute/OS.create_process env 파라미터(Array[String] of "K=V")로 전달.
+func _pipeline_env() -> PackedStringArray:
+	var project_dir := _project_dir()
+	var addon_dir := project_dir.path_join("addons/apps_in_toss")
+	var tools_dir := addon_dir.path_join("tools")
+	var bridge_dir := tools_dir.path_join("bridge")
+	return PackedStringArray([
+		"GODOT_PROJECT_DIR=%s" % project_dir,
+		"AIT_ADDON_DIR=%s" % addon_dir,
+		"AIT_TOOLS_DIR=%s" % tools_dir,
+		"AIT_BRIDGE_DIR=%s" % bridge_dir,
+	])
 
 
 func _set_busy(busy: bool, status_text: String) -> void:

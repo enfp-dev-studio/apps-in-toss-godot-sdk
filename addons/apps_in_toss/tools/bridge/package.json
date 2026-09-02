@@ -1,0 +1,20 @@
+{
+  "name": "apps-in-toss-godot-bridge",
+  "version": "0.1.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "patch": "node scripts/patch-export.mjs",
+    "generate": "node scripts/generate-gdscript.mjs",
+    "prepare": "npm run generate"
+  },
+  "dependencies": {
+    "@apps-in-toss/web-framework": "3.1.1"
+  },
+  "devDependencies": {
+    "@apps-in-toss/devtools": "3.1.1",
+    "typescript": "~6.0.2",
+    "vite": "^8.2.2"
+  }
+}

@@ -27,17 +27,22 @@ cp <플랫폼-리포>/.ait/game.manifest.example.json .ait/game.manifest.json
 #    → gameId, gameVersion, displayName, brand.primaryColor, releaseChannel 채우기
 
 # 2. 애드온 설치 (SDK 원본에서 복사 + autoload 등록)
-ait-godot addon:install --force
+node addons/apps_in_toss/tools/ait-godot.mjs addon:install --force
 
 # 3. 검사 후 첫 빌드
-ait-godot doctor --strict
-ait-godot build        # → <게임>.ait 산출물
+node addons/apps_in_toss/tools/ait-godot.mjs doctor --strict
+node addons/apps_in_toss/tools/ait-godot.mjs build        # → <게임>.ait 산출물
 ```
+
+> **애드온 하나로 끝납니다.** 파이프라인 CLI(`ait-godot`)가 애드온
+> (`addons/apps_in_toss/tools/`)에 내장되어 있어 별도 npm 패키지나 SDK
+> checkout이 필요 없습니다. Godot 에디터의 **AIT 탭**에서도 같은 명령을
+> Doctor / Dev Server / Build & Package 버튼으로 실행할 수 있습니다.
 
 개발 중에는 브라우저만으로 테스트합니다:
 
 ```bash
-ait-godot build:dev    # mock 브리지 + DevTools 패널이 붙은 개발 번들
+node addons/apps_in_toss/tools/ait-godot.mjs build:dev    # mock 브리지 + DevTools 패널이 붙은 개발 번들
 # 로컬 서버로 build/godot-web 를 서빙 → 브라우저에서 API 목테스트
 ```
 
@@ -75,18 +80,28 @@ func response_ok(res: Dictionary) -> bool:
 
 ## 빌드
 
-이 SDK 리포지토리는 부품(애드온+브리지) 공장입니다. 게임 빌드는 플랫폼 리포의
+이 SDK 리포지토리는 부품(애드온+브리지) 공장입니다. 게임 빌드는 애드온에 내장된
 `ait-godot` CLI가 수행합니다:
 
 ```bash
-# 게임 리포에서 (플랫폼 리포가 옆에 checkout돼 있거나, lock 커밋에서 자동 클론)
-ait-godot doctor          # 호환성 검사 (sandbox는 advisory 허용, canary/production은 strict 강제)
-ait-godot build           # 검사→Godot Web export→브리지 주입→검증→.ait
-ait-godot build:dev       # mock 개발 빌드 (브라우저 테스트용)
+# 게임 리포에서 (애드온 설치 후 — 별도 checkout/설치 불필요)
+node addons/apps_in_toss/tools/ait-godot.mjs doctor          # 호환성 검사 (sandbox는 advisory 허용, canary/production은 strict 강제)
+node addons/apps_in_toss/tools/ait-godot.mjs build           # 검사→Godot Web export→브리지 주입→검증→.ait
+node addons/apps_in_toss/tools/ait-godot.mjs build:dev       # mock 개발 빌드 (브라우저 테스트용)
 ```
 
 빌드 산출물에는 `ait-platform-manifest.json`이 포함되어 어떤 조합으로
 만들어졌는지 기록됩니다 — 롤백·재현에 사용하세요.
+
+## SDK 자체 개발 (이 리포)
+
+- `bridge/` — 브리지 소스(타입스크립트). `npm install && npm run build`로
+  번들 생성. 빌드 파이프라인이 사용하는 복사본은 `addons/apps_in_toss/tools/bridge/`
+  이며, `bridge/scripts/generate-gdscript.mjs`가 API 카탈로그를 재생성합니다.
+- `addons/apps_in_toss/tools/` — 게임 파이프라인 CLI(내장). `scripts/`는
+  doctor/export/verify/package 단계, `templates/`는 init용 lock·매니페스트 예시.
+- 애드온을 수정한 뒤에는 게임 리포에서 `addon:install --force`로 재설치해야
+  변경이 반영됩니다.
 
 ## 문서
 

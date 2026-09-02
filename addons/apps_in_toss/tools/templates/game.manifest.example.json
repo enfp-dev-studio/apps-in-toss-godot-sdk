@@ -1,0 +1,15 @@
+{
+  "$schema": "https://enfp-dev-studio.github.io/apps-in-toss-godot-sdk/game-manifest.schema.json",
+  "gameId": "replace-with-private-game-id",
+  "gameVersion": "0.1.0",
+  "platformLock": "platform.lock.json",
+  "requiredApis": [
+    "get_user_key_for_game",
+    "app_login",
+    "iap_get_product_item_list"
+  ],
+  "releaseChannel": "sandbox",
+  "brand": {
+    "primaryColor": "#3182F6"
+  }
+}

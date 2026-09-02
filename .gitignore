@@ -1,5 +1,7 @@
 node_modules
 bridge/dist
 bridge/dist-ssr
+addons/apps_in_toss/tools/bridge/dist
+addons/apps_in_toss/tools/bridge/dist-ssr
 *.local
 .DS_Store

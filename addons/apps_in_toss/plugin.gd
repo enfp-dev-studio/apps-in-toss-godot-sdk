@@ -4,9 +4,10 @@ extends EditorPlugin
 ## (2D / 3D / Script / AssetLib 옆)으로 노출한다.
 ##
 ## AdMob·Firebase·Dialogue Manager류의 "가끔 여는 외부 연결 설정" 애드온이
-## 흔히 쓰는 자리다. 실제 실행은 게임 리포에 설치된 ait-godot CLI를
-## OS.execute()로 위임한다 — Unity의 AITBuildInitializer가 에디터 프로세스
-## 안에서 C# 빌드 코드를 도는 것과 동일한 역할을 CLI 위임으로 재현한다.
+## 흔히 쓰는 자리다. 실제 실행은 애드온에 내장된 ait-godot CLI
+## (addons/apps_in_toss/tools/ait-godot.mjs)를 OS.execute()로 위임한다 —
+## Unity의 AITBuildInitializer가 에디터 프로세스 안에서 C# 빌드 코드를 도는
+## 것과 동일한 역할을 CLI 위임으로 재현한다. 별도 npm 패키지가 필요 없다.
 
 const AUTOLOAD_NAME := "AIT"
 const AUTOLOAD_PATH := "res://addons/apps_in_toss/ait.gd"

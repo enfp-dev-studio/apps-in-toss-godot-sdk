@@ -1,0 +1,50 @@
+{
+  "$schema": "./platform-lock.schema.json",
+  "schemaVersion": 1,
+  "platformVersion": "0.2.0",
+  "channel": "preview",
+  "godot": {
+    "version": "4.7.2",
+    "feature": "4.7",
+    "renderer": "gl_compatibility",
+    "web": {
+      "threadSupport": false,
+      "exportPreset": "Apps in Toss Web",
+      "customHtmlShell": "res://custom_shell.html"
+    }
+  },
+  "aitGodotSdk": {
+    "version": "0.1.1",
+    "repository": "https://github.com/enfp-dev-studio/apps-in-toss-godot-sdk",
+    "baseCommit": "2af77adb0fafcd291cc9a8edc3b97efd2bd274f6",
+    "apiManifestSha256": "4d5e4c097aac92a91ec83c99ee805b280fcef5f531ec8184fd5a14519741810a"
+  },
+  "bridge": {
+    "version": "0.1.1"
+  },
+  "webFramework": {
+    "package": "@apps-in-toss/web-framework",
+    "version": "3.1.1"
+  },
+  "toolchain": {
+    "node": {
+      "supportedMajors": [
+        24,
+        26
+      ],
+      "ciMajor": 24
+    },
+    "npm": {
+      "supportedMajors": [
+        11
+      ],
+      "ciMajor": 11
+    }
+  },
+  "unitySdk": {
+    "repository": "https://github.com/toss/apps-in-toss-unity-sdk.git",
+    "commit": "6ac8110d4b256cbfac42a103817ee34212307ecd",
+    "packageVersion": "3.1.1",
+    "lockPath": "scripts/unity-sdk.lock.json"
+  }
+}
