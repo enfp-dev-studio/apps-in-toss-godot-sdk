@@ -8,20 +8,23 @@ const defaultExportDir = path.resolve(here, '../build/godot-web');
 const exportDir = path.resolve(process.argv[2] ?? process.env.GODOT_EXPORT_DIR ?? defaultExportDir);
 const projectDir = path.resolve(process.env.GODOT_PROJECT_DIR ?? path.join(path.dirname(here), 'godot'));
 const indexPath = path.join(exportDir, 'index.html');
-const bridgePath = path.join(exportDir, 'apps-in-toss-godot-bridge.js');
+// dev 모드(AIT_BRIDGE_MOCK=1)에서는 mock 브리지가 주입된다.
+const withMock = process.env.AIT_BRIDGE_MOCK === '1';
+const bridgeName = withMock ? 'apps-in-toss-godot-bridge.mock.js' : 'apps-in-toss-godot-bridge.js';
+const bridgePath = path.join(exportDir, bridgeName);
 const manifestPath = path.join(exportDir, 'ait-platform-manifest.json');
 
 if (!fs.existsSync(indexPath)) throw new Error(`index.html not found: ${indexPath}`);
 if (!fs.existsSync(bridgePath)) throw new Error(`Godot bridge bundle not found: ${bridgePath}`);
-if (!fs.existsSync(manifestPath)) throw new Error(`AIT platform manifest not found: ${manifestPath}`);
+if (!withMock && !fs.existsSync(manifestPath)) throw new Error(`AIT platform manifest not found: ${manifestPath}`);
 
 let manifest;
 try {
-  manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  manifest = withMock ? null : JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
 } catch (error) {
   throw new Error(`AIT platform manifest is not valid JSON: ${String(error)}`);
 }
-if (!manifest.platformVersion || !manifest.platformLockSha256) {
+if (!withMock && (!manifest.platformVersion || !manifest.platformLockSha256)) {
   throw new Error('AIT platform manifest must include platformVersion and platformLockSha256.');
 }
 const lockPath = path.resolve(
@@ -30,7 +33,7 @@ const lockPath = path.resolve(
       ? path.join(projectDir, '.ait/platform.lock.json')
       : path.join(path.dirname(here), '.ait/platform.lock.json')),
 );
-if (fs.existsSync(lockPath)) {
+if (!withMock && fs.existsSync(lockPath)) {
   const lockSha256 = crypto.createHash('sha256').update(fs.readFileSync(lockPath)).digest('hex');
   if (manifest.platformLockSha256 !== lockSha256) {
     throw new Error(
@@ -55,7 +58,7 @@ if (threadedWorkers.length > 0) {
 }
 
 const html = fs.readFileSync(indexPath, 'utf8');
-const bridgeTag = '<script src="./apps-in-toss-godot-bridge.js"></script>';
+const bridgeTag = `<script src="./${bridgeName}"></script>`;
 if ((html.match(new RegExp(bridgeTag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) ?? []).length !== 1) {
   throw new Error('Apps in Toss Godot bridge script must appear exactly once in index.html.');
 }

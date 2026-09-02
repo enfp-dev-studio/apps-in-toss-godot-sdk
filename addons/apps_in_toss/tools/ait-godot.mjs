@@ -26,13 +26,15 @@ function fail(message) {
 
 // 모든 자식 스크립트에 "SDK = 자기 자신"임을 알린다. 이 env가 있으면 각
 // 스크립트의 SDK 해석(sibling checkout / lock 커밋 클론)은 건너뛴다.
+// 기본값은 이 CLI의 자기 위치(addons/apps_in_toss) 기준 — Godot 패널이 env를
+// 전달하지 않아도 동작한다. (AIT_* env가 이미 있으면 그 값을 존중한다.)
 function pipelineEnv(extra = {}) {
   return {
     ...process.env,
     GODOT_PROJECT_DIR: gameDir,
-    AIT_ADDON_DIR: addonDir,
-    AIT_TOOLS_DIR: toolsDir,
-    AIT_BRIDGE_DIR: bridgeDir,
+    AIT_ADDON_DIR: process.env.AIT_ADDON_DIR ?? addonDir,
+    AIT_TOOLS_DIR: process.env.AIT_TOOLS_DIR ?? toolsDir,
+    AIT_BRIDGE_DIR: process.env.AIT_BRIDGE_DIR ?? bridgeDir,
     ...extra,
   };
 }

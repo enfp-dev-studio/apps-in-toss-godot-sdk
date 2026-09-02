@@ -122,7 +122,7 @@ func _run_dev_server() -> void:
 	var entry := _find_cli_entry()
 	var export_dir := _project_dir().path_join("build/godot-web")
 
-	var pid := OS.create_process(node_exe, [entry, "preview", export_dir], false, _pipeline_env())
+	var pid := OS.create_process(node_exe, [entry, "preview", export_dir])
 	if pid == -1:
 		_append_log("[Preview] 서버 시작 실패 (OS.create_process)")
 		return
@@ -329,7 +329,7 @@ func _run_cli(args: PackedStringArray, label: String) -> bool:
 	var output: Array = []
 	# open_console=false 필수: true면 macOS에서 출력이 별도 콘솔 창으로 새어나가
 	# output 배열이 비어버린다.
-	var exit_code := OS.execute(node_exe, [entry] + Array(args), output, true, false, _pipeline_env())
+	var exit_code := OS.execute(node_exe, [entry] + Array(args), output, true, false)
 	_append_log("\n".join(output) if not output.is_empty() else "(출력 없음)")
 
 	var success := exit_code == 0
@@ -337,21 +337,6 @@ func _run_cli(args: PackedStringArray, label: String) -> bool:
 	_set_busy(false, "%s %s" % [label, "완료" if success else "실패"])
 	_refresh_status()
 	return success
-
-
-## 내장 CLI(addons/apps_in_toss/tools)가 자기 자신을 SDK로 인식하도록 env를 만든다.
-## Godot 4.4+의 OS.execute/OS.create_process env 파라미터(Array[String] of "K=V")로 전달.
-func _pipeline_env() -> PackedStringArray:
-	var project_dir := _project_dir()
-	var addon_dir := project_dir.path_join("addons/apps_in_toss")
-	var tools_dir := addon_dir.path_join("tools")
-	var bridge_dir := tools_dir.path_join("bridge")
-	return PackedStringArray([
-		"GODOT_PROJECT_DIR=%s" % project_dir,
-		"AIT_ADDON_DIR=%s" % addon_dir,
-		"AIT_TOOLS_DIR=%s" % tools_dir,
-		"AIT_BRIDGE_DIR=%s" % bridge_dir,
-	])
 
 
 func _set_busy(busy: bool, status_text: String) -> void:

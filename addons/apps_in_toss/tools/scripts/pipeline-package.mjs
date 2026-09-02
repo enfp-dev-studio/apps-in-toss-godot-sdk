@@ -37,9 +37,21 @@ function resolveAitBin() {
 }
 
 const aitBin = resolveAitBin();
+// 내장 bridge의 node_modules를 NODE_PATH로 노출 — 게임 리포에
+// @apps-in-toss/web-framework를 설치하지 않아도 apps-in-toss.config.ts의
+// import가 해석된다. (게임 리포 자체에 설치돼 있으면 그게 우선이다.)
+const bridgeNodeModules = process.env.AIT_BRIDGE_DIR
+  ? path.join(process.env.AIT_BRIDGE_DIR, 'node_modules')
+  : null;
+const nodePath = [
+  path.join(gameDir, 'node_modules'),
+  bridgeNodeModules,
+  process.env.NODE_PATH,
+].filter(Boolean).join(path.delimiter);
 const result = spawnSync(aitBin, ['build'], {
   cwd: gameDir,
   stdio: 'inherit',
+  env: { ...process.env, NODE_PATH: nodePath },
 });
 if (result.error && result.error.code === 'ENOENT') {
   console.error(
