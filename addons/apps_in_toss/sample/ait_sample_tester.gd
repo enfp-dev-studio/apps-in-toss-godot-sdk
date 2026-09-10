@@ -110,7 +110,7 @@ func _on_invoke_pressed() -> void:
 	_call_button.disabled = true
 	var response: Dictionary = await AIT.invoke_and_wait(
 		String(_selected_api.get("path", "")),
-		_build_arguments(),
+		_argument_for(_selected_api),
 		TEST_TIMEOUT_MS
 	)
 	_busy = false

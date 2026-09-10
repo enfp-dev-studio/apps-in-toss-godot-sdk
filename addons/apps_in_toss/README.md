@@ -2,8 +2,8 @@
 
 커뮤니티 SDK `enfp-dev-studio/apps-in-toss-godot-sdk`의
 `00f813afa76fbb820777574f0315d304fb954f4c`를 기준으로 설치하고, 공식 Unity SDK
-3.1.1 구조에 맞춰 `AIT` Autoload, 로그인, 게임 사용자 식별, IAP·전면 광고 이벤트,
-진단 API와 타임아웃을 보강한 버전입니다.
+3.2.0(web-framework 3.4.0) 구조에 맞춰 `AIT` Autoload, 로그인, 게임 사용자 식별,
+IAP·전면 광고·구독 결제 이벤트, 게임센터·바이럴, 진단 API와 타임아웃을 보강한 버전입니다.
 
 플러그인을 켜면 다음처럼 호출할 수 있습니다.
 

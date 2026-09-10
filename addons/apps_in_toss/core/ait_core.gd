@@ -69,17 +69,40 @@ func start_iap_one_time_purchase(subscription_id: int, sku: String) -> void:
         return
     _bridge.iapCreateOneTimePurchaseOrder(subscription_id, sku, _callback)
 
+func start_iap_subscription_purchase(subscription_id: int, options: Dictionary) -> void:
+    if not is_available():
+        call_deferred("_emit_unavailable_subscription", subscription_id)
+        return
+    _bridge.iapCreateSubscriptionPurchaseOrder(subscription_id, JSON.stringify(options), _callback)
+
+func has_bridge_method(method_name: String) -> bool:
+    if not is_available():
+        return false
+    return bool(_bridge.call("hasBridgeMethod", method_name))
+
 func start_event_subscription(subscription_id: int, bridge_method: String, options: Dictionary = {}) -> void:
     if not is_available():
         call_deferred("_emit_unavailable_subscription", subscription_id)
         return
-    if not _bridge.has(bridge_method):
+    if not has_bridge_method(bridge_method):
         call_deferred("_emit_subscription_error", subscription_id, {
             "code": "AIT_API_UNAVAILABLE",
             "message": "Apps in Toss API is unavailable: %s" % bridge_method,
         })
         return
     _bridge.call(bridge_method, subscription_id, JSON.stringify(options), _callback)
+
+func start_path_subscription(subscription_id: int, path: String, options: Dictionary = {}) -> void:
+    if not is_available():
+        call_deferred("_emit_unavailable_subscription", subscription_id)
+        return
+    if not has_bridge_method("subscribePath"):
+        call_deferred("_emit_subscription_error", subscription_id, {
+            "code": "AIT_API_UNAVAILABLE",
+            "message": "Apps in Toss bridge does not support path subscriptions. Reinstall the addon.",
+        })
+        return
+    _bridge.call("subscribePath", subscription_id, path, JSON.stringify(options), _callback)
 
 func dispose_subscription(subscription_id: int) -> void:
     if is_available():

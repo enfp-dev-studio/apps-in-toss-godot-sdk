@@ -5,6 +5,7 @@ var core: AITCore
 var auth: AITAuth
 var iap: AITIAP
 var ads: AITAds
+var game: AITGame
 var status: AITStatus
 var api: AITGeneratedAPI
 
@@ -17,6 +18,7 @@ func _ready() -> void:
     auth = AITAuth.new(core)
     iap = AITIAP.new(core)
     ads = AITAds.new(core)
+    game = AITGame.new(core)
     status = AITStatus.new(core)
     api = AITGeneratedAPI.new(core)
 

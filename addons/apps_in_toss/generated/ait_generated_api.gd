@@ -49,6 +49,15 @@ func storage_set_item(key: Variant, value: Variant) -> int:
 func storage_remove_item(key: Variant) -> int:
     return _core.invoke("Storage.removeItem", [key])
 
+func storage_clear_items() -> int:
+    return _core.invoke("Storage.clearItems", [])
+
+func storage_get_items(keys: Variant) -> int:
+    return _core.invoke("Storage.getItems", [keys])
+
+func storage_set_items(items: Variant) -> int:
+    return _core.invoke("Storage.setItems", [items])
+
 func get_clipboard_text() -> int:
     return _core.invoke("getClipboardText", [])
 
@@ -70,6 +79,9 @@ func iap_get_completed_or_refunded_orders() -> int:
 func iap_complete_product_grant(options: Variant) -> int:
     return _core.invoke("IAP.completeProductGrant", [options])
 
+func iap_get_subscription_info(options: Variant) -> int:
+    return _core.invoke("IAP.getSubscriptionInfo", [options])
+
 func game_open_leaderboard() -> int:
     return _core.invoke("Game.openLeaderboard", [])
 
@@ -87,3 +99,12 @@ func admob_show(options: Variant) -> int:
 
 func admob_is_loaded(options: Variant) -> int:
     return _core.invoke("GoogleAdMob.isAppsInTossAdMobLoaded", [options])
+
+func viral_get_campaign(options: Variant) -> int:
+    return _core.invoke("Viral.getCampaign", [options])
+
+func viral_share(options: Variant) -> int:
+    return _core.invoke("Viral.share", [options])
+
+func viral_track(options: Variant) -> int:
+    return _core.invoke("Viral.track", [options])

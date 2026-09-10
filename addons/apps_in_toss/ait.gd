@@ -7,6 +7,7 @@ var core: AITCore
 var auth: AITAuth
 var iap: AITIAP
 var ads: AITAds
+var game: AITGame
 var status: AITStatus
 var api: AITGeneratedAPI
 
@@ -22,6 +23,7 @@ func _ready() -> void:
     auth = _sdk.auth
     iap = _sdk.iap
     ads = _sdk.ads
+    game = _sdk.game
     status = _sdk.status
     api = _sdk.api
 

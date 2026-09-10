@@ -42,10 +42,29 @@ func complete_product_grant_and_wait(order_id: String, timeout_ms: int = 0) -> D
         timeout_ms
     )
 
+func get_subscription_info(order_id: String) -> int:
+    return _core.invoke("IAP.getSubscriptionInfo", [{"params": {"orderId": order_id}}])
+
+func get_subscription_info_and_wait(order_id: String, timeout_ms: int = 0) -> Dictionary:
+    return await _core.invoke_and_wait(
+        "IAP.getSubscriptionInfo",
+        [{"params": {"orderId": order_id}}],
+        timeout_ms
+    )
+
 func create_one_time_purchase_order(sku: String) -> int:
     var subscription_id := _core.create_subscription_id()
     _active[subscription_id] = true
     _core.start_iap_one_time_purchase(subscription_id, sku)
+    return subscription_id
+
+func create_subscription_purchase_order(sku: String, offer_id: String = "") -> int:
+    var subscription_id := _core.create_subscription_id()
+    _active[subscription_id] = true
+    var options := {"sku": sku}
+    if not offer_id.is_empty():
+        options["offerId"] = offer_id
+    _core.start_iap_subscription_purchase(subscription_id, options)
     return subscription_id
 
 func resolve_product_grant(subscription_id: int, grant_request_id: int, success: bool) -> void:

@@ -10,8 +10,10 @@ Godot 4 Web 게임에서 Apps in Toss(앱인토스) 기능을 쓰게 해주는 �
 ## 지원 요약
 
 - Godot 4.x (현재 릴리스 기준 4.7.2), Compatibility renderer, Web export
-- API 27종: 토스 로그인 3종, 게임 사용자 키, 환경·권한·저장소·클립보드·햅틱,
-  전면 광고, 인앱결제 4종, 게임센터 3종, AdMob 3종
+- API 34종(+구독형: 광고·구독결제·정보 오버레이): 토스 로그인·사용자 키 4종,
+  환경·권한·저장소(배치 get/set·전체 삭제 포함) 6종·클립보드·햅틱,
+  전면 광고, 인앱결제 5종(+구독 결제), 게임센터 3종(+정보 오버레이 구독),
+  AdMob 3종, 바이럴 캠페인 3종 — Unity SDK 3.2.0 / web-framework 3.4.0 대응
 - 빌드 파이프라인: 검사(d doctor) → Web export → 브리지 주입 → `.ait` 패키징
 - 브라우저 Dev Server: 토스 앱 없이 mock SDK + DevTools 패널로 개발 · API 테스트
 
