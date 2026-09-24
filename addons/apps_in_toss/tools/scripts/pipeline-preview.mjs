@@ -58,3 +58,4 @@ if (result.error) {
   console.error(`[ait-godot preview] ${String(result.error)}`);
   process.exit(1);
 }
+process.exit(result.status ?? 1);

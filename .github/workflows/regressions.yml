@@ -1,4 +1,4 @@
-# 회귀 테스트 — Node 24/26 매트릭스에서 기존 node:test 15개 회귀를 실행한다.
+# 회귀 테스트 — Node 24/26 매트릭스에서 node:test 회귀 테스트를 실행한다.
 # 매트릭스 버전은 addons/apps_in_toss/tools/templates/platform.lock.json의
 # toolchain.node.supportedMajors(24, 26)를 따른다.
 name: Regressions

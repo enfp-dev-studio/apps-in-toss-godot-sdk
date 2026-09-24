@@ -15,7 +15,7 @@ GODOT_PROJECT_DIR="$PWD" node "$SDK/addons/apps_in_toss/tools/ait-godot.mjs" add
 
 갱신할 때도 업데이트된 SDK 원본 경로로 위 명령을 실행합니다. 게임 안의
 복사본에서 `addon:install`/`sync`를 실행하면 기본적으로 자기 자신을 가리켜
-파일을 갱신하지 않습니다. lock 갱신과 빌드 준비는 [루트 README](../../README.md)를
+파일을 갱신하지 않습니다. lock 갱신과 빌드 준비는 [설치 가이드](../../docs/getting-started.md)를
 참고하세요.
 
 그 다음 Godot 에디터에서 Project Settings → Plugins → "Apps in Toss Godot
@@ -34,10 +34,10 @@ var status := await AIT.status.check_all(15_000)
 
 `get_user_key_for_game` 의 결과는 HASH 외에도 `"ERROR"`/없음이 올 수 있으니,
 `result`가 Dictionary이고 `type == "HASH"` 인지 확인한 뒤 `hash`를 읽으세요
-(자세한 예제는 루트 README 참고).
+(자세한 예제는 [API 사용법](../../docs/api-guide.md) 참고).
 
 이벤트형 API는 Unity의 콜백과 같은 수명 관리 모델을 사용합니다. 아래는
-호출부 예시이며, 콜백 정의와 구독 해제까지 포함한 예제는 루트 README에 있습니다.
+호출부 예시이며, 콜백 정의와 구독 해제까지 포함한 예제는 [API 사용법](../../docs/api-guide.md)에 있습니다.
 
 ```gdscript
 AIT.ads.ad_loaded.connect(_on_ad_loaded)
