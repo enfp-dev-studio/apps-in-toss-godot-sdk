@@ -108,3 +108,6 @@ func viral_share(options: Variant) -> int:
 
 func viral_track(options: Variant) -> int:
     return _core.invoke("Viral.track", [options])
+
+func navigation_bar_set_options(options: Variant) -> int:
+    return _core.invoke("NavigationBar.setOptions", [options])

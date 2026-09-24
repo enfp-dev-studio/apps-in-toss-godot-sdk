@@ -1,0 +1,58 @@
+# 회귀 테스트 — Node 24/26 매트릭스에서 기존 node:test 15개 회귀를 실행한다.
+# 매트릭스 버전은 addons/apps_in_toss/tools/templates/platform.lock.json의
+# toolchain.node.supportedMajors(24, 26)를 따른다.
+name: Regressions
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: regressions-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [24, 26]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+          cache-dependency-path: |
+            bridge/package-lock.json
+            addons/apps_in_toss/tools/bridge/package-lock.json
+      - name: Install bridge deps
+        run: npm --prefix bridge ci
+        timeout-minutes: 10
+      - name: Run regressions
+        run: node --test tests/*.test.mjs
+        timeout-minutes: 10
+      - name: Verify generated files unchanged
+        # npm ci(prepare)와 회귀 테스트가 tracked 생성 파일을 재생성한다.
+        # stale 생성 코드가 CI 도중 고쳐진 채 통과하지 못하도록 drift를 검출한다.
+        run: git diff --exit-code -- addons/apps_in_toss/generated/
+        timeout-minutes: 5
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### Regressions (Node ${{ matrix.node }})"
+            echo ""
+            echo "- 결과: ${{ job.status }}"
+            echo "- 커밋: ${{ github.sha }}"
+            echo "- Node: $(node --version) / npm $(npm --version)"
+          } >> "$GITHUB_STEP_SUMMARY"

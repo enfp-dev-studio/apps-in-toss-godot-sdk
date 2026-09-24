@@ -1,0 +1,69 @@
+# 브리지 검사 + 패키징 — 소스·내장 bridge 양쪽의 타입 검사와
+# production/mock 빌드, 최소 HTML .ait 패키징 스모크를 실행한다.
+# Node 버전은 platform.lock의 toolchain.node.ciMajor(24)를 따른다.
+name: Bridge and package
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bridge-package-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            bridge/package-lock.json
+            addons/apps_in_toss/tools/bridge/package-lock.json
+      - name: Install bridge deps (source + embedded)
+        run: |
+          npm --prefix bridge ci
+          npm --prefix addons/apps_in_toss/tools/bridge ci
+        timeout-minutes: 10
+      - name: Typecheck (source)
+        run: npx tsc --noEmit
+        working-directory: bridge
+        timeout-minutes: 10
+      - name: Typecheck (embedded)
+        run: npx tsc --noEmit
+        working-directory: addons/apps_in_toss/tools/bridge
+        timeout-minutes: 10
+      - name: Production build (source + embedded)
+        run: |
+          npm --prefix "$GITHUB_WORKSPACE/bridge" run build
+          npm --prefix "$GITHUB_WORKSPACE/addons/apps_in_toss/tools/bridge" run build
+        timeout-minutes: 10
+      - name: Mock build (source + embedded)
+        run: |
+          AIT_BRIDGE_MOCK=1 npm --prefix "$GITHUB_WORKSPACE/bridge" run build
+          AIT_BRIDGE_MOCK=1 npm --prefix "$GITHUB_WORKSPACE/addons/apps_in_toss/tools/bridge" run build
+        timeout-minutes: 10
+      - name: Minimal .ait packaging smoke
+        run: node tests/run-minimal-package.mjs
+        timeout-minutes: 10
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### Bridge and package"
+            echo ""
+            echo "- 결과: ${{ job.status }}"
+            echo "- 커밋: ${{ github.sha }}"
+            echo "- Node: $(node --version) / npm $(npm --version)"
+          } >> "$GITHUB_STEP_SUMMARY"

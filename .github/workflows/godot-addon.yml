@@ -1,0 +1,50 @@
+# Godot 애드온 검사 — Godot 4.7.2 headless로 임시 프로젝트 import,
+# GDScript 컴파일 게이트, AdMob 수명 검사를 실행한다.
+# Godot 버전은 platform.lock의 godot.version(4.7.2)을 따른다.
+name: Godot addon
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: godot-addon-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24
+      - uses: chickensoft-games/setup-godot@c233594225991af5aec714e52457cc76d6df8fa2 # v2
+        with:
+          version: 4.7.2
+          use-dotnet: false
+          include-templates: false
+      - name: Godot addon check
+        run: node tests/run-godot-addon.mjs
+        timeout-minutes: 10
+        env:
+          GODOT_BIN: godot
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### Godot addon"
+            echo ""
+            echo "- 결과: ${{ job.status }}"
+            echo "- 커밋: ${{ github.sha }}"
+            echo "- Godot: $(godot --version)"
+            echo "- Node: $(node --version)"
+          } >> "$GITHUB_STEP_SUMMARY"

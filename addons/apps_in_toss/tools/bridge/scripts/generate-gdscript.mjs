@@ -4,15 +4,16 @@ import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const bridgeDir = path.resolve(here, '..');
-// 내장 모드(AIT_ADDON_DIR): 생성물은 addonDir/generated/로 쓴다. 그 외에는
-// SDK 리포의 addons/apps_in_toss/generated/.
+// 생성물은 항상 이 브리지가 속한 애드온의 generated/에 쓴다.
+// AIT_ADDON_DIR이 있으면 그 애드온을, 없으면 파일 위치 기준
+// tools/bridge/scripts → tools/bridge → tools → addons/apps_in_toss로 거슬러
+// 올라간 애드온을 쓴다. env 없이 `npm run generate`(prepare)를 실행해도
+// 엉뚱한 tools/addons/... 경로에 생성물이 생기지 않는다.
 const sdkDir = process.env.AIT_ADDON_DIR
   ? path.resolve(process.env.AIT_ADDON_DIR)
-  : path.resolve(bridgeDir, '..');
+  : path.resolve(bridgeDir, '..', '..');
 const manifest = JSON.parse(fs.readFileSync(path.join(bridgeDir, 'api-manifest.json'), 'utf8'));
-const generatedDir = process.env.AIT_ADDON_DIR
-  ? path.join(sdkDir, 'generated')
-  : path.join(sdkDir, 'addons/apps_in_toss/generated');
+const generatedDir = path.join(sdkDir, 'generated');
 fs.mkdirSync(generatedDir, { recursive: true });
 const out = path.join(generatedDir, 'ait_generated_api.gd');
 

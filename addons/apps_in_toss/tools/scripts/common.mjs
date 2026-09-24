@@ -39,15 +39,23 @@ export function resolveSdkDir(gameDir, lock) {
     throw new Error('lock에 aitGodotSdk.baseCommit/repository가 없습니다.');
   }
   const cacheRoot = path.join(os.tmpdir(), 'ait-godot-sdk-cache');
-  const cached = path.join(cacheDir, commit);
+  const cached = path.join(cacheRoot, commit);
   if (!fs.existsSync(path.join(cached, 'addons/apps_in_toss/plugin.cfg'))) {
     console.log(`[ait-godot] 클론 중: SDK ${commit.slice(0, 7)} (${originShort(repository)})`);
-    fs.mkdirSync(cacheDir, { recursive: true });
-    const tmp = fs.mkdtempSync(path.join(cacheDir, `${commit}.`));
+    fs.mkdirSync(cacheRoot, { recursive: true });
+    const tmp = fs.mkdtempSync(path.join(cacheRoot, `${commit}.`));
     fs.rmSync(tmp, { force: true, recursive: true });
     const cloned = spawnSync('git', ['clone', '--quiet', repository, tmp], { stdio: 'inherit' });
     if (cloned.status !== 0) {
+      fs.rmSync(tmp, { force: true, recursive: true });
       throw new Error(`SDK clone failed: ${repository}`);
+    }
+    // lock이 고정한 커밋으로 체크아웃한다. 클론 기본 브랜치 HEAD를 쓰면
+    // doctor의 lock 검사가 실패한다.
+    const checkout = spawnSync('git', ['checkout', '--quiet', commit], { cwd: tmp, stdio: 'inherit' });
+    if (checkout.status !== 0) {
+      fs.rmSync(tmp, { force: true, recursive: true });
+      throw new Error(`SDK commit not found on origin: ${commit}`);
     }
     fs.renameSync(tmp, cached);
   }

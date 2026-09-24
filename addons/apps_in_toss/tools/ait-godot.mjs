@@ -56,14 +56,14 @@ const usage = `ait-godot — Apps in Toss × Godot 게임 파이프라인 (Unity
 (addons/apps_in_toss/tools)에 내장되어 있어 별도 설치가 필요 없습니다.
 
   ait-godot init <gameId> "<표시이름>"    .ait/ 생성 — Unity Configuration에 대응
-  ait-godot addon:install [--force]      AIT 애드온 설치 (AIT autoload 등록)
+  ait-godot addon:install [--force]      애드온 복사 (에디터에서 플러그인 활성화 필요)
   ait-godot doctor [--strict]            호환성 검사 — Unity Build Init 역할
   ait-godot build                        release 파이프라인 → <gameId>.ait — Build & Package 대응
   ait-godot build:dev                    mock 브리지 + DevTools 개발 빌드 — Dev Server 대응
   ait-godot preview                      build/godot-web 로컬 서빙
-  ait-godot sync                         설치된 애드온을 SDK 원본으로 갱신
+  ait-godot sync                         SDK 설치 상태 확인 (강제 갱신은 addon:install --force)
 
-배포는 토스 CLI를 그대로 씁니다: npx ait deploy (ait token add 선행)
+배포는 내장 브리지의 토스 CLI로 합니다: ./addons/apps_in_toss/tools/bridge/node_modules/.bin/ait deploy (같은 바이너리로 ait token add 선행)
 
 환경변수:
   GODOT_PROJECT_DIR   게임 리포 경로 (기본: cwd)
@@ -101,7 +101,7 @@ function main() {
   switch (command) {
     case 'init': return cmdInit();
     case 'addon:install': return cmdAddonInstall();
-    case 'sync': return runStep('설치된 애드온을 SDK 원본으로 갱신', 'pipeline-addon.mjs');
+    case 'sync': return runStep('SDK 애드온 설치 상태 확인', 'pipeline-addon.mjs');
     case 'doctor': return cmdDoctor();
     case 'build': return cmdBuild();
     case 'build:dev': return cmdBuildDev();
@@ -167,7 +167,7 @@ function cmdBuild() {
   });
   runStep('브리지 빌드 → 주입 → 무결성 검사', 'pipeline-finalize.mjs');
   runStep('.ait 패키징 (Unity Build & Package)', 'pipeline-package.mjs');
-  console.log('\n[ait-godot] ✅ 완료. 배포: npx ait deploy (콘솔 토큰 필요)');
+  console.log('\n[ait-godot] ✅ 완료. 배포: ./addons/apps_in_toss/tools/bridge/node_modules/.bin/ait deploy (콘솔 토큰 필요, token add 선행)');
 }
 
 function cmdBuildDev() {
@@ -177,7 +177,7 @@ function cmdBuildDev() {
   runStep('mock 브리지 빌드 (Unity Dev Server의 Mock SDK)', 'pipeline-bridge-mock.mjs');
   runStep('Godot Web export', 'export-godot.mjs');
   runStep('mock 브리지 + DevTools 패널 주입', 'pipeline-mock-patch.mjs');
-  console.log('[ait-godot] 다음: ait-godot preview → 브라우저 테스트 (?e2e=true = 전 API 자동 점검)');
+  console.log('[ait-godot] 다음: ait-godot preview → 브라우저 테스트 (?e2e=true는 파라미터 없는 API 자동 점검)');
 }
 
 function cmdPreview() {

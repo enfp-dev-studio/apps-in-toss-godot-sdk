@@ -173,9 +173,9 @@ func _run_build() -> void:
 
 func _show_publish_hint() -> void:
 	_append_log(
-		"배포는 앱인토스 CLI를 그대로 사용합니다 (Unity AIT > Publish 대응):\n" +
-		"  npx ait token add     (최초 1회, 콘솔 API 키)\n" +
-		"  npx ait deploy",
+		"배포는 애드온 내장 브리지의 앱인토스 CLI를 사용합니다 (Unity AIT > Publish 대응):\n" +
+		"  ./addons/apps_in_toss/tools/bridge/node_modules/.bin/ait token add     (최초 1회, 콘솔 API 키)\n" +
+		"  ./addons/apps_in_toss/tools/bridge/node_modules/.bin/ait deploy",
 	)
 
 

@@ -19,7 +19,19 @@ function resolveSdkDir() {
   if (!fs.existsSync(path.join(cached, 'addons/apps_in_toss/plugin.cfg'))) {
     fs.mkdirSync(path.dirname(cached), { recursive: true });
     const tmp = `${cached}.tmp`;
-    spawnSync('git', ['clone', '--quiet', repo, tmp], { stdio: 'inherit' });
+    fs.rmSync(tmp, { recursive: true, force: true });
+    const clone = spawnSync('git', ['clone', '--quiet', repo, tmp], { stdio: 'inherit' });
+    if ((clone.status ?? 1) !== 0) {
+      fs.rmSync(tmp, { recursive: true, force: true });
+      throw new Error(`SDK clone failed: ${repo}`);
+    }
+    // lock이 고정한 커밋으로 체크아웃한다. 기본 브랜치 HEAD를 쓰면
+    // doctor의 lock 검사가 실패한다.
+    const checkout = spawnSync('git', ['checkout', '--quiet', commit], { cwd: tmp, stdio: 'inherit' });
+    if ((checkout.status ?? 1) !== 0) {
+      fs.rmSync(tmp, { recursive: true, force: true });
+      throw new Error(`SDK commit not found on origin: ${commit}`);
+    }
     fs.renameSync(tmp, cached);
   }
   return cached;

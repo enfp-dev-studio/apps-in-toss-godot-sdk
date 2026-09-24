@@ -122,7 +122,7 @@ console.log(`[AIT doctor] mode: ${strict ? 'strict' : 'advisory'}`);
 const resolvedProfileInfo = resolveProfile(projectDir, root);
 if (resolvedProfileInfo.profile.doctorStrict && !strict) {
   mismatch(
-    `releaseChannel "${resolvedProfileInfo.channel}" requires strict mode. Run with --strict (npm run ait:doctor:strict).`,
+    `releaseChannel "${resolvedProfileInfo.channel}" requires strict mode. Run with --strict (node addons/apps_in_toss/tools/ait-godot.mjs doctor --strict).`,
   );
 }
 if (resolvedProfileInfo.manifest) logProfileBanner(resolvedProfileInfo);

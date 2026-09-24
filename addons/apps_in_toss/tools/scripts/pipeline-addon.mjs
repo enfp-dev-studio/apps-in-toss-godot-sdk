@@ -34,6 +34,13 @@ function resolveSdkDir() {
     const tmp = path.join(cache, `${commit}.tmp`);
     const clone = spawnSync('git', ['clone', '--quiet', repo, tmp], { stdio: 'inherit' });
     if (clone.status !== 0) fail(`SDK 클론 실패: ${repo}`);
+    // lock이 고정한 커밋으로 체크아웃한다. 기본 브랜치 HEAD를 쓰면
+    // doctor의 lock 검사가 실패한다.
+    const checkout = spawnSync('git', ['checkout', '--quiet', commit], { cwd: tmp, stdio: 'inherit' });
+    if (checkout.status !== 0) {
+      fs.rmSync(tmp, { recursive: true, force: true });
+      fail(`SDK 커밋을 찾을 수 없음: ${commit}`);
+    }
     fs.renameSync(tmp, cached);
   }
   return cached;
@@ -51,6 +58,15 @@ if (!fs.existsSync(source)) fail(`SDK addon not found: ${source}`);
 const pluginVersion = fs
   .readFileSync(path.join(source, 'plugin.cfg'), 'utf8')
   .match(/version="?([^"\n]+)"?/)?.[1];
+
+// source와 target이 같은 폴더(내장 모드 자기 자신, 또는 게임 경로가 SDK를
+// 가리키는 심링크)면 --force라도 자기 자신을 지우지 않는다. 지우고 복사하면
+// 애드온이 통째로 사라진다. realpath로 비교해 심링크 별칭도 잡는다.
+if (fs.existsSync(target) && fs.realpathSync(source) === fs.realpathSync(target)) {
+  console.log(`[ait-godot] 애드온이 이미 자기 자신입니다 (내장 모드, SDK ${pluginVersion}). 복사 없이 둡니다.`);
+  console.log('[ait-godot] Godot Editor → Project Settings → Plugins → "Apps in Toss Godot SDK" 활성화');
+  process.exit(0);
+}
 
 if (fs.existsSync(target)) {
   const installed = fs.readFileSync(path.join(target, 'plugin.cfg'), 'utf8').match(/version="?([^"\n]+)"?/)?.[1];
