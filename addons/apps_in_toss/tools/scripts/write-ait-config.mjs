@@ -74,6 +74,10 @@ export default defineConfig({
     primaryColor: '${primaryColor}',
 ${iconLine}  },
   permissions: [],
+  webView: {
+    mediaPlaybackRequiresUserAction: false,
+    pullToRefreshEnabled: false,
+  },
   webBundleDir,
 });
 `;

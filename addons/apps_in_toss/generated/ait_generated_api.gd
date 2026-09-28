@@ -111,3 +111,6 @@ func viral_track(options: Variant) -> int:
 
 func navigation_bar_set_options(options: Variant) -> int:
     return _core.invoke("NavigationBar.setOptions", [options])
+
+func migration_get_origin_storage() -> int:
+    return _core.invoke("Migration.getOriginStorage", [])

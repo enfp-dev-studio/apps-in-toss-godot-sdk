@@ -8,6 +8,7 @@ var ads: AITAds
 var admob: AITAdMob
 var game: AITGame
 var status: AITStatus
+var app_events: AITAppEvents
 var api: AITGeneratedAPI
 
 func _ready() -> void:
@@ -22,6 +23,7 @@ func _ready() -> void:
     admob = AITAdMob.new(core)
     game = AITGame.new(core)
     status = AITStatus.new(core)
+    app_events = AITAppEvents.new()
     api = AITGeneratedAPI.new(core)
 
 func is_available() -> bool:

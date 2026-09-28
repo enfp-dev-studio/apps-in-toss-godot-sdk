@@ -88,3 +88,30 @@ Unity SDK와 npm web-framework, DevTools의 버전이 같다고 가정하지 말
 
 SDK 업데이트의 초기 검수에서는 설치·구문·브리지·최소 HTML 패키징을 확인했습니다.
 이후 진행한 실제 샘플 Web 빌드와 브라우저 실행 결과는 [테스트 기록](testing.md#2026-09-24-샘플-실행-결과)에 있습니다.
+
+## 2026-09-28: 커뮤니티 사례 반영과 잔여 갭 정리
+
+Unity SDK 3.5.0 표면(현재 이름 기준 100여 개)과 앱인토스 개발자 커뮤니티의
+문의·노하우를 대조해, 게임에 필요한 항목을 골라 반영했습니다.
+
+- 반영: 생성 설정(`write-ait-config.mjs`)에 `webView.mediaPlaybackRequiresUserAction: false`,
+  `pullToRefreshEnabled: false` 기본값 — 로딩 직후 터치 없이 BGM 재생과
+  게임 중 당겨서 새로고침 방지(커뮤니티에서 확인된 토스 게임과 동일한 설정).
+- 반영: `migration_get_origin_storage` (`Migration.getOriginStorage`) — 서빙
+  오리진 변경으로 저장 데이터에 접근할 수 없게 된 사고(2026-08)에 대비한
+  이전·현재 저장 덤프 조회. 진행 상태는 SDK 저장소나 서버에 둔다는 규칙을
+  API 가이드에 명시했습니다.
+- 반영: `AIT.app_events` 가시성 감지(`document.visibilitychange`) — 백그라운드
+  진입 이벤트가 엔진 래퍼에 없어 BGM이 계속 재생되던 문의(21개 답글, Unity
+  SDK도 별도 helper로 제공) 대응. headless 검사 대상이 아니므로 실기기 확인 필요.
+- 이미 반영되어 있던 사례: 상품 지급은 콜백에서 즉시 응답하고 미결 주문으로
+  복구(샘플 씬), 광고·AdMob 등 조건부 주입 브리지 방어(`has_api`), QR 실패 시
+  호스트 앱(토스 앱) 버전 먼저 확인, SDK 3.x 롤백 불가·신규 등록 게이트.
+- 잔여 갭(게임 우선순위에 따라 백로그): `TossPay.*`, `Screen.*`(화면 방향·깨우기),
+  `SafeArea.*`, `Analytics.*`, `Device/File.*`(카메라·앨범·PDF), `TossAds` 배너,
+  `Review/Notification/Promotion.*`, 위치 API, `User/Environment.*` 식별·정보 API,
+  `GraniteEvent` back/home 구독. 표면 비교는 `bridge/node_modules/@apps-in-toss/web-framework/dist/index.d.ts`
+  또는 [Domains API](https://developers-apps-in-toss.toss.im/documentation/sdk/domains-api)와
+  `bridge/api-manifest.json`을 대조하면 됩니다.
+- 감시: web-framework 3.6.0(2026-09-28, `User.createAnonymousKeyAuthCode`)이
+  나왔으나 Unity SDK 태그는 아직 3.5.0입니다. Unity가 따라오면 함께 검토합니다.

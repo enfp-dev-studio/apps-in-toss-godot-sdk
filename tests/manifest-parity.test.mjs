@@ -12,14 +12,16 @@ const read = (p) => fs.readFileSync(path.join(repoRoot, p), 'utf8');
 const readJson = (p) => JSON.parse(read(p));
 
 describe('bridge source/embedded parity + 3.5.0 pins', () => {
-  it('both api-manifest.json copies carry navigation_bar_set_options', () => {
+  it('both api-manifest.json copies carry the latest mapped APIs', () => {
+    const expected = [
+      { name: 'navigation_bar_set_options', path: 'NavigationBar.setOptions', args: ['options'] },
+      { name: 'migration_get_origin_storage', path: 'Migration.getOriginStorage', args: [] },
+    ];
     for (const p of ['bridge/api-manifest.json', 'addons/apps_in_toss/tools/bridge/api-manifest.json']) {
       const manifest = readJson(p);
-      assert.deepEqual(
-        manifest.find((e) => e.name === 'navigation_bar_set_options'),
-        { name: 'navigation_bar_set_options', path: 'NavigationBar.setOptions', args: ['options'] },
-        p,
-      );
+      for (const entry of expected) {
+        assert.deepEqual(manifest.find((e) => e.name === entry.name), entry, p);
+      }
     }
   });
 
@@ -46,9 +48,9 @@ describe('bridge source/embedded parity + 3.5.0 pins', () => {
     );
   });
 
-  it('generated GDScript matches the manifest (35 APIs)', () => {
+  it('generated GDScript matches the manifest (36 APIs)', () => {
     const manifest = readJson('bridge/api-manifest.json');
-    assert.equal(manifest.length, 35);
+    assert.equal(manifest.length, 36);
     const api = read('addons/apps_in_toss/generated/ait_generated_api.gd');
     const catalog = read('addons/apps_in_toss/generated/ait_generated_catalog.gd');
     for (const entry of manifest) {

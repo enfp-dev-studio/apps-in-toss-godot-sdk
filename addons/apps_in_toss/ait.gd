@@ -10,6 +10,7 @@ var ads: AITAds
 var admob: AITAdMob
 var game: AITGame
 var status: AITStatus
+var app_events: AITAppEvents
 var api: AITGeneratedAPI
 
 var _sdk: AppsInToss
@@ -27,6 +28,7 @@ func _ready() -> void:
     admob = _sdk.admob
     game = _sdk.game
     status = _sdk.status
+    app_events = _sdk.app_events
     api = _sdk.api
 
 

@@ -12,10 +12,12 @@
 | 결제 | 상품·주문 조회, 일회성·구독 결제, 지급 콜백과 미결 주문 처리 |
 | 광고 | 전면 광고·AdMob의 로드·표시·이벤트 |
 | 게임 | 게임센터, 정보 오버레이 구독 |
+| 이벤트 | 백/포그라운드 가시성 변화 |
 | 기타 | 저장소·배치 처리, 권한·공유·클립보드·햅틱, 바이럴, 내비게이션 바 |
 
-현재 카탈로그는 35개 항목이며, Unity SDK 3.5.0 / web-framework 3.5.0을 기준으로 합니다.
-카탈로그와 별도로 결제·광고·게임 이벤트의 구독과 해제를 관리하는 래퍼를 제공합니다.
+현재 카탈로그는 36개 항목이며, Unity SDK 3.5.0 / web-framework 3.5.0을 기준으로 합니다.
+카탈로그와 별도로 결제·광고·게임 이벤트의 구독과 해제를 관리하는 래퍼와
+가시성 감지(`AIT.app_events`)를 제공합니다.
 AdMob load/show 두 항목은 일반 호출로 사용할 수 없으므로 `AIT.admob`을 사용하세요.
 
 ## 호출 전에 확인할 것
@@ -98,6 +100,36 @@ func _on_admob_failed(subscription_id: int, error: Dictionary) -> void:
     AIT.admob.dispose(subscription_id)
 ```
 
+## 백그라운드와 오디오(BGM)
+
+앱이 백그라운드로 가도 BGM이 계속 재생된다는 문의가 반복되므로 웹뷰의
+`document.visibilitychange`를 `AIT.app_events`로 제공합니다. 구독은 자동으로
+시작되며, 가시성이 변할 때 신호를 받습니다.
+
+```gdscript
+func _ready() -> void:
+    AIT.app_events.visibility_changed.connect(_on_visibility_changed)
+
+
+func _on_visibility_changed(is_visible: bool) -> void:
+    AudioServer.set_bus_mute(0, not is_visible)  # 또는 get_tree().paused = not is_visible
+```
+
+로딩 직후 터치 없이 소리를 재생하려면 WebView의 `mediaPlaybackRequiresUserAction`가
+false여야 합니다. 이 값과 게임 중 당겨서 새로고침을 막는 `pullToRefreshEnabled: false`는
+생성된 `apps-in-toss.config.ts`에 기본으로 들어갑니다.
+
+## 결제 지급 규칙
+
+`product_grant_requested`는 네이티브 결제 오버레이가 떠 있는 상태에서 호출되어,
+안에서 서버 검증을 `await`하면 응답이 돌아오지 않을 수 있습니다. 콜백에서는 즉시
+응답하고, 확정은 미결 주문 복구 루틴에 맡기세요. (커뮤니티 권장 패턴 — 예제는
+샘플 씬의 미결 주문 복구를 참고하세요.)
+
+1. `product_grant_requested`에서 즉시 `resolve_product_grant`(거부는 `reject_product_grant`)로 응답
+2. 게임 시작 시 `get_pending_orders`로 미결 주문을 조회해 지급 후 `complete_product_grant`로 완료 보고
+3. 콜백의 `orderId`가 비어 올 수 있으므로 2의 조회 결과로 보완
+
 ## API 목록과 권한
 
 API 항목의 원본은 [api-manifest.json](../bridge/api-manifest.json)이며,
@@ -108,3 +140,9 @@ API 항목의 원본은 [api-manifest.json](../bridge/api-manifest.json)이며,
 주의: 자동 생성 설정 파일의 `permissions`는 빈 배열입니다. 클립보드 등 권한이
 필요한 API가 기본 상태에서 동작한다고 가정하지 마세요. 권한 선언과 실기기
 동작은 토스 앱에서 직접 확인해야 합니다.
+
+저장소: 진행 상태를 `localStorage`나 IndexedDB에 두지 마세요. 플랫폼이 서빙
+오리진을 바꾸면 접근할 수 없고, 3.x 전환에서 실제로 데이터가 소실된 사례가
+있습니다. 게임 상태는 SDK 저장소(`storage_*`)나 서버에 두세요. 오리진 이전
+데이터를 병합해야 할 때만 `migration_get_origin_storage`로 이전·현재 덤프를
+비교합니다(원본은 `Migration.getOriginStorage`, mock에는 없을 수 있습니다).

@@ -37,4 +37,5 @@ const APIS: Array[Dictionary] = [
 	{"name": "viral_share", "path": "Viral.share", "args": ["options"]},
 	{"name": "viral_track", "path": "Viral.track", "args": ["options"]},
 	{"name": "navigation_bar_set_options", "path": "NavigationBar.setOptions", "args": ["options"]},
+	{"name": "migration_get_origin_storage", "path": "Migration.getOriginStorage", "args": []},
 ]
