@@ -1,4 +1,4 @@
-// Source/embedded parity + upstream 3.5.0 version pins.
+// Source/embedded parity + upstream 3.8.0 version pins.
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
@@ -11,11 +11,12 @@ const repoRoot = path.resolve(here, '..');
 const read = (p) => fs.readFileSync(path.join(repoRoot, p), 'utf8');
 const readJson = (p) => JSON.parse(read(p));
 
-describe('bridge source/embedded parity + 3.5.0 pins', () => {
+describe('bridge source/embedded parity + 3.8.0 pins', () => {
   it('both api-manifest.json copies carry the latest mapped APIs', () => {
     const expected = [
       { name: 'navigation_bar_set_options', path: 'NavigationBar.setOptions', args: ['options'] },
       { name: 'migration_get_origin_storage', path: 'Migration.getOriginStorage', args: [] },
+      { name: 'user_create_anonymous_key_auth_code', path: 'User.createAnonymousKeyAuthCode', args: [] },
     ];
     for (const p of ['bridge/api-manifest.json', 'addons/apps_in_toss/tools/bridge/api-manifest.json']) {
       const manifest = readJson(p);
@@ -48,9 +49,9 @@ describe('bridge source/embedded parity + 3.5.0 pins', () => {
     );
   });
 
-  it('generated GDScript matches the manifest (36 APIs)', () => {
+  it('generated GDScript matches the manifest (37 APIs)', () => {
     const manifest = readJson('bridge/api-manifest.json');
-    assert.equal(manifest.length, 36);
+    assert.equal(manifest.length, 37);
     const api = read('addons/apps_in_toss/generated/ait_generated_api.gd');
     const catalog = read('addons/apps_in_toss/generated/ait_generated_catalog.gd');
     for (const entry of manifest) {
@@ -60,16 +61,16 @@ describe('bridge source/embedded parity + 3.5.0 pins', () => {
     }
   });
 
-  it('web-framework is pinned to 3.5.0 everywhere, devtools not downgraded', () => {
+  it('web-framework and devtools are pinned to 3.8.0 everywhere', () => {
     for (const p of ['bridge/package.json', 'addons/apps_in_toss/tools/bridge/package.json']) {
       const pkg = readJson(p);
-      assert.equal(pkg.dependencies['@apps-in-toss/web-framework'], '3.5.0', p);
-      assert.equal(pkg.devDependencies['@apps-in-toss/devtools'], '3.2.0', `${p} keeps devtools 3.2.0`);
+      assert.equal(pkg.dependencies['@apps-in-toss/web-framework'], '3.8.0', p);
+      assert.equal(pkg.devDependencies['@apps-in-toss/devtools'], '3.8.0', p);
     }
     const lock = readJson('addons/apps_in_toss/tools/templates/platform.lock.json');
-    assert.equal(lock.webFramework.version, '3.5.0');
-    assert.equal(lock.unitySdk.packageVersion, '3.5.0');
-    assert.equal(lock.unitySdk.commit, '29682a9cbc9ff35bf3008d3fb2b790111d34887e');
+    assert.equal(lock.webFramework.version, '3.8.0');
+    assert.equal(lock.unitySdk.packageVersion, '3.8.0');
+    assert.equal(lock.unitySdk.commit, '18814fe5b5a2af5cd2a11a7a5bae53403fafa15e');
     assert.equal(read('addons/apps_in_toss/plugin.cfg').match(/version="([^"]+)"/)[1], '0.2.0');
   });
 

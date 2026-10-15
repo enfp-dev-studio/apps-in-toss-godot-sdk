@@ -114,3 +114,6 @@ func navigation_bar_set_options(options: Variant) -> int:
 
 func migration_get_origin_storage() -> int:
     return _core.invoke("Migration.getOriginStorage", [])
+
+func user_create_anonymous_key_auth_code() -> int:
+    return _core.invoke("User.createAnonymousKeyAuthCode", [])

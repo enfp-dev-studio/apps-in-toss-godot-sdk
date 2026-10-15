@@ -17,14 +17,14 @@
     "version": "0.2.0",
     "repository": "https://github.com/enfp-dev-studio/apps-in-toss-godot-sdk",
     "baseCommit": "2af77adb0fafcd291cc9a8edc3b97efd2bd274f6",
-    "apiManifestSha256": "487a70d3d057f42e0a00ed1f116bcd6d2cf9fabe1c2b4261bc91aad7e67f1e7d"
+    "apiManifestSha256": "3a26e28df40c615453289ae133f4d2df1b6151c1bd26bad7e7b67a2ae1eb60de"
   },
   "bridge": {
     "version": "0.2.0"
   },
   "webFramework": {
     "package": "@apps-in-toss/web-framework",
-    "version": "3.5.0"
+    "version": "3.8.0"
   },
   "toolchain": {
     "node": {
@@ -43,8 +43,8 @@
   },
   "unitySdk": {
     "repository": "https://github.com/toss/apps-in-toss-unity-sdk.git",
-    "commit": "29682a9cbc9ff35bf3008d3fb2b790111d34887e",
-    "packageVersion": "3.5.0",
+    "commit": "18814fe5b5a2af5cd2a11a7a5bae53403fafa15e",
+    "packageVersion": "3.8.0",
     "lockPath": "scripts/unity-sdk.lock.json"
   }
 }

@@ -24,3 +24,10 @@ func get_user_key_for_game(timeout_ms: int = 0) -> Dictionary:
 ## 기존 토스 로그인 연동 여부를 확인합니다.
 func get_is_toss_login_integrated_service(timeout_ms: int = 0) -> Dictionary:
     return await _core.invoke_and_wait("getIsTossLoginIntegratedService", [], timeout_ms)
+
+
+## 익명 사용자 식별키를 서버에서 교환할 일회용 인증 코드를 요청합니다. (web-framework 3.6.0+)
+## 반환값의 result는 { code, expiresIn } 형식입니다.
+## 코드는 expiresIn(초) 안에 한 번만 쓸 수 있으므로 즉시 파트너 서버로 보내 교환해야 합니다.
+func create_anonymous_key_auth_code(timeout_ms: int = 0) -> Dictionary:
+    return await _core.invoke_and_wait("User.createAnonymousKeyAuthCode", [], timeout_ms)
