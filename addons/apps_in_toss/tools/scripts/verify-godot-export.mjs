@@ -69,6 +69,24 @@ if (/id=["']status-(?:splash|progress)["']/i.test(html)) {
 }
 if (/<iframe\b/i.test(html)) throw new Error('iframe is not allowed in Apps in Toss bundles.');
 
+// release 번들에는 build:dev 전용 파일(mock 브리지·DevTools 패널)과 Godot import
+// 메타데이터(*.import)가 있으면 안 된다. index.html이 참조하지 않아도 .ait에 함께 실린다.
+if (!withMock) {
+  const devOnlyNames = new Set(['apps-in-toss-godot-bridge.mock.js', 'ait-devtools-panel.js']);
+  const leftovers = fs
+    .readdirSync(exportDir, { recursive: true })
+    .map(String)
+    .filter((file) => devOnlyNames.has(path.basename(file)) || file.endsWith('.import'));
+  if (leftovers.length > 0) {
+    throw new Error(
+      `Release bundle contains dev build or Godot import files: ${leftovers.join(', ')}. ` +
+        `Delete ${exportDir} and run the release build again.`,
+    );
+  }
+  const devTag = [...devOnlyNames].find((name) => html.includes(name));
+  if (devTag) throw new Error(`Release index.html must not reference ${devTag}.`);
+}
+
 const bridge = fs.readFileSync(bridgePath, 'utf8');
 if (!bridge.includes('AppsInTossGodot')) throw new Error('Bridge bundle does not expose AppsInTossGodot.');
 

@@ -6,11 +6,11 @@ import { fileURLToPath } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..');
 const defaultProjectDir = path.join(root, 'godot');
-const defaultExportDir = path.join(root, 'build/godot-web');
 
 const projectDir = path.resolve(process.env.GODOT_PROJECT_DIR ?? defaultProjectDir);
 // Godot Web export — 결과물은 항상 게임 리포의 build/godot-web에 둔다.
-const exportDir = path.resolve(process.env.GODOT_EXPORT_DIR ?? path.join(projectDir, 'build/godot-web'));
+const buildRoot = path.join(projectDir, 'build');
+const exportDir = path.resolve(process.env.GODOT_EXPORT_DIR ?? path.join(buildRoot, 'godot-web'));
 const preset = process.env.GODOT_EXPORT_PRESET ?? 'Apps in Toss Web';
 const godotBin = process.env.GODOT_BIN ?? 'godot';
 const outputPath = path.join(exportDir, 'index.html');
@@ -19,6 +19,26 @@ const verifyScript = path.join(toolsDir, 'scripts', 'verify-gdscript.gd');
 
 if (!fs.existsSync(path.join(projectDir, 'project.godot'))) {
   throw new Error(`Godot project not found: ${projectDir}`);
+}
+
+// export 폴더는 게임의 build/ 안(build 자체 제외)에 있을 때만 비우고 .gdignore를 둔다.
+// 심볼릭 링크로 build/ 밖을 가리키는 경우를 막으려고 실제 경로로도 한 번 더 비교한다.
+function isStrictlyInside(parent, child) {
+  const rel = path.relative(parent, child);
+  return rel !== '' && rel !== '..' && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel);
+}
+const exportDirInBuild =
+  isStrictlyInside(buildRoot, exportDir) &&
+  (!fs.existsSync(exportDir) || isStrictlyInside(fs.realpathSync(buildRoot), fs.realpathSync(exportDir)));
+
+// build/.gdignore: 에디터나 아래 컴파일 게이트가 export 결과물(PNG 등)을 리소스로
+// 가져오면 .import 파일이 생기고 .pck에도 실릴 수 있다. 컴파일 게이트 전에 둔다.
+if (exportDirInBuild) {
+  const gdignore = path.join(buildRoot, '.gdignore');
+  if (!fs.existsSync(gdignore)) {
+    fs.mkdirSync(buildRoot, { recursive: true });
+    fs.writeFileSync(gdignore, '');
+  }
 }
 
 // 0. 컴파일 게이트: export는 깨진 스크립트가 있어도 exit 0을 내는 경우가 있어
@@ -38,8 +58,18 @@ if (fs.existsSync(verifyScript)) {
   console.log(`[Godot] WARN verify script not found, skipping compile gate: ${verifyScript}`);
 }
 
-if (exportDir === defaultExportDir && fs.existsSync(exportDir)) {
-  fs.rmSync(exportDir, { recursive: true, force: true });
+// 이전 빌드 잔여물(build:dev의 mock 브리지·DevTools 패널, .import 등)이 release
+// 번들에 섞이지 않도록 export 전에 비운다. build/ 밖의 폴더는 지우지 않는다.
+if (exportDirInBuild) {
+  if (fs.existsSync(exportDir)) {
+    fs.rmSync(exportDir, { recursive: true, force: true });
+    console.log(`[Godot] cleaned previous export: ${exportDir}`);
+  }
+} else {
+  console.log(
+    `[Godot] WARN export dir is outside ${buildRoot}, not cleaning it ` +
+      `(files from earlier builds may remain): ${exportDir}`,
+  );
 }
 fs.mkdirSync(exportDir, { recursive: true });
 

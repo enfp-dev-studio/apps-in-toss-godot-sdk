@@ -9,7 +9,7 @@
 
 | 검사 | 확인하는 내용 |
 | --- | --- |
-| [회귀 테스트](../.github/workflows/regressions.yml) | Node 24/26에서 설치 안전성, SDK 캐시, API 매니페스트·생성 파일 일치, 브리지 호출·이벤트 전달 |
+| [회귀 테스트](../.github/workflows/regressions.yml) | Node 24/26에서 설치 안전성, SDK 캐시, API 매니페스트·생성 파일 일치, 브리지 호출·이벤트 전달, export 폴더 정리·release 번들 잔여물 검사 |
 | [브리지·패키징](../.github/workflows/bridge-package.yml) | 소스·내장 브리지 타입 검사, production/mock 빌드, 최소 HTML 입력의 `.ait` 패키징 |
 | [Godot 애드온](../.github/workflows/godot-addon.yml) | Godot 4.7.2 headless import, GDScript 구문 검사, AdMob 브리지 부재 오류·구독 해제 |
 | 별도 확인 | 전체 Godot Web export, 브라우저 게임 플레이, 토스 앱·실기기 동작 |
@@ -115,3 +115,34 @@ Godot 4.7.2와 같은 버전의 비스레드 Web export 템플릿으로 SDK 샘�
 임시 게임 프로젝트에 샘플 씬·폰트 테마·HTML shell을 준비했고,
 모의 광고 확인에만 임시 광고 그룹 ID를 사용했습니다.
 실제 토스 로그인·결제·광고 송출과 게임 전체 플레이는 이 기록에 포함하지 않습니다.
+
+## 2026-10-16 샘플 실행 결과 (web-framework·DevTools 3.8.0)
+
+브리지를 web-framework 3.8.0·DevTools 3.8.0으로 올린 뒤 위와 같은 방법으로 다시 실행했습니다.
+Godot 4.7.2와 같은 버전의 비스레드 Web export 템플릿(`web_nothreads_*`)을 사용했고,
+애드온은 SDK 원본 CLI의 `addon:install --force`로 임시 게임 프로젝트에 설치했습니다.
+
+| 확인한 항목 | 결과 |
+| --- | --- |
+| `doctor --strict` | 통과 |
+| 실제 Godot Web export와 실전 브리지 주입·검증 | 통과 (11개 파일, 주입된 브리지에 `User.createAnonymousKeyAuthCode` 포함) |
+| 실제 Web 출력의 `.ait` 패키징 | 통과 (배포는 실행하지 않음) |
+| mock 개발 빌드와 브라우저 화면·한글 표시 | 통과 |
+| 샘플 `?e2e=true` | 성공 15개, 실패 0개 (`user_create_anonymous_key_auth_code` 포함) |
+| 샘플 버튼 | 모의 로그인 인가 코드 수신, 상품 2개 조회, 전면 광고 로드·종료 확인 |
+| mock `AIT.create_anonymous_key_auth_code()` | 통과 — `code`와 `expiresIn`(300초) 수신 |
+| mock `Viral.share` 제목·설명 전달 | 통과 — DevTools 로그에 `title`·`description`이 그대로 전달됨 |
+| `build:dev` 뒤 `build` 다시 실행 | 수정 후 통과 — 11개 파일(51.67 MiB), mock 브리지·DevTools 패널·`.import` 파일 없음 |
+
+`?e2e=true` 대상은 현재 카탈로그에서 인자가 없는 API 16개 중 `close_view`를 뺀 15개입니다.
+익명 키·`Viral.share`는 임시 프로젝트에만 둔 점검 스크립트로 호출했고, 샘플 씬에는 포함하지 않았습니다.
+브라우저 창이 가려진 상태에서는 렌더링이 초당 약 1프레임으로 느려져 점검 시간이 길어지지만 결과에는 영향이 없었습니다.
+
+마지막 항목은 처음 실행에서 실패했습니다. `export-godot.mjs`가 게임의 `build/godot-web`을 비우지 않아
+개발 빌드의 mock 브리지·DevTools 패널과 Godot이 export PNG를 가져오며 만든 `.import` 파일이 `.ait`에 남았습니다.
+`index.html`은 실전 브리지만 불러오지만, 남은 파일까지 패키징되어 11개였던 파일이 16개(53.22 MiB)로 늘었습니다.
+이제 export 단계가 매번 `build/godot-web`을 비우고(게임의 `build/` 폴더 안일 때만) `build/.gdignore`를 만들며,
+release 검증은 이런 파일이 남아 있으면 실패합니다. 수정 후 같은 순서로 다시 실행해 위 결과를 확인했습니다.
+
+실제 토스 로그인·결제·광고 송출, 익명 키 인증 코드의 서버 교환, 실기기 공유 시트와
+게임 전체 플레이는 이 기록에 포함하지 않습니다.

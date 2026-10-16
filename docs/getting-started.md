@@ -100,6 +100,8 @@ node addons/apps_in_toss/tools/ait-godot.mjs build
 
 설정 검사 → Godot Web export → 브리지 주입·검증 → `.ait` 패키징 순으로 진행합니다.
 빌드 산출물의 `ait-platform-manifest.json`에는 사용한 버전 조합이 기록됩니다.
+`build`와 `build:dev`는 export 전에 `build/godot-web`을 비우므로 이 폴더에 직접 둔 파일은 남지 않습니다.
+`build/.gdignore`도 만들어 Godot이 export 결과물을 리소스로 가져오지 않게 합니다.
 업로드와 실제 기능 확인은 [토스 앱 테스트](testing.md#토스-앱에서-확인하기)를 참고하세요.
 
 플러그인을 켜면 Godot 에디터의 **AIT 탭**에서도 Doctor, Dev Server,
