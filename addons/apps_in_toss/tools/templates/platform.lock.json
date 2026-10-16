@@ -17,7 +17,7 @@
     "version": "0.2.0",
     "repository": "https://github.com/enfp-dev-studio/apps-in-toss-godot-sdk",
     "baseCommit": "2af77adb0fafcd291cc9a8edc3b97efd2bd274f6",
-    "apiManifestSha256": "3a26e28df40c615453289ae133f4d2df1b6151c1bd26bad7e7b67a2ae1eb60de"
+    "apiManifestSha256": "6e3be46481b8ad73af57ee105a71386014ef94ae63e7cc300e486d1933b9d70b"
   },
   "bridge": {
     "version": "0.2.0"

@@ -117,3 +117,6 @@ func migration_get_origin_storage() -> int:
 
 func user_create_anonymous_key_auth_code() -> int:
     return _core.invoke("User.createAnonymousKeyAuthCode", [])
+
+func share_create_link(options: Variant) -> int:
+    return _core.invoke("Share.createLink", [options])

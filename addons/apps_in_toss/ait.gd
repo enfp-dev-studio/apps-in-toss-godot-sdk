@@ -60,5 +60,9 @@ func get_is_toss_login_integrated_service(timeout_ms: int = 0) -> Dictionary:
     return await auth.get_is_toss_login_integrated_service(timeout_ms)
 
 
+func get_value(path: String) -> Variant:
+    return core.get_value(path)
+
+
 func create_anonymous_key_auth_code(timeout_ms: int = 0) -> Dictionary:
     return await auth.create_anonymous_key_auth_code(timeout_ms)

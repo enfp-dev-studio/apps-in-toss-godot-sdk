@@ -17,6 +17,7 @@ describe('bridge source/embedded parity + 3.8.0 pins', () => {
       { name: 'navigation_bar_set_options', path: 'NavigationBar.setOptions', args: ['options'] },
       { name: 'migration_get_origin_storage', path: 'Migration.getOriginStorage', args: [] },
       { name: 'user_create_anonymous_key_auth_code', path: 'User.createAnonymousKeyAuthCode', args: [] },
+      { name: 'share_create_link', path: 'Share.createLink', args: ['options'] },
     ];
     for (const p of ['bridge/api-manifest.json', 'addons/apps_in_toss/tools/bridge/api-manifest.json']) {
       const manifest = readJson(p);
@@ -49,9 +50,9 @@ describe('bridge source/embedded parity + 3.8.0 pins', () => {
     );
   });
 
-  it('generated GDScript matches the manifest (37 APIs)', () => {
+  it('generated GDScript matches the manifest (38 APIs)', () => {
     const manifest = readJson('bridge/api-manifest.json');
-    assert.equal(manifest.length, 37);
+    assert.equal(manifest.length, 38);
     const api = read('addons/apps_in_toss/generated/ait_generated_api.gd');
     const catalog = read('addons/apps_in_toss/generated/ait_generated_catalog.gd');
     for (const entry of manifest) {

@@ -39,4 +39,5 @@ const APIS: Array[Dictionary] = [
 	{"name": "navigation_bar_set_options", "path": "NavigationBar.setOptions", "args": ["options"]},
 	{"name": "migration_get_origin_storage", "path": "Migration.getOriginStorage", "args": []},
 	{"name": "user_create_anonymous_key_auth_code", "path": "User.createAnonymousKeyAuthCode", "args": []},
+	{"name": "share_create_link", "path": "Share.createLink", "args": ["options"]},
 ]

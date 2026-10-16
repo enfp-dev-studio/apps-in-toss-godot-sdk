@@ -42,6 +42,9 @@ module.exports = {
       return Promise.resolve(true);
     },
   },
+  Environment: {
+    initialURL: 'intoss://cat-room-godot/visit?code=abc',
+  },
 };
 `;
 
@@ -151,6 +154,16 @@ describe('bridge transport (vm + fake WebFramework)', () => {
     assert.equal(bridge.has('subscribePath'), false);
     assert.equal(bridge.hasBridgeMethod('subscribePath'), true);
     assert.equal(bridge.hasBridgeMethod('nope'), false);
+  });
+
+  it('getValue reads string properties as JSON, null for missing or function paths', () => {
+    assert.equal(bridge.hasBridgeMethod('getValue'), true);
+    assert.equal(
+      bridge.getValue('Environment.initialURL'),
+      JSON.stringify('intoss://cat-room-godot/visit?code=abc'),
+    );
+    assert.equal(bridge.getValue('Nope.missing'), 'null');
+    assert.equal(bridge.getValue('NavigationBar.setOptions'), 'null');
   });
 
   it('unknown path returns a structured error instead of hanging', async () => {

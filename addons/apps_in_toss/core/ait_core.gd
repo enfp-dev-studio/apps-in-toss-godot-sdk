@@ -27,6 +27,12 @@ func is_available() -> bool:
 func has_api(path: String) -> bool:
     return is_available() and bool(_bridge.has(path))
 
+func get_value(path: String) -> Variant:
+    if not is_available():
+        return null
+    var raw: String = _bridge.getValue(path)
+    return JSON.parse_string(raw)
+
 func invoke(path: String, args: Array = []) -> int:
     var request_id := _next_request_id
     _next_request_id += 1

@@ -13,9 +13,9 @@
 | 광고 | 전면 광고·AdMob의 로드·표시·이벤트 |
 | 게임 | 게임센터, 정보 오버레이 구독 |
 | 이벤트 | 백/포그라운드 가시성 변화 |
-| 기타 | 저장소·배치 처리, 권한·공유·클립보드·햅틱, 바이럴, 내비게이션 바 |
+| 기타 | 저장소·배치 처리, 권한·공유·공유 링크·진입 주소·클립보드·햅틱, 바이럴, 내비게이션 바 |
 
-현재 카탈로그는 37개 항목이며, Unity SDK 3.8.0 / web-framework 3.8.0을 기준으로 합니다.
+현재 카탈로그는 38개 항목이며, Unity SDK 3.8.0 / web-framework 3.8.0을 기준으로 합니다.
 카탈로그와 별도로 결제·광고·게임 이벤트의 구독과 해제를 관리하는 래퍼와
 가시성 감지(`AIT.app_events`)를 제공합니다.
 AdMob load/show 두 항목은 일반 호출로 사용할 수 없으므로 `AIT.admob`을 사용하세요.
@@ -110,6 +110,40 @@ func _share_record() -> void:
     if not bool(response.get("ok", false)):
         push_warning("share failed: %s" % JSON.stringify(response.get("error")))
 ```
+
+## 친구 초대 링크와 진입 주소
+
+친구 초대 링크는 `Share.createLink`로 만들고, 들어온 쪽은 시작할 때
+`Environment.initialURL`에서 초대 코드 쿼리를 꺼냅니다. (web-framework 3.8.0 기준)
+
+```gdscript
+func _make_invite_link(code: String) -> void:
+    if not AIT.has_api("Share.createLink"):
+        return  # 구버전 토스 앱
+    var path := "intoss://<앱이름>/visit?code=%s" % code
+    var response := await AIT.invoke_and_wait("Share.createLink", [{"path": path}], 15_000)
+    if not bool(response.get("ok", false)):
+        push_warning("share link failed: %s" % JSON.stringify(response.get("error")))
+        return
+    print(String(response.get("result")))
+```
+
+```gdscript
+func _read_invite_code() -> void:
+    if not AIT.has_api("Share.createLink"):
+        return  # 구버전 토스 앱
+    var value: Variant = AIT.get_value("Environment.initialURL")
+    if typeof(value) != TYPE_STRING: return
+    var url := String(value)
+    if url.is_empty() or not url.contains("code="):
+        return
+    var code := url.get_slice("code=", 1).get_slice("&", 0)
+    print(code)
+```
+
+`Environment.initialURL`은 앱에 처음 진입할 때 쓴 스킴 URL만 담고, 이후 이동은 반영되지 않습니다.
+`ogImageUrl`은 토스앱 Android 5.240.0 / iOS 5.239.0 이상에서만 동작합니다.
+링크 값은 조작될 수 있으니 서버에서 검증해야 합니다.
 
 ## AdMob 광고
 
