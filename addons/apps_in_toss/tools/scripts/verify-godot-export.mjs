@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { DEV_ONLY_EXPORT_FILES } from './export-dir.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const defaultExportDir = path.resolve(here, '../build/godot-web');
@@ -58,6 +59,17 @@ if (threadedWorkers.length > 0) {
 }
 
 const html = fs.readFileSync(indexPath, 'utf8');
+// release 빌드에 개발 전용 파일(mock 브리지·DevTools 패널)이 섞여 .ait로 나가지 않도록 여기서 막는다.
+if (!withMock) {
+  const devFile = DEV_ONLY_EXPORT_FILES.find((file) => fs.existsSync(path.join(exportDir, file)));
+  const devRef = DEV_ONLY_EXPORT_FILES.find((file) => html.includes(file));
+  const offender = devFile ?? devRef;
+  if (offender) {
+    throw new Error(
+      `Release export에 개발 전용 파일이 포함되어 있습니다: ${offender}. release 빌드 전에 build/godot-web을 비우거나 다시 빌드하세요.`,
+    );
+  }
+}
 const bridgeTag = `<script src="./${bridgeName}"></script>`;
 if ((html.match(new RegExp(bridgeTag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) ?? []).length !== 1) {
   throw new Error('Apps in Toss Godot bridge script must appear exactly once in index.html.');

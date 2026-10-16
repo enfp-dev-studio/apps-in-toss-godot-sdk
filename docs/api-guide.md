@@ -177,9 +177,10 @@ API 항목의 원본은 [api-manifest.json](../bridge/api-manifest.json)이며,
 자세한 사용 방법(로그인 서버 연동, 결제 지급/복구, 전면 광고)은
 플랫폼 리포 [`docs/godot-integration.md`](https://github.com/enfp-dev-studio/toss-web-game/blob/main/docs/godot-integration.md)를 참고하세요.
 
-주의: 자동 생성 설정 파일의 `permissions`는 빈 배열입니다. 클립보드 등 권한이
-필요한 API가 기본 상태에서 동작한다고 가정하지 마세요. 권한 선언과 실기기
-동작은 토스 앱에서 직접 확인해야 합니다.
+주의: 필요한 권한은 `.ait/game.manifest.json`의 `permissions`로 선언합니다.
+`build`·`build:dev`가 매니페스트를 읽어 `apps-in-toss.config.ts`를 다시 만들며, 선언하지 않으면
+빈 배열입니다. 클립보드 등 권한이 필요한 API가 기본 상태에서 동작한다고 가정하지 마세요.
+권한 선언과 실기기 동작은 토스 앱에서 직접 확인해야 합니다.
 
 저장소: 진행 상태를 `localStorage`나 IndexedDB에 두지 마세요. 플랫폼이 서빙
 오리진을 바꾸면 접근할 수 없고, 3.x 전환에서 실제로 데이터가 소실된 사례가

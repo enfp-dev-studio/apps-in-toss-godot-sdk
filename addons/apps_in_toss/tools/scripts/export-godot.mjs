@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { isClearableExportDir, removeDevOnlyFiles } from './export-dir.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..');
@@ -38,8 +39,16 @@ if (fs.existsSync(verifyScript)) {
   console.log(`[Godot] WARN verify script not found, skipping compile gate: ${verifyScript}`);
 }
 
-if (exportDir === defaultExportDir && fs.existsSync(exportDir)) {
-  fs.rmSync(exportDir, { recursive: true, force: true });
+if (fs.existsSync(exportDir)) {
+  if (isClearableExportDir(exportDir, { projectDir, defaultExportDir })) {
+    fs.rmSync(exportDir, { recursive: true, force: true });
+  } else {
+    // 프로젝트 바깥이거나 export 폴더로 보이지 않으면 통째로 지우지 않고 개발 전용 파일만 지운다.
+    const removed = removeDevOnlyFiles(exportDir);
+    console.log(
+      `[Godot] WARN export dir was not cleared (outside the project or not an export folder): ${exportDir}; removed dev-only files: ${removed.join(', ') || '(none)'}`,
+    );
+  }
 }
 fs.mkdirSync(exportDir, { recursive: true });
 

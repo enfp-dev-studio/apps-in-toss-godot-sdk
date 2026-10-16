@@ -12,6 +12,9 @@
 | [회귀 테스트](../.github/workflows/regressions.yml) | Node 24/26에서 설치 안전성, SDK 캐시, API 매니페스트·생성 파일 일치, 브리지 호출·이벤트 전달 |
 | [브리지·패키징](../.github/workflows/bridge-package.yml) | 소스·내장 브리지 타입 검사, production/mock 빌드, 최소 HTML 입력의 `.ait` 패키징 |
 | [Godot 애드온](../.github/workflows/godot-addon.yml) | Godot 4.7.2 headless import, GDScript 구문 검사, AdMob 브리지 부재 오류·구독 해제 |
+| [export 폴더 정리](../tests/export-dir.test.mjs) | 프로젝트 안 export 폴더는 비워도 되고 소스·프로젝트 바깥은 비우지 않음, release에 개발 전용 파일이 섞이면 검증 실패 |
+| [설정 생성](../tests/write-ait-config.test.mjs) | 매니페스트의 `webView`·`permissions`·`navigationBar` 반영과 기본값·검증, 잘못된 키·조합은 실패 |
+| [eval 금지](../tests/no-eval.test.mjs) | 애드온 GDScript에 `JavaScriptBridge.eval`이 없음 |
 | 별도 확인 | 전체 Godot Web export, 브라우저 게임 플레이, 토스 앱·실기기 동작 |
 
 PR 생성·업데이트와 `main` push 때 실행하며, GitHub Actions 탭에서 수동 실행도 가능합니다.
@@ -93,6 +96,13 @@ QR 테스트가 "지금은 서비스를 사용할 수 없어요"로 실패하면
 
 SDK 3.x 번들을 출시하면 2.x로 되돌릴 수 없고, 2026-10-05부터 3.x 미만 신규
 등록이 제한됩니다. QR·DevTools에서 충분히 확인한 뒤 배포하세요.
+
+출시 체크리스트의 외부 코드 실행(eval) 검수에는 다음처럼 답합니다. 애드온과
+샘플의 GDScript는 `JavaScriptBridge.eval`을 쓰지 않으며, `doctor`는 게임
+스크립트의 `JavaScriptBridge.eval` 사용을 경고합니다. Godot 엔진 JS 자체에는
+`JavaScriptBridge.eval` 구현용 eval 코드가 들어 있지만, 게임과 SDK가 그 API를
+호출하지 않으면 실행되지 않습니다. 엔진에서 아예 빼는 방법(커스텀 Web 템플릿
+빌드)은 이 SDK에서 검증하지 않았습니다.
 
 ## 2026-09-24 샘플 실행 결과
 

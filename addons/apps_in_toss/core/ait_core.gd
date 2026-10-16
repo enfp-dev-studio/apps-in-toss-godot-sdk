@@ -179,6 +179,11 @@ func _refresh_bridge() -> void:
     if not OS.has_feature("web"):
         return
     if _bridge == null:
-        _bridge = JavaScriptBridge.get_interface("AppsInTossGodot")
+        # get_interface로 직접 읽으면 없을 때 엔진 오류가 찍히므로 window 속성으로 조용히 확인한다.
+        var window: Variant = JavaScriptBridge.get_interface("window")
+        if window != null:
+            var bridge: Variant = window.AppsInTossGodot
+            if bridge is JavaScriptObject:
+                _bridge = bridge
     if _callback == null:
         _callback = JavaScriptBridge.create_callback(_on_js_callback)

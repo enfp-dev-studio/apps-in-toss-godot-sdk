@@ -159,3 +159,58 @@ Unity SDK 3.5.0 표면(현재 이름 기준 100여 개)과 앱인토스 개발�
   로컬에 Godot가 없어 GDScript 구문 검사는 CI(`godot-addon.yml`)에 맡겼습니다.
   새 API의 실제 응답은 토스 앱에서 확인해야 합니다.
 - 감시: Unity SDK가 `User.getConsentedData`나 배너 외 helper를 추가하는지, devtools mock 응답이 바뀌는지 봅니다.
+
+## 2026-10-16: 게임 적용에서 발견한 버그 수정
+
+cat-room-godot 게임에 SDK를 적용하며 4건(1~4)을 발견했고, 수정 검수에서 1건(5)을 더 찾았습니다. 아래와 같이 고쳤습니다.
+
+1. export 폴더 정리: `build:dev` 뒤 `build`를 하면 mock 브리지와 DevTools 패널
+   (약 1.6MB)이 출시 `.ait`에 섞였습니다. `export-godot.mjs`가 이전에는 기본
+   경로일 때만 폴더를 비웠기 때문입니다. 새 모듈
+   [`export-dir.mjs`](../addons/apps_in_toss/tools/scripts/export-dir.mjs)가
+   지워도 되는 폴더인지 판단하고(`isClearableExportDir`), `export-godot.mjs`가
+   그 결과에 따라 폴더를 비우거나 개발 전용 파일만 골라 지웁니다.
+   [`verify-godot-export.mjs`](../addons/apps_in_toss/tools/scripts/verify-godot-export.mjs)는
+   release 빌드에 개발 전용 파일(`apps-in-toss-godot-bridge.mock.js`,
+   `ait-devtools-panel.js`)이 파일 또는 `index.html` 참조로 남아 있으면
+   실패합니다. 추가된 테스트는 [export-dir](../tests/export-dir.test.mjs)입니다.
+2. 설정 생성: [`write-ait-config.mjs`](../addons/apps_in_toss/tools/scripts/write-ait-config.mjs)가
+   `.ait/game.manifest.json`의 `webView`, `permissions`, `navigationBar`를 읽어
+   `apps-in-toss.config.ts`에 넣습니다. `webView`는 기본값
+   (`mediaPlaybackRequiresUserAction: false`, `pullToRefreshEnabled: false`) 위에
+   매니페스트 값을 덮어쓰고, 허용되지 않은 키·값·조합은 실패합니다. 추가된
+   테스트는 [write-ait-config](../tests/write-ait-config.test.mjs)입니다.
+3. eval 제거: 애드온 가시성 모듈(`ait_app_events.gd`)과 샘플
+   (`ait_sample_scene.gd`, `ait_sample_tester.gd`)이 `JavaScriptBridge.eval`을
+   쓰지 않습니다. `get_interface`와 콜백 직접 전달로 바꿨습니다. `doctor`는
+   게임 스크립트의 `JavaScriptBridge.eval` 사용을 경고합니다. Godot 엔진 JS
+   자체에는 `JavaScriptBridge.eval` 구현용 eval 코드가 들어 있지만, 게임과 SDK가
+   그 API를 호출하지 않으면 실행되지 않습니다. 엔진에서 아예 빼는 방법(커스텀
+   Web 템플릿 빌드)은 이 SDK에서 검증하지 않았습니다. 추가된 테스트는
+   [no-eval](../tests/no-eval.test.mjs)입니다.
+4. 브리지 탐색: `AITCore`가 `get_interface("AppsInTossGodot")` 직접 조회 대신
+   `window` 속성으로 브리지를 찾아, 브리지가 아직 없을 때
+    `No interface 'AppsInTossGodot' registered` 오류를 찍지 않습니다. 이 항목의
+    전용 회귀 테스트는 추가하지 않았습니다. 대신 아래 검증 문단의 브라우저 확인으로
+    대체했습니다.
+5. 경로 표시 정리: `doctor`의 eval 경고가 게임 폴더 기준 경로(`scripts/x.gd:4`)로
+   나오고, 생성 설정의 webBundleDir 기본값이 게임 안이면 상대경로(`build/godot-web`)로
+   기록돼 기기별 절대경로가 커밋되지 않습니다.
+
+게임 쪽 우회: cat-room-godot의 `npm run clean`은 export 폴더를 직접 비우는
+임시 조치이며, SDK 업데이트 후 없애도 됩니다.
+
+검증: `node --test tests/*.test.mjs` 35개와 Godot 4.7.2 애드온 검사
+(`tests/run-godot-addon.mjs`)가 통과합니다. cat-room-godot 복사본에 수정한
+애드온을 넣고 확인했습니다. `build:dev` 결과를 브라우저(375×812)에서 열어
+브리지 연결, 가시성 이벤트(숨김 → 소리 게이트에 hidden, 다시 보임 → 해제)가
+eval 없이 동작함을 확인했습니다. 이어서 정리 단계 없이 `build`를 실행해
+`build/godot-web`과 `.ait`에 mock 브리지·DevTools 패널이 없고 출시 브리지만
+들어감을 확인했습니다. 매니페스트의 webView 옵션(`bounces`,
+`allowsBackForwardNavigationGestures`)이 설정에 들어감, `doctor`가 게임 스크립트의
+eval을 경고함, 브리지를 뺀 빌드에서 "No interface" 오류 없이 게임 자체 경고만
+나옴을 확인했습니다. 미확인: 토스 앱·실기기 동작.
+
+참고: DevTools 패널 번들은 `process.env.NODE_ENV`를 참조하므로 SDK의 `preview`(Vite)로
+열어야 합니다. 단순 정적 서버로 열면 `process is not defined` 오류로 패널만 뜨지
+않습니다(3.2.0 패널도 같음, 게임 동작에는 영향 없음).

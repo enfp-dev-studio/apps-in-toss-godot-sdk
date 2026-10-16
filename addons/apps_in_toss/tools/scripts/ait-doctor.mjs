@@ -285,6 +285,42 @@ if (unityLock) {
   exact('Unity SDK package version', unityLock.packageVersion, lock.unitySdk?.packageVersion);
 }
 
+// 게임 코드의 외부 코드 실행(eval) 검출 — strict 여부와 상관없이 경고만 남긴다.
+const evalExcludedDirs = new Set(['.godot', 'node_modules', 'build']);
+const evalExcludedAddon = path.join(projectDir, 'addons/apps_in_toss');
+function collectGdFiles(dir, out) {
+  let entries;
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return out;
+  }
+  for (const entry of entries) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (evalExcludedDirs.has(entry.name)) continue;
+      if (full === evalExcludedAddon) continue;
+      collectGdFiles(full, out);
+    } else if (entry.isFile() && entry.name.endsWith('.gd')) {
+      out.push(full);
+    }
+  }
+  return out;
+}
+if (fs.existsSync(projectDir)) {
+  for (const file of collectGdFiles(projectDir, [])) {
+    const text = fs.readFileSync(file, 'utf8');
+    const lines = text.split('\n');
+    lines.forEach((line, index) => {
+      if (line.includes('JavaScriptBridge.eval')) {
+        // eval 경고만 게임 프로젝트 기준 경로로 표시한다(다른 메시지의 relative()는 그대로).
+        const shown = path.relative(projectDir, file) || '.';
+        warnings.push(`${shown}:${index + 1} uses JavaScriptBridge.eval — 출시 체크리스트는 외부 코드 실행(eval)을 금지합니다. JavaScriptBridge.get_interface()로 바꾸세요.`);
+      }
+    });
+  }
+}
+
 for (const warning of warnings) console.warn(`[AIT doctor] WARN ${warning}`);
 for (const error of errors) console.error(`[AIT doctor] ERROR ${error}`);
 
