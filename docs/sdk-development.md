@@ -151,5 +151,5 @@ Unity SDK 3.5.0 표면(현재 이름 기준 100여 개)과 앱인토스 개발�
 - 잔여 갭은 2026-09-28 목록과 같습니다.
 - 감시: Windows `ait build`가 `.ait` 안 경로를 역슬래시로 쓴다는 문의(#5003,
   답변 대기). CLI 3.5.0에도 같은 코드라 이번 업데이트로 생긴 문제는 아닙니다.
-  bridge devDependency 경로의 `source-map-js` 감사 경고(vite → postcss)는 기존부터
-  있었고 배포 번들에는 포함되지 않습니다.
+  bridge devDependency 경로의 `source-map-js` 감사 경고(vite → postcss, 배포 번들
+  미포함)는 `npm audit fix`로 1.2.2로 올려 해소했습니다.
