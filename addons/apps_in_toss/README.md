@@ -1,6 +1,6 @@
 # Apps in Toss Godot addon
 
-공식 Unity SDK 3.5.0(web-framework 3.5.0) 구조에 맞춰 `AIT` 오토로드, 로그인,
+공식 Unity SDK 3.8.0(web-framework 3.8.0) 구조에 맞춰 `AIT` 오토로드, 로그인,
 게임 사용자 식별, IAP·전면 광고·AdMob·구독 결제 이벤트, 게임센터·바이럴·
 내비게이션 바, 진단 API와 타임아웃을 제공하는 Godot 4 애드온입니다(플러그인
 버전 0.2.0).

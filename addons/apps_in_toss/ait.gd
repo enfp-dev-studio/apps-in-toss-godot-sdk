@@ -58,3 +58,7 @@ func get_user_key_for_game(timeout_ms: int = 0) -> Dictionary:
 
 func get_is_toss_login_integrated_service(timeout_ms: int = 0) -> Dictionary:
     return await auth.get_is_toss_login_integrated_service(timeout_ms)
+
+
+func create_anonymous_key_auth_code(timeout_ms: int = 0) -> Dictionary:
+    return await auth.create_anonymous_key_auth_code(timeout_ms)

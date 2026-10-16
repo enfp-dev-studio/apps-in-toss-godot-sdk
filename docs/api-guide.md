@@ -8,14 +8,14 @@
 
 | 분류 | 제공하는 기능 |
 | --- | --- |
-| 인증 | 토스 로그인, 게임 사용자 식별키, 로그인 연동 여부 |
+| 인증 | 토스 로그인, 게임 사용자 식별키와 서버 검증 코드, 로그인 연동 여부 |
 | 결제 | 상품·주문 조회, 일회성·구독 결제, 지급 콜백과 미결 주문 처리 |
 | 광고 | 전면 광고·AdMob의 로드·표시·이벤트 |
 | 게임 | 게임센터, 정보 오버레이 구독 |
 | 이벤트 | 백/포그라운드 가시성 변화 |
 | 기타 | 저장소·배치 처리, 권한·공유·클립보드·햅틱, 바이럴, 내비게이션 바 |
 
-현재 카탈로그는 36개 항목이며, Unity SDK 3.5.0 / web-framework 3.5.0을 기준으로 합니다.
+현재 카탈로그는 37개 항목이며, Unity SDK 3.8.0 / web-framework 3.8.0을 기준으로 합니다.
 카탈로그와 별도로 결제·광고·게임 이벤트의 구독과 해제를 관리하는 래퍼와
 가시성 감지(`AIT.app_events`)를 제공합니다.
 AdMob load/show 두 항목은 일반 호출로 사용할 수 없으므로 `AIT.admob`을 사용하세요.
@@ -27,8 +27,9 @@ AdMob load/show 두 항목은 일반 호출로 사용할 수 없으므로 `AIT.a
 브리지가 없는 Godot 에디터나 일반 브라우저에서는 false이며,
 호출은 `AIT_BRIDGE_UNAVAILABLE` 오류로 비동기 반환됩니다.
 
-현재 DevTools 3.2.0에는 `NavigationBar.setOptions`와 `Viral.*`가 없습니다.
-기능별 지원 여부는 `AIT.has_api()`로 확인하세요. [브라우저 테스트 범위](testing.md#브라우저-시뮬레이터의-테스트-범위)
+DevTools 3.8.0부터 `NavigationBar.setOptions`, `Viral.*`, `User.createAnonymousKeyAuthCode`도
+mock으로 응답합니다. 오래된 토스 앱에는 새 API가 없을 수 있으니 기능별 지원 여부는
+`AIT.has_api()`로 확인하세요. [브라우저 테스트 범위](testing.md#브라우저-시뮬레이터의-테스트-범위)
 
 ## 기본 호출과 광고 이벤트
 
@@ -56,7 +57,7 @@ func _ready() -> void:
             print(String(result.get("hash", "")))
 
     # 내비게이션 바 (web-framework 3.5.0 추가 — 넘긴 필드만 반영).
-    # mock 개발 빌드에서는 미지원이므로 has_api 가드를 권장합니다.
+    # 오래된 토스 앱에는 없을 수 있으므로 has_api 가드를 권장합니다.
     if AIT.has_api("NavigationBar.setOptions"):
         await AIT.invoke_and_wait("NavigationBar.setOptions", [{"theme": "dark"}], 15_000)
 
@@ -100,6 +101,45 @@ func _on_admob_failed(subscription_id: int, error: Dictionary) -> void:
     AIT.admob.dispose(subscription_id)
 ```
 
+보상은 `userEarnedReward` 이벤트에서 지급하고, `dismissed`는 화면 상태 복구와
+구독 해제에만 쓰세요. 2026-10-08 AdMob 장애 때는 `dismissed`가 오지 않아
+닫힘 이벤트에서 보상을 주던 게임의 보상이 누락됐습니다. 닫힘 이벤트가 오지 않을 때를
+대비해 로딩·버튼 비활성 같은 대기 상태도 타임아웃으로 풀어 주는 것이 안전합니다.
+
+## 사용자 식별키 서버 검증
+
+`get_user_key_for_game`의 `hash`를 서버가 그대로 믿지 않도록, 일회용 코드로
+서버에서 다시 교환할 수 있습니다(web-framework 3.6.0 추가). 코드는 한 번만 쓸 수
+있고 `expiresIn`(초) 안에 파트너 서버에서 교환해야 하며, 교환 결과의 `hash`는
+`get_user_key_for_game`의 `hash`와 같습니다.
+
+```gdscript
+func _verify_user() -> void:
+    if not AIT.has_api("User.createAnonymousKeyAuthCode"):
+        return  # 오래된 토스 앱 — 기존 식별 흐름 유지
+    var response := await AIT.create_anonymous_key_auth_code(15_000)
+    if not bool(response.get("ok", false)):
+        push_warning("auth code failed: %s" % JSON.stringify(response.get("error")))
+        return
+    var result: Dictionary = response.get("result", {})
+    var code := String(result.get("code", ""))
+    # code를 즉시 게임 서버로 보내 교환하세요. 클라이언트에 저장하지 마세요.
+    print("send to server: %s (expires in %ss)" % [code, result.get("expiresIn", 0)])
+```
+
+## 바이럴 공유
+
+`Viral.share`는 web-framework 3.8.0부터 `title`·`description`을 받습니다.
+비워 두면 콘솔 캠페인에 설정한 값이 쓰입니다.
+
+```gdscript
+func _share_campaign() -> void:
+    var options := {"campaignId": "캠페인ID", "title": "같이 해요", "description": "친구와 기록 대결"}
+    var response := await AIT.invoke_and_wait("Viral.share", [options], 15_000)
+    if not bool(response.get("ok", false)):
+        push_warning("viral share failed: %s" % JSON.stringify(response.get("error")))
+```
+
 ## 백그라운드와 오디오(BGM)
 
 앱이 백그라운드로 가도 BGM이 계속 재생된다는 문의가 반복되므로 웹뷰의
@@ -136,6 +176,10 @@ API 항목의 원본은 [api-manifest.json](../bridge/api-manifest.json)이며,
 [카탈로그 GDScript](../addons/apps_in_toss/generated/ait_generated_catalog.gd)는 자동 생성됩니다.
 자세한 사용 방법(로그인 서버 연동, 결제 지급/복구, 전면 광고)은
 플랫폼 리포 [`docs/godot-integration.md`](https://github.com/enfp-dev-studio/toss-web-game/blob/main/docs/godot-integration.md)를 참고하세요.
+
+게임센터 프로필: `game_get_user_profile`(`Game.getUserProfile`)은 문서의
+`SUCCESS`/`PROFILE_NOT_FOUND` 외에 라이브에서 `NOT_SUPPORTED`를 돌려준 사례가
+있습니다(2026-10 커뮤니티, 토스 확인 중). 성공이 아니면 기본 닉네임으로 대체하세요.
 
 주의: 자동 생성 설정 파일의 `permissions`는 빈 배열입니다. 클립보드 등 권한이
 필요한 API가 기본 상태에서 동작한다고 가정하지 마세요. 권한 선언과 실기기

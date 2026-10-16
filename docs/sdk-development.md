@@ -115,3 +115,41 @@ Unity SDK 3.5.0 표면(현재 이름 기준 100여 개)과 앱인토스 개발�
   `bridge/api-manifest.json`을 대조하면 됩니다.
 - 감시: web-framework 3.6.0(2026-09-28, `User.createAnonymousKeyAuthCode`)이
   나왔으나 Unity SDK 태그는 아직 3.5.0입니다. Unity가 따라오면 함께 검토합니다.
+
+## 2026-10-15: Unity SDK 3.8.0 대응과 커뮤니티 사례
+
+- 기준: 공식 Unity SDK `release/v3.8.0`
+  (`18814fe5b5a2af5cd2a11a7a5bae53403fafa15e`, 2026-10-14). Unity 릴리스 태그는
+  이제 UPM 패키지 커밋 하나로 다시 만들어지며(3.5.0도 2026-10-06에 재태깅),
+  이전 핀 `29682a9`는 어느 태그에도 속하지 않습니다. 태그끼리 diff하지 말고
+  `main`의 `SDK 업데이트: vX.Y.Z` 커밋과 `api-changelog.md`를 비교하세요.
+- Unity C# 표면 변화는 3.6.0의 `AIT.UserCreateAnonymousKeyAuthCode` 하나이고
+  3.6.0 → 3.8.0은 변경 없음입니다. Runtime 변경(배너 높이, 소프트 키보드)은 Unity
+  WebGL 템플릿 전용이라 이 SDK에 해당하지 않습니다.
+- 반영: `User.createAnonymousKeyAuthCode` → `user_create_anonymous_key_auth_code`
+  (매니페스트 양쪽 + 생성 GDScript + platform lock SHA) 및 `AIT.create_anonymous_key_auth_code()`
+  래퍼. 익명 키를 서버에서 검증하는 경로입니다.
+- 코드 변경 없이 유효: `Viral.share`의 `title`·`description`(3.8.0)은 options
+  Dictionary를 그대로 넘기므로 바로 쓸 수 있습니다. `User.getConsentedData`의 주소
+  분리 키(3.7.0)는 이 SDK에 매핑되지 않은 API입니다.
+- 버전: web-framework 3.5.0 → 3.8.0, devtools 3.2.0 → 3.8.0(상류 Unity 템플릿과
+  동일). devtools 3.8.0 mock이 `NavigationBar.setOptions`, `Viral.*`,
+  `User.createAnonymousKeyAuthCode`에 응답하는 것을 mock 번들로 확인했습니다.
+  `@apps-in-toss/cli` 3.5.0과 3.8.0의 배포 코드는 버전 문자열만 다릅니다.
+- 아래 `#번호`는 [개발자 커뮤니티](https://techchat-apps-in-toss.toss.im/) 글
+  (`/t/<번호>`)입니다.
+- 커뮤니티 반영(문서): 광고 보상은 `userEarnedReward` 기준(2026-10-08 AdMob
+  장애 공지), `Game.getUserProfile`의 `NOT_SUPPORTED` 반환 사례, QR 실패 시 계정
+  확인, 웹 디버그 툴즈, "미니앱을 다시 시작했어요" 토스트 = OOM.
+- 호스트 쪽에서 조치된 사례(코드 변경 없음): 테스트 환경의 fetch 가로채기로
+  `WebAssembly.compileStreaming`이 거부되던 문제(#4880, #4920 — Flutter Web, 토스가
+  10-08 수정). Godot 로더는 응답을 새 `Response`로 감싸 넘기므로 영향이 적을 것으로
+  보지만 실기기로 확인하지는 않았습니다. 그 밖에 서버 전송 실패 주문이
+  `getPendingOrders`에 나오지 않던 문제(#4882), 첫 터치 오류 팝업(#4878),
+  내비게이션 바 로고 자동 반려(#4896), iOS 가로 화면의 몰입형 내비게이션 바(#4873)는
+  토스가 조치 중이거나 완료했습니다.
+- 잔여 갭은 2026-09-28 목록과 같습니다.
+- 감시: Windows `ait build`가 `.ait` 안 경로를 역슬래시로 쓴다는 문의(#5003,
+  답변 대기). CLI 3.5.0에도 같은 코드라 이번 업데이트로 생긴 문제는 아닙니다.
+  bridge devDependency 경로의 `source-map-js` 감사 경고(vite → postcss)는 기존부터
+  있었고 배포 번들에는 포함되지 않습니다.
