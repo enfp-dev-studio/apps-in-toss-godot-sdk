@@ -2,7 +2,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { isClearableExportDir, removeDevOnlyFiles } from './export-dir.mjs';
+import { isClearableExportDir, needsGodotImport, removeDevOnlyFiles } from './export-dir.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..');
@@ -20,6 +20,24 @@ const verifyScript = path.join(toolsDir, 'scripts', 'verify-gdscript.gd');
 
 if (!fs.existsSync(path.join(projectDir, 'project.godot'))) {
   throw new Error(`Godot project not found: ${projectDir}`);
+}
+
+// 깨끗한 체크아웃(.godot 없음)에서는 class_name 캐시가 없어 컴파일 게이트가
+// "Could not find type"으로 실패하므로, 캐시가 없을 때만 headless import를 먼저 한다.
+if (needsGodotImport(projectDir)) {
+  console.log('[Godot] project not imported yet; running headless import');
+  const headlessImport = spawnSync(godotBin, ['--headless', '--path', projectDir, '--import'], {
+    cwd: root,
+    stdio: 'inherit',
+  });
+  if (headlessImport.error) {
+    throw new Error(`Godot headless import failed: ${headlessImport.error.message}`);
+  }
+  if (headlessImport.status !== 0) {
+    throw new Error(
+      `Godot headless import failed (exit ${headlessImport.status ?? '?'}). Run '${godotBin} --headless --path ${projectDir} --import' manually and fix the errors above, then rebuild.`,
+    );
+  }
 }
 
 // 0. 컴파일 게이트: export는 깨진 스크립트가 있어도 exit 0을 내는 경우가 있어

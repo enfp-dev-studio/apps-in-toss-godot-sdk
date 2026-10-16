@@ -162,7 +162,7 @@ Unity SDK 3.5.0 표면(현재 이름 기준 100여 개)과 앱인토스 개발�
 
 ## 2026-10-16: 게임 적용에서 발견한 버그 수정
 
-cat-room-godot 게임에 SDK를 적용하며 4건(1~4)을 발견했고, 수정 검수에서 1건(5)을 더 찾았습니다. 아래와 같이 고쳤습니다.
+cat-room-godot 게임에 SDK를 적용하며 4건(1~4)을 발견했고, 수정 검수에서 1건(5), 출시 점검에서 1건(6)을 더 찾았습니다. 아래와 같이 고쳤습니다.
 
 1. export 폴더 정리: `build:dev` 뒤 `build`를 하면 mock 브리지와 DevTools 패널
    (약 1.6MB)이 출시 `.ait`에 섞였습니다. `export-godot.mjs`가 이전에는 기본
@@ -196,11 +196,12 @@ cat-room-godot 게임에 SDK를 적용하며 4건(1~4)을 발견했고, 수정 �
 5. 경로 표시 정리: `doctor`의 eval 경고가 게임 폴더 기준 경로(`scripts/x.gd:4`)로
    나오고, 생성 설정의 webBundleDir 기본값이 게임 안이면 상대경로(`build/godot-web`)로
    기록돼 기기별 절대경로가 커밋되지 않습니다.
+6. 깨끗한 체크아웃 빌드: `.godot`가 없는 프로젝트(새 clone, git worktree)에서 `build`가 컴파일 게이트에서 `Could not find type AITCore`로 실패했습니다. 게이트가 import 전에 돌아 class_name 캐시가 없었기 때문입니다. `export-godot.mjs`가 `.godot/global_script_class_cache.cfg`가 없을 때만 `godot --headless --import`를 먼저 실행합니다. 추가된 테스트는 [export-import-order](../tests/export-import-order.test.mjs)입니다. `.godot`를 뺀 cat-room-godot 사본에서 첫 실행은 import 후 export 성공, 두 번째 실행은 import 없이 성공함을 확인했습니다.
 
 게임 쪽 우회: cat-room-godot의 `npm run clean`은 export 폴더를 직접 비우는
 임시 조치이며, SDK 업데이트 후 없애도 됩니다.
 
-검증: `node --test tests/*.test.mjs` 35개와 Godot 4.7.2 애드온 검사
+검증: `node --test tests/*.test.mjs` 37개와 Godot 4.7.2 애드온 검사
 (`tests/run-godot-addon.mjs`)가 통과합니다. cat-room-godot 복사본에 수정한
 애드온을 넣고 확인했습니다. `build:dev` 결과를 브라우저(375×812)에서 열어
 브리지 연결, 가시성 이벤트(숨김 → 소리 게이트에 hidden, 다시 보임 → 해제)가
@@ -214,3 +215,4 @@ eval을 경고함, 브리지를 뺀 빌드에서 "No interface" 오류 없이 �
 참고: DevTools 패널 번들은 `process.env.NODE_ENV`를 참조하므로 SDK의 `preview`(Vite)로
 열어야 합니다. 단순 정적 서버로 열면 `process is not defined` 오류로 패널만 뜨지
 않습니다(3.2.0 패널도 같음, 게임 동작에는 영향 없음).
+잔여 갭: Godot 번들에는 `@apps-in-toss/debug-console` 연결 지점이 없어 `/ait:debug` 환경 3(실기기 원격 디버깅)을 쓸 수 없습니다. 백로그로 둡니다.

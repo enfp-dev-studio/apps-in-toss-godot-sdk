@@ -32,6 +32,12 @@ export function isClearableExportDir(dir, { projectDir, defaultExportDir }) {
   return false;
 }
 
+// 깨끗한 체크아웃(.godot 없음)에서는 컴파일 게이트 전에 headless import가
+// 먼저 필요하다. class_name 캐시가 있으면 이미 import된 프로젝트이다.
+export function needsGodotImport(projectDir) {
+  return !fs.existsSync(path.join(path.resolve(projectDir), '.godot', 'global_script_class_cache.cfg'));
+}
+
 // 지우면 안 되는 폴더에 남은 개발 전용 파일만 골라 지운다.
 // 지운 파일 이름 배열을 반환한다.
 export function removeDevOnlyFiles(dir) {
