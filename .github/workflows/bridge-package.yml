@@ -54,6 +54,21 @@ jobs:
           AIT_BRIDGE_MOCK=1 npm --prefix "$GITHUB_WORKSPACE/bridge" run build
           AIT_BRIDGE_MOCK=1 npm --prefix "$GITHUB_WORKSPACE/addons/apps_in_toss/tools/bridge" run build
         timeout-minutes: 10
+      - name: Debug console build (source + embedded)
+        # 테스트 빌드 전용 별도 번들. 출시 브리지 번들에는 들어가지 않는다.
+        # 출시 번들 → debug-console 순서로 빌드해 두 파일이 함께 남는지, 출시 번들에 섞이지 않는지 본다.
+        run: |
+          for dir in bridge addons/apps_in_toss/tools/bridge; do
+            npm --prefix "$GITHUB_WORKSPACE/$dir" run build
+            npm --prefix "$GITHUB_WORKSPACE/$dir" run build:debug-console
+            test -f "$dir/dist/apps-in-toss-godot-bridge.js"
+            test -f "$dir/dist/ait-debug-console.js"
+            if grep -q -e '__ait_debug_status' -e '/ait-attach' "$dir/dist/apps-in-toss-godot-bridge.js"; then
+              echo "::error::$dir release bridge bundle contains debug-console code"
+              exit 1
+            fi
+          done
+        timeout-minutes: 10
       - name: Minimal .ait packaging smoke
         run: node tests/run-minimal-package.mjs
         timeout-minutes: 10

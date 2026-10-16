@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { DEV_ONLY_EXPORT_FILES } from './export-dir.mjs';
+import { DEBUG_CONSOLE_EXPORT_FILE, DEV_ONLY_EXPORT_FILES } from './export-dir.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const defaultExportDir = path.resolve(here, '../build/godot-web');
@@ -11,6 +11,8 @@ const projectDir = path.resolve(process.env.GODOT_PROJECT_DIR ?? path.join(path.
 const indexPath = path.join(exportDir, 'index.html');
 // dev 모드(AIT_BRIDGE_MOCK=1)에서는 mock 브리지가 주입된다.
 const withMock = process.env.AIT_BRIDGE_MOCK === '1';
+// 테스트 빌드(build --debug-console, AIT_DEBUG_CONSOLE=1)에서만 debug-console을 허용한다.
+const withDebugConsole = !withMock && process.env.AIT_DEBUG_CONSOLE === '1';
 const bridgeName = withMock ? 'apps-in-toss-godot-bridge.mock.js' : 'apps-in-toss-godot-bridge.js';
 const bridgePath = path.join(exportDir, bridgeName);
 const manifestPath = path.join(exportDir, 'ait-platform-manifest.json');
@@ -59,10 +61,14 @@ if (threadedWorkers.length > 0) {
 }
 
 const html = fs.readFileSync(indexPath, 'utf8');
-// release 빌드에 개발 전용 파일(mock 브리지·DevTools 패널)이 섞여 .ait로 나가지 않도록 여기서 막는다.
+// release 빌드에 개발 전용 파일(mock 브리지·DevTools 패널·debug-console)이 섞여 .ait로 나가지 않도록 여기서 막는다.
+// 테스트 빌드는 debug-console 하나만 허용한다.
 if (!withMock) {
-  const devFile = DEV_ONLY_EXPORT_FILES.find((file) => fs.existsSync(path.join(exportDir, file)));
-  const devRef = DEV_ONLY_EXPORT_FILES.find((file) => html.includes(file));
+  const forbidden = DEV_ONLY_EXPORT_FILES.filter(
+    (file) => !(withDebugConsole && file === DEBUG_CONSOLE_EXPORT_FILE),
+  );
+  const devFile = forbidden.find((file) => fs.existsSync(path.join(exportDir, file)));
+  const devRef = forbidden.find((file) => html.includes(file));
   const offender = devFile ?? devRef;
   if (offender) {
     throw new Error(
@@ -71,8 +77,27 @@ if (!withMock) {
   }
 }
 const bridgeTag = `<script src="./${bridgeName}"></script>`;
-if ((html.match(new RegExp(bridgeTag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) ?? []).length !== 1) {
+if (countOccurrences(html, bridgeTag) !== 1) {
   throw new Error('Apps in Toss Godot bridge script must appear exactly once in index.html.');
+}
+if (withDebugConsole) {
+  const consoleTag = `<script src="./${DEBUG_CONSOLE_EXPORT_FILE}"></script>`;
+  if (!fs.existsSync(path.join(exportDir, DEBUG_CONSOLE_EXPORT_FILE))) {
+    throw new Error(`Debug console bundle not found: ${DEBUG_CONSOLE_EXPORT_FILE}. Run the test build again.`);
+  }
+  if (countOccurrences(html, consoleTag) !== 1) {
+    throw new Error('Debug console script must appear exactly once in index.html.');
+  }
+  if (html.indexOf(consoleTag) < html.indexOf(bridgeTag)) {
+    throw new Error('Debug console script must come after the Apps in Toss Godot bridge script.');
+  }
+  if (manifest.debugConsole !== true) {
+    throw new Error('Test build manifest must record "debugConsole": true.');
+  }
+} else if (manifest?.debugConsole) {
+  throw new Error(
+    'AIT platform manifest records "debugConsole": true, but this is a release build. Rebuild without --debug-console.',
+  );
 }
 if (/id=["']status-(?:splash|progress)["']/i.test(html)) {
   throw new Error(
@@ -83,6 +108,15 @@ if (/<iframe\b/i.test(html)) throw new Error('iframe is not allowed in Apps in T
 
 const bridge = fs.readFileSync(bridgePath, 'utf8');
 if (!bridge.includes('AppsInTossGodot')) throw new Error('Bridge bundle does not expose AppsInTossGodot.');
+// debug-console은 별도 번들(ait-debug-console.js)로만 들어간다. 브리지 번들에 섞이면 막는다.
+const debugConsoleMarker = ['__ait_debug_status', '/ait-attach'].find((marker) => bridge.includes(marker));
+if (debugConsoleMarker) {
+  throw new Error(`Bridge bundle contains debug-console code (${debugConsoleMarker}). Rebuild the bridge with npm run build.`);
+}
 
 const totalBytes = files.reduce((sum, file) => sum + fs.statSync(path.join(exportDir, file)).size, 0);
 console.log(`Verified Godot Apps in Toss bundle: ${files.length} files, ${(totalBytes / 1024 / 1024).toFixed(2)} MiB`);
+
+function countOccurrences(text, needle) {
+  return text.split(needle).length - 1;
+}

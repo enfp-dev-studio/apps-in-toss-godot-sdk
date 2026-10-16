@@ -1,9 +1,16 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-// 개발 빌드(build:dev)에서만 export 폴더에 넣는 파일.
+// 테스트 빌드(build --debug-console)에서만 넣는 실기기 원격 디버깅 번들.
+export const DEBUG_CONSOLE_EXPORT_FILE = 'ait-debug-console.js';
+
+// 개발 빌드(build:dev)나 테스트 빌드(build --debug-console)에서만 export 폴더에 넣는 파일.
 // release 빌드의 .ait에 섞이면 안 된다.
-export const DEV_ONLY_EXPORT_FILES = ['apps-in-toss-godot-bridge.mock.js', 'ait-devtools-panel.js'];
+export const DEV_ONLY_EXPORT_FILES = [
+  'apps-in-toss-godot-bridge.mock.js',
+  'ait-devtools-panel.js',
+  DEBUG_CONSOLE_EXPORT_FILE,
+];
 
 // export 폴더를 통째로 지워도 되는지 판단한다.
 // SDK 기본 경로면 true, 프로젝트 안의 export 결과물 폴더(비어 있거나

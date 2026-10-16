@@ -63,4 +63,5 @@ var cached := await AIT.admob.is_admob_loaded_and_wait({"adGroupId": "광고그�
 이 애드온만으로는 Web 페이지의 JavaScript 브리지가 만들어지지 않습니다.
 게임 루트에서 `node addons/apps_in_toss/tools/ait-godot.mjs build`를 실행하면
 Godot Web export에 브리지를 주입하고 `.ait` 파일을 생성합니다. `build:dev`는
-브라우저 mock 테스트용 Web 번들만 생성합니다.
+브라우저 mock 테스트용 Web 번들만 생성합니다. `build --debug-console`은 실기기
+원격 디버깅(`/ait:debug`)용 테스트 번들을 만들며, 검수에는 쓰지 않습니다.

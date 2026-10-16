@@ -215,4 +215,46 @@ eval을 경고함, 브리지를 뺀 빌드에서 "No interface" 오류 없이 �
 참고: DevTools 패널 번들은 `process.env.NODE_ENV`를 참조하므로 SDK의 `preview`(Vite)로
 열어야 합니다. 단순 정적 서버로 열면 `process is not defined` 오류로 패널만 뜨지
 않습니다(3.2.0 패널도 같음, 게임 동작에는 영향 없음).
-잔여 갭: Godot 번들에는 `@apps-in-toss/debug-console` 연결 지점이 없어 `/ait:debug` 환경 3(실기기 원격 디버깅)을 쓸 수 없습니다. 백로그로 둡니다.
+잔여 갭(해결): Godot 번들에 `@apps-in-toss/debug-console` 연결 지점이 없어 `/ait:debug` 환경 3(실기기 원격 디버깅)을 쓸 수 없던 문제는 아래 "2026-10-16: 실기기 원격 디버깅 테스트 빌드"에서 `build --debug-console`로 해결했습니다.
+
+## 2026-10-16: 실기기 원격 디버깅 테스트 빌드
+
+토스 앱에서 연 테스트 번들에 앱인토스 디버거(`ait-devtools` MCP, `/ait:debug` 환경 3,
+relay-staging QR attach)를 붙일 수 있게 했습니다. 출시 번들에는 들어가지 않습니다.
+사용 순서는 [테스트 가이드](testing.md#실기기-원격-디버깅)에 있습니다.
+
+- 의존성: `@apps-in-toss/debug-console` 0.2.0(harness GitHub Release tarball)을 두 브리지
+  `dependencies`에 넣었습니다. 두 `package.json`·lockfile은 바이트가 같고,
+  [manifest-parity](../tests/manifest-parity.test.mjs)가 lockfile까지 비교합니다.
+- 별도 번들: `npm run build:debug-console`(Vite mode `debug-console`)이
+  `src/debug-console.ts`(`@apps-in-toss/debug-console/auto`)를 `dist/ait-debug-console.js`
+  IIFE(약 12KB)로 만듭니다. 출시 브리지 `src/index.ts`는 이 패키지를 import하지 않으며,
+  옵션 없이 만든 출시·mock 브리지 번들은 변경 전과 바이트가 같습니다. debug-console이
+  `import('@apps-in-toss/web-framework')`로 부르는 SDK는 빌드 때 브리지가 올린
+  `window.AppsInToss`로 바꿔 web-framework가 두 번 들어가지 않게 했습니다. 그래서
+  `index.html`에서 브리지 다음에 와야 합니다. `/auto`의 DEV 신호는 빌드에서 `false`로 고정됩니다.
+- 켜는 방법: `ait-godot build --debug-console` 또는 `AIT_DEBUG_CONSOLE=1`. 켜면
+  `pipeline-finalize`가 debug-console 번들을 만들고, `patch-export`가 브리지 다음에
+  `<script src="./ait-debug-console.js">`를 넣고, `write-platform-manifest`가
+  `"debugConsole": true`를 기록합니다. 빌드 로그 처음과 끝에 "테스트 전용 빌드 — 검수 제출 금지"를
+  출력합니다. 끄면(기본) 이전과 같은 결과입니다. `build:dev`(mock)에서는 이 옵션을 무시합니다.
+- 안전장치: `ait-debug-console.js`를 `export-dir.mjs`의 개발 전용 목록에 넣어 `build`가
+  export 폴더를 비우지 못할 때도 지웁니다. `verify-godot-export.mjs`는 release 검증에서
+  이 파일이나 `index.html` 참조, 매니페스트 `debugConsole: true`, 브리지 번들 안의
+  debug-console 코드(`__ait_debug_status`, `/ait-attach`)를 발견하면 실패합니다.
+  테스트 빌드 검증은 파일·참조 1회·브리지 다음 순서·매니페스트 기록을 확인합니다.
+  `doctor`는 export 폴더 매니페스트에 `debugConsole: true`가 남아 있으면 경고합니다.
+  추가된 테스트는 [debug-console](../tests/debug-console.test.mjs)(18개)이고, CI의
+  [브리지·패키징](../.github/workflows/bridge-package.yml)에 `build:debug-console` 단계를 넣었습니다.
+
+검증: `node --test tests/*.test.mjs` 56개, 두 브리지의 `tsc --noEmit`·production·mock·
+`build:debug-console` 빌드, `tests/run-minimal-package.mjs`, Godot 4.7.2
+`tests/run-godot-addon.mjs`가 통과합니다. cat-room-godot 커밋(`60c3246`)을 git worktree로
+꺼내 이 애드온(SDK `8fffd4b` + 이번 변경)과 새 템플릿 lock을 넣고 확인했습니다.
+`build --debug-console`의 `.ait`에는 `ait-debug-console.js`와 `"debugConsole": true`가 있었고,
+이어서 옵션 없이 `build`하자 `doctor`가 이전 테스트 빌드를 경고한 뒤 `.ait`에서 둘 다 빠졌습니다.
+테스트 빌드 결과를 정적 서버(375×812)로 열면 쿼리가 없을 때 debug-console이 아무것도 하지 않고
+(`__ait_debug_status`·`__sdk` 없음, relay 요청 없음) 게임이 입양 화면까지 뜹니다. 콘솔 오류는
+토스 밖에서 나는 게임의 Storage 경고뿐입니다. `?debug=1`만 붙이면 relay 주소가 없어
+`blocked-invalid-relay` 막대가 뜨고, `window.__sdk`는 브리지의 `window.AppsInToss` 객체를 그대로 씁니다.
+미확인: 토스 앱 실기기에서 QR attach와 디버거 도구(`take_screenshot`, `evaluate`, `call_sdk`, `run_tests`) 동작.

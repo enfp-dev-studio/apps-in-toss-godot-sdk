@@ -131,11 +131,18 @@ node addons/apps_in_toss/tools/ait-godot.mjs build
 ```
 
 설정 검사 → Godot Web export → 브리지 주입·검증 → `.ait` 패키징 순으로 진행합니다.
-`build`는 export 전에 `build/godot-web`을 비우며, 개발 전용 파일
-(`apps-in-toss-godot-bridge.mock.js`, `ait-devtools-panel.js`)이 release 결과에
-남으면 검사가 실패합니다.
+`build`는 export 전에 `build/godot-web`을 비우며, 개발·테스트 전용 파일
+(`apps-in-toss-godot-bridge.mock.js`, `ait-devtools-panel.js`, `ait-debug-console.js`)이
+release 결과에 남으면 검사가 실패합니다.
 빌드 산출물의 `ait-platform-manifest.json`에는 사용한 버전 조합이 기록됩니다.
 업로드와 실제 기능 확인은 [토스 앱 테스트](testing.md#토스-앱에서-확인하기)를 참고하세요.
+
+실기기에서 `/ait:debug`로 원격 디버깅할 테스트 번들은 `build --debug-console`로 만듭니다.
+검수에는 쓰지 말고 [실기기 원격 디버깅](testing.md#실기기-원격-디버깅)을 참고하세요.
+
+```bash
+node addons/apps_in_toss/tools/ait-godot.mjs build --debug-console  # 테스트 전용, 검수 제출 금지
+```
 
 플러그인을 켜면 Godot 에디터의 **AIT 탭**에서도 Doctor, Dev Server,
 Build & Package를 실행할 수 있습니다. Configuration 열기, Publish 안내,

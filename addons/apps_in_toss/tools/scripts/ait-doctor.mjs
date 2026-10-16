@@ -321,6 +321,25 @@ if (fs.existsSync(projectDir)) {
   }
 }
 
+// 테스트 빌드(build --debug-console) 결과가 export 폴더에 남아 있으면 알린다.
+// 그 .ait에는 실기기 원격 디버깅 표면이 들어 있어 검수에 제출하면 안 된다.
+const exportDir = path.resolve(process.env.GODOT_EXPORT_DIR ?? path.join(projectDir, 'build/godot-web'));
+const exportManifestPath = path.join(exportDir, 'ait-platform-manifest.json');
+if (fs.existsSync(exportManifestPath)) {
+  let exportManifest = null;
+  try {
+    exportManifest = JSON.parse(fs.readFileSync(exportManifestPath, 'utf8'));
+  } catch {
+    // export 매니페스트 검증은 verify-godot-export.mjs가 맡는다.
+  }
+  if (exportManifest?.debugConsole === true) {
+    const shown = path.relative(projectDir, exportManifestPath) || exportManifestPath;
+    warnings.push(
+      `${shown} has "debugConsole": true — 테스트 빌드(--debug-console) 결과입니다. 그 .ait는 검수에 제출하지 마세요. 옵션 없이 build하면 출시용으로 다시 만들어집니다.`,
+    );
+  }
+}
+
 for (const warning of warnings) console.warn(`[AIT doctor] WARN ${warning}`);
 for (const error of errors) console.error(`[AIT doctor] ERROR ${error}`);
 

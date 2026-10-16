@@ -52,6 +52,16 @@ if (!fs.existsSync(path.join(bridgeDir, 'node_modules'))) {
 }
 run('npm', ['run', 'build'], { cwd: bridgeDir });
 
+// 테스트 빌드(AIT_DEBUG_CONSOLE=1): debug-console을 별도 번들로 만든다.
+// 출시 브리지 번들과 섞이지 않고, patch-export가 export에만 넣는다.
+const withDebugConsole = process.env.AIT_DEBUG_CONSOLE === '1';
+if (withDebugConsole) {
+  if (!fs.existsSync(path.join(bridgeDir, 'node_modules/@apps-in-toss/debug-console'))) {
+    fail(`@apps-in-toss/debug-console이 설치되지 않았습니다. npm --prefix ${bridgeDir} ci 를 먼저 실행하세요.`);
+  }
+  run('npm', ['run', 'build:debug-console'], { cwd: bridgeDir });
+}
+
 // 주입 + export 무결성 검증 — 게임 리포의 export dir을 명시적으로 넘긴다.
 run('node', [path.join(bridgeDir, 'scripts/patch-export.mjs')], {
   cwd: sdkDir,
@@ -61,4 +71,4 @@ run(process.execPath, [path.join(here, 'verify-godot-export.mjs')], {
   env: { GODOT_EXPORT_DIR: path.join(gameDir, 'build/godot-web') },
 });
 
-console.log('[ait-godot finalize] 브리지 주입·검증 완료');
+console.log(`[ait-godot finalize] 브리지 주입·검증 완료${withDebugConsole ? ' (테스트 빌드: debug-console 포함)' : ''}`);

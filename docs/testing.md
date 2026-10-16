@@ -10,11 +10,12 @@
 | 검사 | 확인하는 내용 |
 | --- | --- |
 | [회귀 테스트](../.github/workflows/regressions.yml) | Node 24/26에서 설치 안전성, SDK 캐시, API 매니페스트·생성 파일 일치, 브리지 호출·이벤트 전달 |
-| [브리지·패키징](../.github/workflows/bridge-package.yml) | 소스·내장 브리지 타입 검사, production/mock 빌드, 최소 HTML 입력의 `.ait` 패키징 |
+| [브리지·패키징](../.github/workflows/bridge-package.yml) | 소스·내장 브리지 타입 검사, production/mock/debug-console 빌드, 최소 HTML 입력의 `.ait` 패키징 |
 | [Godot 애드온](../.github/workflows/godot-addon.yml) | Godot 4.7.2 headless import, GDScript 구문 검사, AdMob 브리지 부재 오류·구독 해제 |
 | [export 폴더 정리](../tests/export-dir.test.mjs) | 프로젝트 안 export 폴더는 비워도 되고 소스·프로젝트 바깥은 비우지 않음, release에 개발 전용 파일이 섞이면 검증 실패 |
 | [설정 생성](../tests/write-ait-config.test.mjs) | 매니페스트의 `webView`·`permissions`·`navigationBar` 반영과 기본값·검증, 잘못된 키·조합은 실패 |
 | [eval 금지](../tests/no-eval.test.mjs) | 애드온 GDScript에 `JavaScriptBridge.eval`이 없음 |
+| [debug-console](../tests/debug-console.test.mjs) | 테스트 빌드에서만 debug-console을 브리지 다음에 주입, release에 남으면 검증 실패, 매니페스트 `debugConsole` 기록과 `doctor` 경고 |
 | 별도 확인 | 전체 Godot Web export, 브라우저 게임 플레이, 토스 앱·실기기 동작 |
 
 PR 생성·업데이트와 `main` push 때 실행하며, GitHub Actions 탭에서 수동 실행도 가능합니다.
@@ -35,6 +36,9 @@ git diff --exit-code -- addons/apps_in_toss/generated/  # 생성 파일 변경 �
 (cd addons/apps_in_toss/tools/bridge && npx tsc --noEmit)
 (cd bridge && npm run build && AIT_BRIDGE_MOCK=1 npm run build)
 (cd addons/apps_in_toss/tools/bridge && npm run build && AIT_BRIDGE_MOCK=1 npm run build)
+# 테스트 빌드 전용 debug-console 번들 (dist/ait-debug-console.js)
+(cd bridge && npm run build:debug-console)
+(cd addons/apps_in_toss/tools/bridge && npm run build:debug-console)
 
 node tests/run-minimal-package.mjs  # 최소 .ait 패키징
 # macOS 앱 경로 예시. PATH에 설치했다면 GODOT_BIN=godot 사용
@@ -103,6 +107,51 @@ SDK 3.x 번들을 출시하면 2.x로 되돌릴 수 없고, 2026-10-05부터 3.x
 `JavaScriptBridge.eval` 구현용 eval 코드가 들어 있지만, 게임과 SDK가 그 API를
 호출하지 않으면 실행되지 않습니다. 엔진에서 아예 빼는 방법(커스텀 Web 템플릿
 빌드)은 이 SDK에서 검증하지 않았습니다.
+
+## 실기기 원격 디버깅
+
+토스 앱에서 연 테스트 번들에 앱인토스 디버거(`ait-devtools` MCP, `/ait:debug` 환경 3)를
+붙이면 화면 캡처, JS 평가, 콘솔·네트워크 로그, SDK 호출, `*.ait.test.ts` 실행을
+원격으로 할 수 있습니다. 폰 쪽 코드는 `@apps-in-toss/debug-console` 0.2.0이며
+테스트 빌드에만 넣습니다.
+
+미리 필요한 것:
+
+- 게임 폴더 `.mcp.json`에 `ait-devtools`(`@apps-in-toss/debugger`) 등록. `/ait:setup-debugger`가 해 줍니다.
+- 내장 브리지 의존성: `npm --prefix addons/apps_in_toss/tools/bridge ci`. debug-console이
+  설치되지 않았으면 테스트 빌드가 이 명령을 안내하며 멈춥니다.
+
+순서:
+
+1. 게임 폴더에서 테스트 빌드를 만듭니다. `AIT_DEBUG_CONSOLE=1`을 붙여 `build`해도 같습니다.
+
+   ```bash
+   node addons/apps_in_toss/tools/ait-godot.mjs build --debug-console
+   ```
+
+   출시 브리지 다음에 `ait-debug-console.js`가 들어가고, `ait-platform-manifest.json`에
+   `"debugConsole": true`가 기록됩니다. 빌드 로그 처음과 끝에 "테스트 전용 빌드 — 검수 제출 금지"가 나옵니다.
+2. 만든 `.ait`를 콘솔에 테스트 번들로 올립니다(콘솔 웹이나 console MCP). `ait build` 출력의
+   `deploymentId`로 올린 번들이 맞는지 확인합니다.
+3. `/ait:debug`를 실행해 환경 3(relay-staging) QR attach를 진행합니다. 디버거가 띄운 QR을
+   폰 카메라로 스캔합니다. QR 링크에는 `debug=1&relay=…`가 붙어 있습니다. 토스 앱에 같은
+   미니앱이 열려 있으면 X로 닫은 뒤 스캔합니다.
+
+동작 범위:
+
+- debug-console은 URL에 `debug=1`이나 `relay=`가 없으면 아무것도 하지 않습니다. 붙을 때도
+  미니앱 호스트(`*.tossmini.com`, localhost), relay 주소(`*.trycloudflare.com`, localhost),
+  QR의 일회용 코드를 확인합니다.
+- SDK 호출(`call_sdk`)은 브리지가 올린 `window.AppsInToss`를 씁니다. debug-console 번들에
+  web-framework를 다시 넣지 않으므로 `index.html`에서 브리지보다 뒤에 있어야 하며, 검증이 이 순서를 확인합니다.
+- Godot 화면은 canvas 하나라 DOM 스냅샷에는 게임 UI가 나오지 않습니다. 화면은
+  `take_screenshot`, 상태는 `evaluate`와 `measure_safe_area`로 봅니다.
+
+**검수 번들에 쓰지 마세요.** 테스트 빌드 `.ait`에는 원격 디버깅 표면이 들어 있습니다.
+검수·출시용 `.ait`는 옵션 없이 `build`를 다시 실행해 만듭니다. `build`는 export 폴더를
+비우고 다시 만들며, `ait-debug-console.js`가 파일이나 `index.html` 참조로 남거나
+매니페스트에 `debugConsole: true`가 있으면 검증이 실패합니다. `doctor`는 export 폴더의
+매니페스트에 `debugConsole: true`가 남아 있으면 경고합니다.
 
 ## 2026-09-24 샘플 실행 결과
 

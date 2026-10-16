@@ -31,7 +31,9 @@ describe('bridge source/embedded parity + 3.8.0 pins', () => {
     const pairs = [
       ['bridge/api-manifest.json', 'addons/apps_in_toss/tools/bridge/api-manifest.json'],
       ['bridge/package.json', 'addons/apps_in_toss/tools/bridge/package.json'],
+      ['bridge/package-lock.json', 'addons/apps_in_toss/tools/bridge/package-lock.json'],
       ['bridge/src/index.ts', 'addons/apps_in_toss/tools/bridge/src/index.ts'],
+      ['bridge/src/debug-console.ts', 'addons/apps_in_toss/tools/bridge/src/debug-console.ts'],
       ['bridge/vite.config.ts', 'addons/apps_in_toss/tools/bridge/vite.config.ts'],
       ['bridge/tsconfig.json', 'addons/apps_in_toss/tools/bridge/tsconfig.json'],
       ['bridge/scripts/patch-export.mjs', 'addons/apps_in_toss/tools/bridge/scripts/patch-export.mjs'],

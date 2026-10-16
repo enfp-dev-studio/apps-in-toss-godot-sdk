@@ -9,6 +9,11 @@ const root = path.resolve(bridgeDir, '../..');
 const defaultExportDir = path.join(root, 'build/godot-web');
 const exportDir = path.resolve(process.argv[2] ?? process.env.GODOT_EXPORT_DIR ?? defaultExportDir);
 const withMock = process.env.AIT_BRIDGE_MOCK === '1';
+// 테스트 빌드(ait-godot build --debug-console)만 켠다. mock 개발 빌드에는 넣지 않는다.
+const withDebugConsole = process.env.AIT_DEBUG_CONSOLE === '1' && !withMock;
+if (process.env.AIT_DEBUG_CONSOLE === '1' && withMock) {
+  console.warn('AIT_DEBUG_CONSOLE is ignored for the mock (Dev Server) build.');
+}
 
 const indexPath = path.join(exportDir, 'index.html');
 const bundleName = withMock ? 'apps-in-toss-godot-bridge.mock.js' : 'apps-in-toss-godot-bridge.js';
@@ -44,6 +49,24 @@ if (withMock) {
     fs.writeFileSync(indexPath, html);
   }
   console.log('Dev Server mode: mock bridge + DevTools panel injected.');
+}
+
+// 테스트 빌드: 실기기 원격 디버깅(/ait:debug 환경 3)용 debug-console을 브리지 바로
+// 다음에 넣는다. 브리지가 올린 window.AppsInToss를 쓰므로 순서가 중요하다.
+// 검수·출시 번들에는 들어가면 안 된다(verify-godot-export.mjs가 막는다).
+if (withDebugConsole) {
+  const consoleName = 'ait-debug-console.js';
+  const consoleSrc = path.join(bridgeDir, 'dist', consoleName);
+  if (!fs.existsSync(consoleSrc)) {
+    throw new Error(`Debug console bundle not found: ${consoleSrc}. Run npm run build:debug-console first.`);
+  }
+  fs.copyFileSync(consoleSrc, path.join(exportDir, consoleName));
+  const consoleTag = `<script src="./${consoleName}"></script>`;
+  if (!html.includes(consoleTag)) {
+    html = html.replace(tag, `${tag}\n  ${consoleTag}`);
+    fs.writeFileSync(indexPath, html);
+  }
+  console.log('Debug console injected (test build only, do not submit for review).');
 }
 
 console.log(`Patched ${indexPath}`);
