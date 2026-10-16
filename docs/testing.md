@@ -90,8 +90,9 @@ DevTools 패널을 뜻합니다. 아래는 설치된 DevTools 3.8.0 구현 기�
 
 QR 테스트가 "지금은 서비스를 사용할 수 없어요"로 실패하면 SDK 코드보다 환경을
 먼저 확인합니다. 커뮤니티에서 확인된 순서는 ① 토스 앱을 최신 버전으로
-업데이트(신규 SDK를 모르는 호스트 앱에서 발생) ② 로컬에서는 AIT Devtools mock으로
-재현 여부 확인 ③ 그다음 번들 재빌드입니다.
+업데이트(신규 SDK를 모르는 호스트 앱에서 발생) ② QR을 연 토스 계정이 콘솔의 대표
+관리자 또는 워크스페이스 멤버 계정인지 확인 ③ 로컬에서는 AIT Devtools mock으로
+재현 여부 확인 ④ 그다음 번들 재빌드입니다.
 
 테스트 스킴에서만 로딩 화면에서 멈추면 웹 디버그 툴즈의 Log 탭에서 WebAssembly 오류를 확인하세요.
 툴즈가 `fetch` 응답을 감싸 wasm 컴파일이 실패한 사례가 있었고, 2026-10-08 플랫폼에서 수정됐습니다.
@@ -170,3 +171,32 @@ Godot 4.7.2와 같은 버전의 비스레드 Web export 템플릿으로 SDK 샘�
 임시 게임 프로젝트에 샘플 씬·폰트 테마·HTML shell을 준비했고,
 모의 광고 확인에만 임시 광고 그룹 ID를 사용했습니다.
 실제 토스 로그인·결제·광고 송출과 게임 전체 플레이는 이 기록에 포함하지 않습니다.
+
+## 2026-10-16 샘플 실행 결과 (web-framework·DevTools 3.8.0)
+
+브리지를 web-framework 3.8.0·DevTools 3.8.0으로 올린 뒤 위와 같은 방법으로 다시 실행했습니다.
+Godot 4.7.2와 같은 버전의 비스레드 Web export 템플릿(`web_nothreads_*`)을 사용했고,
+애드온은 SDK 원본 CLI의 `addon:install --force`로 임시 게임 프로젝트에 설치했습니다.
+
+| 확인한 항목 | 결과 |
+| --- | --- |
+| `doctor --strict` | 통과 |
+| 실제 Godot Web export와 실전 브리지 주입·검증 | 통과 (11개 파일, 주입된 브리지에 `User.createAnonymousKeyAuthCode` 포함) |
+| 실제 Web 출력의 `.ait` 패키징 | 통과 (배포는 실행하지 않음) |
+| mock 개발 빌드와 브라우저 화면·한글 표시 | 통과 |
+| 샘플 `?e2e=true` | 성공 15개, 실패 0개 (`user_create_anonymous_key_auth_code` 포함) |
+| 샘플 버튼 | 모의 로그인 인가 코드 수신, 상품 2개 조회, 전면 광고 로드·종료 확인 |
+| mock `AIT.create_anonymous_key_auth_code()` | 통과 — `code`와 `expiresIn`(300초) 수신 |
+| mock `Viral.share` 제목·설명 전달 | 통과 — DevTools 로그에 `title`·`description`이 그대로 전달됨 |
+| `build:dev` 뒤 `build` 다시 실행 | 처음에는 실패, export 폴더 정리 수정 후 통과 (11개 파일, 51.67 MiB) |
+
+`?e2e=true` 대상은 이 실행 시점 카탈로그에서 인자가 없는 API 16개 중 `close_view`를 뺀 15개입니다.
+익명 키·`Viral.share`는 임시 프로젝트에만 둔 점검 스크립트로 호출했고, 샘플 씬에는 포함하지 않았습니다.
+
+마지막 항목은 처음 실행에서 export 폴더가 비워지지 않아 개발 빌드의 mock 브리지·DevTools 패널과
+Godot이 export PNG를 가져오며 만든 `.import` 파일이 `.ait`에 실린 문제(16개 파일, 53.22 MiB)였습니다.
+같은 날 `main`에 들어간 export 폴더 정리와 release 검증([버그 수정 기록](sdk-development.md))이 이 경우를 다루며,
+이 기록의 재실행은 같은 동작의 이전 수정본으로 확인했습니다.
+
+실제 토스 로그인·결제·광고 송출, 익명 키 인증 코드의 서버 교환, 실기기 공유 시트와
+게임 전체 플레이는 이 기록에 포함하지 않습니다.

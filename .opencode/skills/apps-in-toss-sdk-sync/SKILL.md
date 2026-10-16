@@ -33,6 +33,9 @@ description: Apps in Toss Unity SDK/web-framework 업데이트와 앱인토스 �
    릴리스 노트를 최신부터 읽는다. Unity 태그 `release/vX.Y.Z`가 web-framework
    `X.Y.Z`와 1:1인 경우가 많지만 **가정하지 말고 실제 의존성 비교**(devtools 등은
    다를 수 있음). web-framework에만 있고 Unity가 아직 안 감싼 API도 후보로 잡는다.
+   Unity 릴리스 태그는 UPM 패키지 커밋 하나로 재생성·백필되므로(이전 핀 커밋이 태그에서
+   사라질 수 있음) 태그끼리 diff하지 말고 `main`의 `SDK 업데이트: vX.Y.Z` 커밋과
+   `api-changelog.md`, npm `CHANGELOG.md`·`dist/index.d.ts` diff로 판단한다.
 2. **API 표면 diff.** `index.d.ts`의 네임스페이스·익스포트를 `api-manifest.json`과
    대조해 미매핑 목록을 만든다. 구독형(`addEventListener`/cleanup 반환,
    `processProductGrant` 콜백)은 일반 invoke로 못 넣고 전용 래퍼가 필요하다

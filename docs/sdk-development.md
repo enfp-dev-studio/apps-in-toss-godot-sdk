@@ -159,6 +159,11 @@ Unity SDK 3.5.0 표면(현재 이름 기준 100여 개)과 앱인토스 개발�
   로컬에 Godot가 없어 GDScript 구문 검사는 CI(`godot-addon.yml`)에 맡겼습니다.
   새 API의 실제 응답은 토스 앱에서 확인해야 합니다.
 - 감시: Unity SDK가 `User.getConsentedData`나 배너 외 helper를 추가하는지, devtools mock 응답이 바뀌는지 봅니다.
+- 감시: Windows `ait build`가 `.ait` 안 경로를 역슬래시로 쓴다는 문의
+  ([5003](https://techchat-apps-in-toss.toss.im/t/5003), 답변 대기). `@apps-in-toss/cli` 3.5.0과 3.8.0의
+  배포 코드는 버전 문자열만 달라 이번 업데이트로 생긴 문제는 아닙니다.
+- 의존성: bridge 개발 의존성 경로(vite → postcss)의 `source-map-js` 감사 경고를
+  `npm audit fix`로 1.2.2로 올려 해소했습니다. 배포 번들에는 포함되지 않습니다.
 
 ## 2026-10-16: 게임 적용에서 발견한 버그 수정
 

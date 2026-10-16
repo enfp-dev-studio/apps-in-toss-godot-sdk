@@ -174,6 +174,12 @@ func _on_admob_failed(subscription_id: int, error: Dictionary) -> void:
     AIT.admob.dispose(subscription_id)
 ```
 
+보상은 `userEarnedReward` 이벤트에서 지급하고, `dismissed`는 화면 상태 복구와
+구독 해제에만 쓰세요. 2026-10-08 AdMob 장애 때는 `dismissed`가 오지 않아
+닫힘 이벤트에서 보상을 주던 게임의 보상이 누락됐습니다
+([공지](https://techchat-apps-in-toss.toss.im/t/4951)). 닫힘 이벤트가 오지 않을 때를
+대비해 로딩·버튼 비활성 같은 대기 상태도 타임아웃으로 풀어 주는 것이 안전합니다.
+
 ## 백그라운드와 오디오(BGM)
 
 앱이 백그라운드로 가도 BGM이 계속 재생된다는 문의가 반복되므로 웹뷰의
@@ -210,6 +216,10 @@ API 항목의 원본은 [api-manifest.json](../bridge/api-manifest.json)이며,
 [카탈로그 GDScript](../addons/apps_in_toss/generated/ait_generated_catalog.gd)는 자동 생성됩니다.
 자세한 사용 방법(로그인 서버 연동, 결제 지급/복구, 전면 광고)은
 플랫폼 리포 [`docs/godot-integration.md`](https://github.com/enfp-dev-studio/toss-web-game/blob/main/docs/godot-integration.md)를 참고하세요.
+
+게임센터 프로필: `game_get_user_profile`(`Game.getUserProfile`)은 문서의
+`SUCCESS`/`PROFILE_NOT_FOUND` 외에 라이브에서 `NOT_SUPPORTED`를 돌려준 사례가
+있습니다(2026-10, 토스 확인 중). 성공이 아니면 기본 닉네임으로 대체하세요.
 
 주의: 필요한 권한은 `.ait/game.manifest.json`의 `permissions`로 선언합니다.
 `build`·`build:dev`가 매니페스트를 읽어 `apps-in-toss.config.ts`를 다시 만들며, 선언하지 않으면
