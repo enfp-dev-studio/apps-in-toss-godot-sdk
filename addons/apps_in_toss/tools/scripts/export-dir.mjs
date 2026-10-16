@@ -39,10 +39,22 @@ export function isClearableExportDir(dir, { projectDir, defaultExportDir }) {
   return false;
 }
 
-// 깨끗한 체크아웃(.godot 없음)에서는 컴파일 게이트 전에 headless import가
-// 먼저 필요하다. class_name 캐시가 있으면 이미 import된 프로젝트이다.
+// 깨끗한 체크아웃(.godot 없음)인지 판단한다. import는 캐시가 있어도
+// 항상 실행하므로(오래된 .godot 캐시가 깨진 스크립트를 가릴 수 있다)
+// 이 값은 로그 문구(처음/갱신) 구분에만 쓴다.
 export function needsGodotImport(projectDir) {
   return !fs.existsSync(path.join(path.resolve(projectDir), '.godot', 'global_script_class_cache.cfg'));
+}
+
+// Godot 출력에서 SCRIPT ERROR 줄을 찾는다. 색 코드와 줄 앞 공백을 허용하고
+// 'error: WARNING' 같은 정보성 라인은 고르지 않는다.
+export function findScriptErrors(text) {
+  if (!text) return [];
+  const stripped = String(text).replace(/\x1b\[[0-9;]*m/g, '');
+  return stripped
+    .split('\n')
+    .filter((line) => line.includes('SCRIPT ERROR'))
+    .map((line) => line.trim());
 }
 
 // 지우면 안 되는 폴더에 남은 개발 전용 파일만 골라 지운다.

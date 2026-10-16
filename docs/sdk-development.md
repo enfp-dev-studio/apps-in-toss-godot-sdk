@@ -196,7 +196,8 @@ cat-room-godot 게임에 SDK를 적용하며 4건(1~4)을 발견했고, 수정 �
 5. 경로 표시 정리: `doctor`의 eval 경고가 게임 폴더 기준 경로(`scripts/x.gd:4`)로
    나오고, 생성 설정의 webBundleDir 기본값이 게임 안이면 상대경로(`build/godot-web`)로
    기록돼 기기별 절대경로가 커밋되지 않습니다.
-6. 깨끗한 체크아웃 빌드: `.godot`가 없는 프로젝트(새 clone, git worktree)에서 `build`가 컴파일 게이트에서 `Could not find type AITCore`로 실패했습니다. 게이트가 import 전에 돌아 class_name 캐시가 없었기 때문입니다. `export-godot.mjs`가 `.godot/global_script_class_cache.cfg`가 없을 때만 `godot --headless --import`를 먼저 실행합니다. 추가된 테스트는 [export-import-order](../tests/export-import-order.test.mjs)입니다. `.godot`를 뺀 cat-room-godot 사본에서 첫 실행은 import 후 export 성공, 두 번째 실행은 import 없이 성공함을 확인했습니다.
+ 6. 깨끗한 체크아웃 빌드: `.godot`가 없는 프로젝트(새 clone, git worktree)에서 `build`가 컴파일 게이트에서 `Could not find type AITCore`로 실패했습니다. 게이트가 import 전에 돌아 class_name 캐시가 없었기 때문입니다. `export-godot.mjs`가 `.godot/global_script_class_cache.cfg`가 없을 때만 `godot --headless --import`를 먼저 실행합니다. 추가된 테스트는 [export-import-order](../tests/export-import-order.test.mjs)입니다. `.godot`를 뺀 cat-room-godot 사본에서 첫 실행은 import 후 export 성공, 두 번째 실행은 import 없이 성공함을 확인했습니다.
+ 7. 오래된 캐시 빌드 통과: 출시 점검 세션이 오래된 `.godot` 캐시가 남은 작업 사본에서 빌드하다 발견했습니다. 새 `class_name TouchScroll`이 추가됐는데 캐시가 있어 import가 건너뛰어졌고, 컴파일 게이트는 애드온 파일만 검사해 "passed (17 files)"로 통과했습니다. export 중 게임 스크립트 6개의 SCRIPT ERROR가 났는데도 빌드가 exit 0으로 끝나 `.ait`가 만들어졌습니다. 원인 둘: (a) import가 캐시가 있을 때 건너뛰어 새 class_name이 등록되지 않았고, (b) export 출력 판정이 `startsWith('SCRIPT ERROR')`라 색 코드·앞 공백이 붙은 줄을 놓쳤습니다. 수정: `export-godot.mjs`가 컴파일 게이트 전에 매번 `godot --headless --import`를 실행하고(증분이라 빠름, 실행 시간을 로그에 남김; `needsGodotImport`는 처음/갱신 로그 문구 구분에만 사용), import와 export 출력 모두 ANSI 색 코드를 제거한 뒤 줄 단위 `includes('SCRIPT ERROR')`로 검사합니다. 검출 함수 `findScriptErrors`는 [`export-dir.mjs`](../addons/apps_in_toss/tools/scripts/export-dir.mjs)의 순수 함수로 두었습니다. 추가된 테스트는 [export-script-errors](../tests/export-script-errors.test.mjs)입니다.
 
 게임 쪽 우회: cat-room-godot의 `npm run clean`은 export 폴더를 직접 비우는
 임시 조치이며, SDK 업데이트 후 없애도 됩니다.

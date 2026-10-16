@@ -2,7 +2,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { isClearableExportDir, needsGodotImport, removeDevOnlyFiles } from './export-dir.mjs';
+import { findScriptErrors, isClearableExportDir, needsGodotImport, removeDevOnlyFiles } from './export-dir.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..');
@@ -22,20 +22,39 @@ if (!fs.existsSync(path.join(projectDir, 'project.godot'))) {
   throw new Error(`Godot project not found: ${projectDir}`);
 }
 
-// 깨끗한 체크아웃(.godot 없음)에서는 class_name 캐시가 없어 컴파일 게이트가
-// "Could not find type"으로 실패하므로, 캐시가 없을 때만 headless import를 먼저 한다.
-if (needsGodotImport(projectDir)) {
-  console.log('[Godot] project not imported yet; running headless import');
+// import는 캐시가 있어도 항상 실행한다. 오래된 .godot 캐시가 있으면
+// 새 class_name이 등록되지 않아 컴파일 게이트를 통과하고도 export에서
+// SCRIPT ERROR가 나는데, 캐시가 있을 때 import를 건너뛰면 이를 못 잡는다.
+// 증분 import라 빠르다. needsGodotImport는 로그 문구 구분에만 쓴다.
+{
+  const firstImport = needsGodotImport(projectDir);
+  console.log(
+    firstImport
+      ? '[Godot] project not imported yet; running headless import'
+      : '[Godot] refreshing project import (headless)',
+  );
+  const importStart = Date.now();
   const headlessImport = spawnSync(godotBin, ['--headless', '--path', projectDir, '--import'], {
     cwd: root,
-    stdio: 'inherit',
+    stdio: ['ignore', 'pipe', 'pipe'],
+    encoding: 'utf8',
   });
+  const importOutput = `${headlessImport.stdout ?? ''}\n${headlessImport.stderr ?? ''}`;
+  process.stdout.write(importOutput);
+  console.log(`[Godot] headless import done in ${Date.now() - importStart}ms`);
   if (headlessImport.error) {
     throw new Error(`Godot headless import failed: ${headlessImport.error.message}`);
   }
   if (headlessImport.status !== 0) {
     throw new Error(
       `Godot headless import failed (exit ${headlessImport.status ?? '?'}). Run '${godotBin} --headless --path ${projectDir} --import' manually and fix the errors above, then rebuild.`,
+    );
+  }
+  const importErrors = findScriptErrors(importOutput);
+  if (importErrors.length > 0) {
+    throw new Error(
+      `Godot project import contains ${importErrors.length} script error(s), failing the build:\n` +
+        importErrors.slice(0, 10).join('\n'),
     );
   }
 }
@@ -88,8 +107,9 @@ process.stdout.write(combinedOutput);
 if (result.status !== 0) process.exit(result.status ?? 1);
 // GDScript 컴파일 에러(SCRIPT ERROR:)는 export를 깨뜨리지 않고 exit 0으로
 // 묻히는 경우가 있다. 깨진 스크립트가 실리면 런타임에 터지므로 여기서 실패시킨다.
-// 일반 WARNING이나 'error: WARNING' 같은 정보성 라인은 대상이 아니다.
-const scriptErrors = combinedOutput.split('\n').filter((line) => line.startsWith('SCRIPT ERROR'));
+// 색 코드·줄 앞 공백이 있어도 잡고, 일반 WARNING이나 'error: WARNING' 같은
+// 정보성 라인은 대상이 아니다.
+const scriptErrors = findScriptErrors(combinedOutput);
 if (scriptErrors.length > 0) {
   throw new Error(
     `Godot Web export contains ${scriptErrors.length} script compile error(s), failing the build:\n` +
