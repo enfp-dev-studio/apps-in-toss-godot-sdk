@@ -45,6 +45,11 @@ function resolveSdkDir() {
   return cached;
 }
 
+// 테스트 빌드: --debug-console 또는 AIT_DEBUG_CONSOLE=1. 검수 제출 금지.
+const withDebugConsole = process.argv.includes('--debug-console') || process.env.AIT_DEBUG_CONSOLE === '1';
+const AIT_DEBUG_CONSOLE = withDebugConsole ? '1' : '';
+if (withDebugConsole) console.log('[ait-godot] !!! 테스트 전용 빌드 (--debug-console) — 검수 제출 금지 !!!');
+
 console.log(`[ait-godot] 게임: ${gameId} (${gameDir})`);
 const sdkDir = resolveSdkDir();
 // 내장 모드: bridge는 addonDir/tools/bridge에 있다. 그 외에는 SDK 리포의 bridge.
@@ -70,6 +75,7 @@ if (!fs.existsSync(path.join(bridgeDir, 'node_modules'))) {
   run('npm', ['install', '--no-audit', '--no-fund'], { cwd: bridgeDir });
 }
 run('npm', ['run', 'build'], { cwd: bridgeDir });
+if (withDebugConsole) run('npm', ['run', 'build:debug-console'], { cwd: bridgeDir });
 
 // 6. Godot Web export — export 결과물도 게임 리포 안에 둔다.
 script('export-godot.mjs', { GODOT_SDK_DIR: sdkDir, GODOT_EXPORT_DIR: path.join(gameDir, 'build/godot-web') });
@@ -78,16 +84,22 @@ script('export-godot.mjs', { GODOT_SDK_DIR: sdkDir, GODOT_EXPORT_DIR: path.join(
 script('write-platform-manifest.mjs', {
   GODOT_SDK_DIR: sdkDir,
   GODOT_EXPORT_DIR: path.join(gameDir, 'build/godot-web'),
+  AIT_DEBUG_CONSOLE,
 });
 
 // 8. 브리지 주입 + export 무결성 검증
 run('node', [path.join(bridgeDir, 'scripts/patch-export.mjs')], {
   cwd: sdkDir,
-  env: { GODOT_EXPORT_DIR: path.join(gameDir, 'build/godot-web') },
+  env: { GODOT_EXPORT_DIR: path.join(gameDir, 'build/godot-web'), AIT_DEBUG_CONSOLE },
 });
-script('verify-godot-export.mjs', { GODOT_SDK_DIR: sdkDir, GODOT_EXPORT_DIR: path.join(gameDir, 'build/godot-web') });
+script('verify-godot-export.mjs', {
+  GODOT_SDK_DIR: sdkDir,
+  GODOT_EXPORT_DIR: path.join(gameDir, 'build/godot-web'),
+  AIT_DEBUG_CONSOLE,
+});
 
 // 9. .ait 패키징 (ait bin 해석은 pipeline-package.mjs가 담당)
 script('pipeline-package.mjs', { GODOT_SDK_DIR: sdkDir });
 
 console.log(`\n[ait-godot build] 완료: ${gameId}.ait`);
+if (withDebugConsole) console.log('[ait-godot] !!! 테스트 전용 빌드 (--debug-console) — 검수 제출 금지 !!!');

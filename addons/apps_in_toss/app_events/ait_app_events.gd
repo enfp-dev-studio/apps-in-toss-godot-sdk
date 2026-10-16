@@ -18,31 +18,28 @@ func _init() -> void:
 func is_visible() -> bool:
     if not OS.has_feature("web"):
         return true
-    return bool(JavaScriptBridge.eval("document.visibilityState === 'visible'", true))
+    var document: Variant = JavaScriptBridge.get_interface("document")
+    if document == null:
+        return true
+    return String(document.visibilityState) == "visible"
 
 func start_listening() -> void:
     if _listening or not OS.has_feature("web"):
         return
     _listening = true
     _callback = JavaScriptBridge.create_callback(_on_visibility_event)
-    JavaScriptBridge.get_interface("window").__ait_visibility_callback = _callback
-    JavaScriptBridge.eval(
-        "window.__ait_visibility_listener = function () {" +
-        " window.__ait_visibility_callback(document.visibilityState === 'visible');" +
-        "}; document.addEventListener('visibilitychange', window.__ait_visibility_listener);"
-    )
+    var document: Variant = JavaScriptBridge.get_interface("document")
+    if document != null:
+        document.addEventListener("visibilitychange", _callback)
 
 func stop_listening() -> void:
     if not _listening or not OS.has_feature("web"):
         return
     _listening = false
-    JavaScriptBridge.eval(
-        "if (window.__ait_visibility_listener) {" +
-        " document.removeEventListener('visibilitychange', window.__ait_visibility_listener);" +
-        " delete window.__ait_visibility_listener; delete window.__ait_visibility_callback;" +
-        "}"
-    )
+    var document: Variant = JavaScriptBridge.get_interface("document")
+    if document != null and _callback != null:
+        document.removeEventListener("visibilitychange", _callback)
     _callback = null
 
-func _on_visibility_event(args: Array) -> void:
-    visibility_changed.emit(args.is_empty() or bool(args[0]))
+func _on_visibility_event(_args: Array) -> void:
+    visibility_changed.emit(is_visible())

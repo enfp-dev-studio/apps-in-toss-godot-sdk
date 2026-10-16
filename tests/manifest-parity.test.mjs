@@ -17,6 +17,7 @@ describe('bridge source/embedded parity + 3.8.0 pins', () => {
       { name: 'navigation_bar_set_options', path: 'NavigationBar.setOptions', args: ['options'] },
       { name: 'migration_get_origin_storage', path: 'Migration.getOriginStorage', args: [] },
       { name: 'user_create_anonymous_key_auth_code', path: 'User.createAnonymousKeyAuthCode', args: [] },
+      { name: 'share_create_link', path: 'Share.createLink', args: ['options'] },
     ];
     for (const p of ['bridge/api-manifest.json', 'addons/apps_in_toss/tools/bridge/api-manifest.json']) {
       const manifest = readJson(p);
@@ -30,7 +31,9 @@ describe('bridge source/embedded parity + 3.8.0 pins', () => {
     const pairs = [
       ['bridge/api-manifest.json', 'addons/apps_in_toss/tools/bridge/api-manifest.json'],
       ['bridge/package.json', 'addons/apps_in_toss/tools/bridge/package.json'],
+      ['bridge/package-lock.json', 'addons/apps_in_toss/tools/bridge/package-lock.json'],
       ['bridge/src/index.ts', 'addons/apps_in_toss/tools/bridge/src/index.ts'],
+      ['bridge/src/debug-console.ts', 'addons/apps_in_toss/tools/bridge/src/debug-console.ts'],
       ['bridge/vite.config.ts', 'addons/apps_in_toss/tools/bridge/vite.config.ts'],
       ['bridge/tsconfig.json', 'addons/apps_in_toss/tools/bridge/tsconfig.json'],
       ['bridge/scripts/patch-export.mjs', 'addons/apps_in_toss/tools/bridge/scripts/patch-export.mjs'],
@@ -49,9 +52,9 @@ describe('bridge source/embedded parity + 3.8.0 pins', () => {
     );
   });
 
-  it('generated GDScript matches the manifest (37 APIs)', () => {
+  it('generated GDScript matches the manifest (38 APIs)', () => {
     const manifest = readJson('bridge/api-manifest.json');
-    assert.equal(manifest.length, 37);
+    assert.equal(manifest.length, 38);
     const api = read('addons/apps_in_toss/generated/ait_generated_api.gd');
     const catalog = read('addons/apps_in_toss/generated/ait_generated_catalog.gd');
     for (const entry of manifest) {
@@ -65,7 +68,7 @@ describe('bridge source/embedded parity + 3.8.0 pins', () => {
     for (const p of ['bridge/package.json', 'addons/apps_in_toss/tools/bridge/package.json']) {
       const pkg = readJson(p);
       assert.equal(pkg.dependencies['@apps-in-toss/web-framework'], '3.8.0', p);
-      assert.equal(pkg.devDependencies['@apps-in-toss/devtools'], '3.8.0', `${p} devtools matches web-framework`);
+      assert.equal(pkg.devDependencies['@apps-in-toss/devtools'], '3.8.0', p);
     }
     const lock = readJson('addons/apps_in_toss/tools/templates/platform.lock.json');
     assert.equal(lock.webFramework.version, '3.8.0');

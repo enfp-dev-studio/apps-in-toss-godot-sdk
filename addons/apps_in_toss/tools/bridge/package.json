@@ -5,11 +5,13 @@
   "type": "module",
   "scripts": {
     "build": "vite build",
+    "build:debug-console": "vite build --mode debug-console",
     "patch": "node scripts/patch-export.mjs",
     "generate": "node scripts/generate-gdscript.mjs",
     "prepare": "npm run generate"
   },
   "dependencies": {
+    "@apps-in-toss/debug-console": "https://github.com/toss/apps-in-toss-harness/releases/download/debug-console-v0.2.0/apps-in-toss-debug-console-0.2.0.tgz",
     "@apps-in-toss/web-framework": "3.8.0"
   },
   "devDependencies": {

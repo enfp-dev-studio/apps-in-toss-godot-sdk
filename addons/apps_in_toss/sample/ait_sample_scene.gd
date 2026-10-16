@@ -87,7 +87,10 @@ func _build_ui() -> void:
 func _is_e2e_mode() -> bool:
 	if not OS.has_feature("web"):
 		return false
-	var query := String(JavaScriptBridge.eval("window.location.search", true))
+	var location: Variant = JavaScriptBridge.get_interface("location")
+	var query := ""
+	if location != null:
+		query = String(location.search)
 	return query.contains("e2e=true")
 
 

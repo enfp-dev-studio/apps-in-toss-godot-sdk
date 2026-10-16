@@ -10,7 +10,13 @@ npm run build            # 실전 번들 → dist/apps-in-toss-godot-bridge.js
 npm run generate         # api-manifest.json에서 GDScript 카탈로그 재생성
 npx tsc --noEmit         # 타입 검사
 AIT_BRIDGE_MOCK=1 npm run build   # mock 개발 번들 (브라우저 DevTools 테스트용)
+npm run build:debug-console       # 테스트 빌드 전용 → dist/ait-debug-console.js
 ```
+
+`build:debug-console`은 `@apps-in-toss/debug-console/auto`를 출시 브리지와 별개의
+IIFE로 만듭니다. `ait-godot build --debug-console`만 이 파일을 export에 넣으며,
+debug-console이 부르는 SDK는 브리지가 올린 `window.AppsInToss`로 바꿔 web-framework를
+한 번 더 번들하지 않습니다.
 
 `npm install` 시 실행되는 `prepare`도 추가 환경변수 없이 애드온의
 `generated/` 폴더에 파일을 생성합니다.

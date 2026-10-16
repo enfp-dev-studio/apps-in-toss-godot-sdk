@@ -59,6 +59,7 @@ const usage = `ait-godot — Apps in Toss × Godot 게임 파이프라인 (Unity
   ait-godot addon:install [--force]      애드온 복사 (에디터에서 플러그인 활성화 필요)
   ait-godot doctor [--strict]            호환성 검사 — Unity Build Init 역할
   ait-godot build                        release 파이프라인 → <gameId>.ait — Build & Package 대응
+  ait-godot build --debug-console        테스트 빌드: 실기기 원격 디버깅(/ait:debug) 포함 — 검수 제출 금지
   ait-godot build:dev                    mock 브리지 + DevTools 개발 빌드 — Dev Server 대응
   ait-godot preview                      build/godot-web 로컬 서빙
   ait-godot sync                         SDK 설치 상태 확인 (강제 갱신은 addon:install --force)
@@ -68,7 +69,8 @@ const usage = `ait-godot — Apps in Toss × Godot 게임 파이프라인 (Unity
 환경변수:
   GODOT_PROJECT_DIR   게임 리포 경로 (기본: cwd)
   GODOT_BIN           Godot 실행 파일 (기본: godot)
-  AIT_PLATFORM_LOCK   init 시 복사할 lock (기본: 내장 preview 릴리스 lock)`;
+  AIT_PLATFORM_LOCK   init 시 복사할 lock (기본: 내장 preview 릴리스 lock)
+  AIT_DEBUG_CONSOLE   1이면 build를 --debug-console 테스트 빌드로 실행`;
 
 main();
 
@@ -152,8 +154,21 @@ function cmdDoctor() {
   process.exit(result.status ?? 1);
 }
 
+// 테스트 빌드 경고. 실기기 원격 디버깅 표면이 들어간 .ait는 검수·출시에 쓰면 안 된다.
+function logDebugConsoleBanner() {
+  const line = '!'.repeat(64);
+  console.log(`\n${line}`);
+  console.log('!!  테스트 전용 빌드 (--debug-console) — 검수 제출 금지');
+  console.log('!!  실기기 원격 디버깅(@apps-in-toss/debug-console)이 들어갑니다.');
+  console.log('!!  출시·검수용 .ait는 옵션 없이 build를 다시 실행해 만드세요.');
+  console.log(`${line}\n`);
+}
+
 function cmdBuild() {
   const exportDir = path.join(gameDir, 'build/godot-web');
+  const debugConsole = args.includes('--debug-console') || process.env.AIT_DEBUG_CONSOLE === '1';
+  const AIT_DEBUG_CONSOLE = debugConsole ? '1' : '';
+  if (debugConsole) logDebugConsoleBanner();
   runStep('게임 매니페스트 → 웹 설정 생성 (Unity Configuration)', 'write-ait-config.mjs', {
     env: { GODOT_EXPORT_DIR: exportDir },
   });
@@ -163,20 +178,28 @@ function cmdBuild() {
     env: { GODOT_EXPORT_DIR: exportDir },
   });
   runStep('플랫폼 매니페스트 기록 (ait-build-info 대응)', 'write-platform-manifest.mjs', {
-    env: { GODOT_EXPORT_DIR: exportDir },
+    env: { GODOT_EXPORT_DIR: exportDir, AIT_DEBUG_CONSOLE },
   });
-  runStep('브리지 빌드 → 주입 → 무결성 검사', 'pipeline-finalize.mjs');
+  runStep('브리지 빌드 → 주입 → 무결성 검사', 'pipeline-finalize.mjs', { env: { AIT_DEBUG_CONSOLE } });
   runStep('.ait 패키징 (Unity Build & Package)', 'pipeline-package.mjs');
+  if (debugConsole) {
+    logDebugConsoleBanner();
+    console.log('[ait-godot] 테스트 빌드 완료. 콘솔에 테스트 번들로 올린 뒤 /ait:debug로 QR attach 하세요.');
+    return;
+  }
   console.log('\n[ait-godot] ✅ 완료. 배포: ./addons/apps_in_toss/tools/bridge/node_modules/.bin/ait deploy (콘솔 토큰 필요, token add 선행)');
 }
 
 function cmdBuildDev() {
+  if (args.includes('--debug-console') || process.env.AIT_DEBUG_CONSOLE === '1') {
+    console.log('[ait-godot] build:dev는 브라우저 mock 빌드라 --debug-console을 쓰지 않습니다. 실기기 디버깅은 build --debug-console.');
+  }
   runStep('게임 매니페스트 → 웹 설정 생성', 'write-ait-config.mjs');
   runStep('호환성 검사 (sandbox는 advisory)', 'ait-doctor.mjs');
   runStep('SDK 애드온 동기화', 'sync-godot-sdk.mjs');
   runStep('mock 브리지 빌드 (Unity Dev Server의 Mock SDK)', 'pipeline-bridge-mock.mjs');
   runStep('Godot Web export', 'export-godot.mjs');
-  runStep('mock 브리지 + DevTools 패널 주입', 'pipeline-mock-patch.mjs');
+  runStep('mock 브리지 + DevTools 패널 주입', 'pipeline-mock-patch.mjs', { env: { AIT_DEBUG_CONSOLE: '' } });
   console.log('[ait-godot] 다음: ait-godot preview → 브라우저 테스트 (?e2e=true는 파라미터 없는 API 자동 점검)');
 }
 

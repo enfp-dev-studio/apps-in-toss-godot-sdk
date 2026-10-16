@@ -18,6 +18,7 @@ interface GodotBridge {
   rejectNested: (subscriptionId: number, nestedId: number, json: string) => boolean;
   has: (path: string) => boolean;
   keys: () => string[];
+  getValue: typeof getValue;
 }
 
 type AppsInTossWindow = Window & {
@@ -252,6 +253,7 @@ const BRIDGE_METHODS = [
   'has',
   'hasBridgeMethod',
   'keys',
+  'getValue',
 ];
 
 function hasBridgeMethod(name: string) {
@@ -289,8 +291,27 @@ function settleNested(subscriptionId: number, nestedId: number, json: string, re
   return true;
 }
 
+// initialURL 같은 읽기 전용 속성은 invoke로 부를 수 없으므로
+// 동기 값 읽기로 제공한다. 함수는 invoke로 부르도록 'null'을 돌려준다.
+function getValue(path: string): string {
+  const parts = path.split('.').filter(Boolean);
+  if (parts.length === 0) return 'null';
+  let current: unknown = namespaces;
+  for (const part of parts) {
+    current = getProperty(current, part);
+    if (current === undefined) return 'null';
+  }
+  if (typeof current === 'function') return 'null';
+  try {
+    return JSON.stringify(current ?? null) ?? 'null';
+  } catch {
+    return 'null';
+  }
+}
+
 bridgeWindow.AppsInTossGodot = {
   invoke,
+  getValue,
   iapCreateOneTimePurchaseOrder,
   iapCreateSubscriptionPurchaseOrder,
   adsLoadFullScreenAd,

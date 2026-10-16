@@ -62,6 +62,9 @@ if (gameManifest && !isPlaceholder) {
   manifest.game = { gameVersion: gameManifest.gameVersion, releaseChannel: gameManifest.releaseChannel, sample: true };
 }
 
+// 테스트 빌드(build --debug-console)임을 남긴다. doctor와 verify가 이 값을 본다.
+if (process.env.AIT_DEBUG_CONSOLE === '1') manifest.debugConsole = true;
+
 const outputPath = path.join(exportDir, 'ait-platform-manifest.json');
 fs.writeFileSync(outputPath, `${JSON.stringify(manifest, null, 2)}\n`);
 console.log(`Wrote Apps in Toss platform manifest: ${outputPath}`);

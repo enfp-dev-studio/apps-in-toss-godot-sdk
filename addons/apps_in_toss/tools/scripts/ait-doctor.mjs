@@ -285,6 +285,61 @@ if (unityLock) {
   exact('Unity SDK package version', unityLock.packageVersion, lock.unitySdk?.packageVersion);
 }
 
+// 게임 코드의 외부 코드 실행(eval) 검출 — strict 여부와 상관없이 경고만 남긴다.
+const evalExcludedDirs = new Set(['.godot', 'node_modules', 'build']);
+const evalExcludedAddon = path.join(projectDir, 'addons/apps_in_toss');
+function collectGdFiles(dir, out) {
+  let entries;
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return out;
+  }
+  for (const entry of entries) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (evalExcludedDirs.has(entry.name)) continue;
+      if (full === evalExcludedAddon) continue;
+      collectGdFiles(full, out);
+    } else if (entry.isFile() && entry.name.endsWith('.gd')) {
+      out.push(full);
+    }
+  }
+  return out;
+}
+if (fs.existsSync(projectDir)) {
+  for (const file of collectGdFiles(projectDir, [])) {
+    const text = fs.readFileSync(file, 'utf8');
+    const lines = text.split('\n');
+    lines.forEach((line, index) => {
+      if (line.includes('JavaScriptBridge.eval')) {
+        // eval 경고만 게임 프로젝트 기준 경로로 표시한다(다른 메시지의 relative()는 그대로).
+        const shown = path.relative(projectDir, file) || '.';
+        warnings.push(`${shown}:${index + 1} uses JavaScriptBridge.eval — 출시 체크리스트는 외부 코드 실행(eval)을 금지합니다. JavaScriptBridge.get_interface()로 바꾸세요.`);
+      }
+    });
+  }
+}
+
+// 테스트 빌드(build --debug-console) 결과가 export 폴더에 남아 있으면 알린다.
+// 그 .ait에는 실기기 원격 디버깅 표면이 들어 있어 검수에 제출하면 안 된다.
+const exportDir = path.resolve(process.env.GODOT_EXPORT_DIR ?? path.join(projectDir, 'build/godot-web'));
+const exportManifestPath = path.join(exportDir, 'ait-platform-manifest.json');
+if (fs.existsSync(exportManifestPath)) {
+  let exportManifest = null;
+  try {
+    exportManifest = JSON.parse(fs.readFileSync(exportManifestPath, 'utf8'));
+  } catch {
+    // export 매니페스트 검증은 verify-godot-export.mjs가 맡는다.
+  }
+  if (exportManifest?.debugConsole === true) {
+    const shown = path.relative(projectDir, exportManifestPath) || exportManifestPath;
+    warnings.push(
+      `${shown} has "debugConsole": true — 테스트 빌드(--debug-console) 결과입니다. 그 .ait는 검수에 제출하지 마세요. 옵션 없이 build하면 출시용으로 다시 만들어집니다.`,
+    );
+  }
+}
+
 for (const warning of warnings) console.warn(`[AIT doctor] WARN ${warning}`);
 for (const error of errors) console.error(`[AIT doctor] ERROR ${error}`);
 

@@ -136,9 +136,13 @@ func _argument_for(_api: Dictionary) -> Array:
 func _check_e2e_mode() -> void:
 	if not OS.has_feature("web"):
 		return
-	var bridge: JavaScriptObject = JavaScriptBridge.get_interface("AITGodotE2EProbe")
-	if bridge == null:
+	var window: Variant = JavaScriptBridge.get_interface("window")
+	if window == null:
 		return
+	var probe: Variant = window.AITGodotE2EProbe
+	if not (probe is JavaScriptObject):
+		return
+	var bridge: JavaScriptObject = probe
 	var enabled: bool = bool(bridge.is_e2e())
 	Engine.set_meta(E2E_MODE_VAR, enabled)
 	if enabled:

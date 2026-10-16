@@ -116,40 +116,151 @@ Unity SDK 3.5.0 표면(현재 이름 기준 100여 개)과 앱인토스 개발�
 - 감시: web-framework 3.6.0(2026-09-28, `User.createAnonymousKeyAuthCode`)이
   나왔으나 Unity SDK 태그는 아직 3.5.0입니다. Unity가 따라오면 함께 검토합니다.
 
-## 2026-10-15: Unity SDK 3.8.0 대응과 커뮤니티 사례
+## 2026-10-16: Unity SDK 3.8.0 대응
 
 - 기준: 공식 Unity SDK `release/v3.8.0`
-  (`18814fe5b5a2af5cd2a11a7a5bae53403fafa15e`, 2026-10-14). Unity 릴리스 태그는
-  이제 UPM 패키지 커밋 하나로 다시 만들어지며(3.5.0도 2026-10-06에 재태깅),
-  이전 핀 `29682a9`는 어느 태그에도 속하지 않습니다. 태그끼리 diff하지 말고
-  `main`의 `SDK 업데이트: vX.Y.Z` 커밋과 `api-changelog.md`를 비교하세요.
-- Unity C# 표면 변화는 3.6.0의 `AIT.UserCreateAnonymousKeyAuthCode` 하나이고
-  3.6.0 → 3.8.0은 변경 없음입니다. Runtime 변경(배너 높이, 소프트 키보드)은 Unity
-  WebGL 템플릿 전용이라 이 SDK에 해당하지 않습니다.
-- 반영: `User.createAnonymousKeyAuthCode` → `user_create_anonymous_key_auth_code`
-  (매니페스트 양쪽 + 생성 GDScript + platform lock SHA) 및 `AIT.create_anonymous_key_auth_code()`
-  래퍼. 익명 키를 서버에서 검증하는 경로입니다.
-- 코드 변경 없이 유효: `Viral.share`의 `title`·`description`(3.8.0)은 options
-  Dictionary를 그대로 넘기므로 바로 쓸 수 있습니다. `User.getConsentedData`의 주소
-  분리 키(3.7.0)는 이 SDK에 매핑되지 않은 API입니다.
-- 버전: web-framework 3.5.0 → 3.8.0, devtools 3.2.0 → 3.8.0(상류 Unity 템플릿과
-  동일). devtools 3.8.0 mock이 `NavigationBar.setOptions`, `Viral.*`,
-  `User.createAnonymousKeyAuthCode`에 응답하는 것을 mock 번들로 확인했습니다.
-  `@apps-in-toss/cli` 3.5.0과 3.8.0의 배포 코드는 버전 문자열만 다릅니다.
-- 아래 `#번호`는 [개발자 커뮤니티](https://techchat-apps-in-toss.toss.im/) 글
-  (`/t/<번호>`)입니다.
-- 커뮤니티 반영(문서): 광고 보상은 `userEarnedReward` 기준(2026-10-08 AdMob
-  장애 공지), `Game.getUserProfile`의 `NOT_SUPPORTED` 반환 사례, QR 실패 시 계정
-  확인, 웹 디버그 툴즈, "미니앱을 다시 시작했어요" 토스트 = OOM.
-- 호스트 쪽에서 조치된 사례(코드 변경 없음): 테스트 환경의 fetch 가로채기로
-  `WebAssembly.compileStreaming`이 거부되던 문제(#4880, #4920 — Flutter Web, 토스가
-  10-08 수정). Godot 로더는 응답을 새 `Response`로 감싸 넘기므로 영향이 적을 것으로
-  보지만 실기기로 확인하지는 않았습니다. 그 밖에 서버 전송 실패 주문이
-  `getPendingOrders`에 나오지 않던 문제(#4882), 첫 터치 오류 팝업(#4878),
-  내비게이션 바 로고 자동 반려(#4896), iOS 가로 화면의 몰입형 내비게이션 바(#4873)는
-  토스가 조치 중이거나 완료했습니다.
-- 잔여 갭은 2026-09-28 목록과 같습니다.
-- 감시: Windows `ait build`가 `.ait` 안 경로를 역슬래시로 쓴다는 문의(#5003,
-  답변 대기). CLI 3.5.0에도 같은 코드라 이번 업데이트로 생긴 문제는 아닙니다.
-  bridge devDependency 경로의 `source-map-js` 감사 경고(vite → postcss, 배포 번들
-  미포함)는 `npm audit fix`로 1.2.2로 올려 해소했습니다.
+  (`18814fe5b5a2af5cd2a11a7a5bae53403fafa15e`,
+  [2026-10-14 공식 릴리스](https://github.com/toss/apps-in-toss-unity-sdk/releases/tag/release%2Fv3.8.0)).
+  3.6.0·3.7.0·3.8.0이 같은 날 함께 나왔습니다.
+- Unity 쪽 `release/v3.5.0 → release/v3.8.0` Runtime 변경은 배너 광고 helper뿐입니다.
+  창 크기가 바뀐 뒤 배너 높이 비율이 갱신되지 않아 배너가 게임 화면을 가리던 문제를 고쳤습니다
+  (`AIT.BannerAd.cs`, `AppsInToss-BannerAd.jslib`). 이 SDK에는 배너 광고가 없어 반영할 코드가 없습니다.
+- web-framework API 표면 변경과 반영 결과:
+  - 3.6.0 `User.createAnonymousKeyAuthCode` → 반영. `user_create_anonymous_key_auth_code`
+    (매니페스트 양쪽 + 생성 GDScript)와 `AIT.create_anonymous_key_auth_code` 래퍼(`AITAuth`)를 추가했습니다.
+  - 3.7.0 `ConsentedUserDataKey`에 `USER_ADDRESS_BASE`, `USER_ADDRESS_DETAIL` 추가 →
+    `User.getConsentedData`를 매핑하지 않았으므로 코드 변경 없음.
+  - 3.8.0 `Viral.share` 옵션에 `title`, `description` 추가 → 옵션을 그대로 넘기므로
+    코드 변경 없이 사용할 수 있습니다. API 가이드에 예제를 추가했습니다.
+- 버전: web-framework 3.5.0 → 3.8.0, devtools 3.2.0 → 3.8.0(Unity 템플릿과 같은 버전).
+  devtools 3.8.0 mock은 카탈로그 37개 API를 모두 제공하고, 브리지가 쓰는
+  `unplugin` 옵션(`mock`, `panel`, `forceEnable`)과 `dist/panel/index.js` 경로도 그대로입니다.
+  이 SDK 플러그인 버전은 0.2.0을 유지합니다.
+- 상류 태그 재생성: Unity SDK는 2026-10-06에 `release/v3.2.0`~`v3.5.0` 태그를 다시 만들었습니다.
+  이전에 고정한 `29682a9`는 지금의 `release/v3.5.0` 태그 커밋이 아닙니다.
+  차이는 Editor 도구, WebGL 템플릿(`index.html`), BuildConfig devtools·vite 버전뿐이고 Runtime 변경은 없습니다.
+  다음 비교도 태그 이름이 아니라 고정한 커밋 해시를 기준으로 하세요.
+- 잔여 갭(백로그):
+  - Unity WebGL 템플릿의 소프트 키보드 처리(`index.html`, 3.5.0 재태그에 포함). iOS WKWebView가
+    입력창을 드러내려고 문서를 스크롤하면 `position: fixed` 게임 컨테이너가 밀려 상단 UI가 화면 밖으로
+    나가는 문제를 `visualViewport`로 보정합니다. Godot의 텍스트 입력에도 같은 원리가 적용될 수 있어
+    실기기에서 재현한 뒤 커스텀 셸에 넣을지 판단합니다.
+  - `TossAds` 배너, `User.getConsentedData` 등 2026-09-28 기록의 잔여 갭은 그대로입니다.
+- 커뮤니티(2026-09-28 이후, 게임 관련):
+  - [웹 디버그 툴즈](https://techchat-apps-in-toss.toss.im/t/4890)(2026-09-30 출시)가 테스트 스킴에서
+    `fetch` 응답을 감싸 `WebAssembly.compileStreaming`이 실패한 사례가 있었습니다(Flutter Web,
+    [4920](https://techchat-apps-in-toss.toss.im/t/4920)). 2026-10-08 플랫폼에서 수정됐습니다.
+    Godot도 wasm을 쓰므로 테스트 스킴에서만 로딩이 멈추면 이 사례를 먼저 확인합니다.
+  - "문제가 생겨서 미니앱을 다시 시작했어요" 토스트와 반복 재시작은 대부분 메모리 부족(OOM) 때문이라는
+    운영팀 답변이 있습니다([4990](https://techchat-apps-in-toss.toss.im/t/4990), Unity Web, iOS).
+  - `Game.getUserProfile`이 라이브에서 `NOT_SUPPORTED`를 돌려주는 사례를 운영팀이 재현해 확인 중입니다
+    ([4887](https://techchat-apps-in-toss.toss.im/t/4887)). 게임은 이 값을 받으면 기본 닉네임으로 대체해야 합니다.
+- 검증: `node --test tests/*.test.mjs`, 브리지 타입 검사, prod·mock 빌드.
+  로컬에 Godot가 없어 GDScript 구문 검사는 CI(`godot-addon.yml`)에 맡겼습니다.
+  새 API의 실제 응답은 토스 앱에서 확인해야 합니다.
+- 감시: Unity SDK가 `User.getConsentedData`나 배너 외 helper를 추가하는지, devtools mock 응답이 바뀌는지 봅니다.
+- 감시: Windows `ait build`가 `.ait` 안 경로를 역슬래시로 쓴다는 문의
+  ([5003](https://techchat-apps-in-toss.toss.im/t/5003), 답변 대기). `@apps-in-toss/cli` 3.5.0과 3.8.0의
+  배포 코드는 버전 문자열만 달라 이번 업데이트로 생긴 문제는 아닙니다.
+- 의존성: bridge 개발 의존성 경로(vite → postcss)의 `source-map-js` 감사 경고를
+  `npm audit fix`로 1.2.2로 올려 해소했습니다. 배포 번들에는 포함되지 않습니다.
+
+## 2026-10-16: 게임 적용에서 발견한 버그 수정
+
+cat-room-godot 게임에 SDK를 적용하며 4건(1~4)을 발견했고, 수정 검수에서 1건(5), 출시 점검에서 1건(6)을 더 찾았습니다. 아래와 같이 고쳤습니다.
+
+1. export 폴더 정리: `build:dev` 뒤 `build`를 하면 mock 브리지와 DevTools 패널
+   (약 1.6MB)이 출시 `.ait`에 섞였습니다. `export-godot.mjs`가 이전에는 기본
+   경로일 때만 폴더를 비웠기 때문입니다. 새 모듈
+   [`export-dir.mjs`](../addons/apps_in_toss/tools/scripts/export-dir.mjs)가
+   지워도 되는 폴더인지 판단하고(`isClearableExportDir`), `export-godot.mjs`가
+   그 결과에 따라 폴더를 비우거나 개발 전용 파일만 골라 지웁니다.
+   [`verify-godot-export.mjs`](../addons/apps_in_toss/tools/scripts/verify-godot-export.mjs)는
+   release 빌드에 개발 전용 파일(`apps-in-toss-godot-bridge.mock.js`,
+   `ait-devtools-panel.js`)이 파일 또는 `index.html` 참조로 남아 있으면
+   실패합니다. 추가된 테스트는 [export-dir](../tests/export-dir.test.mjs)입니다.
+2. 설정 생성: [`write-ait-config.mjs`](../addons/apps_in_toss/tools/scripts/write-ait-config.mjs)가
+   `.ait/game.manifest.json`의 `webView`, `permissions`, `navigationBar`를 읽어
+   `apps-in-toss.config.ts`에 넣습니다. `webView`는 기본값
+   (`mediaPlaybackRequiresUserAction: false`, `pullToRefreshEnabled: false`) 위에
+   매니페스트 값을 덮어쓰고, 허용되지 않은 키·값·조합은 실패합니다. 추가된
+   테스트는 [write-ait-config](../tests/write-ait-config.test.mjs)입니다.
+3. eval 제거: 애드온 가시성 모듈(`ait_app_events.gd`)과 샘플
+   (`ait_sample_scene.gd`, `ait_sample_tester.gd`)이 `JavaScriptBridge.eval`을
+   쓰지 않습니다. `get_interface`와 콜백 직접 전달로 바꿨습니다. `doctor`는
+   게임 스크립트의 `JavaScriptBridge.eval` 사용을 경고합니다. Godot 엔진 JS
+   자체에는 `JavaScriptBridge.eval` 구현용 eval 코드가 들어 있지만, 게임과 SDK가
+   그 API를 호출하지 않으면 실행되지 않습니다. 엔진에서 아예 빼는 방법(커스텀
+   Web 템플릿 빌드)은 이 SDK에서 검증하지 않았습니다. 추가된 테스트는
+   [no-eval](../tests/no-eval.test.mjs)입니다.
+4. 브리지 탐색: `AITCore`가 `get_interface("AppsInTossGodot")` 직접 조회 대신
+   `window` 속성으로 브리지를 찾아, 브리지가 아직 없을 때
+    `No interface 'AppsInTossGodot' registered` 오류를 찍지 않습니다. 이 항목의
+    전용 회귀 테스트는 추가하지 않았습니다. 대신 아래 검증 문단의 브라우저 확인으로
+    대체했습니다.
+5. 경로 표시 정리: `doctor`의 eval 경고가 게임 폴더 기준 경로(`scripts/x.gd:4`)로
+   나오고, 생성 설정의 webBundleDir 기본값이 게임 안이면 상대경로(`build/godot-web`)로
+   기록돼 기기별 절대경로가 커밋되지 않습니다.
+ 6. 깨끗한 체크아웃 빌드: `.godot`가 없는 프로젝트(새 clone, git worktree)에서 `build`가 컴파일 게이트에서 `Could not find type AITCore`로 실패했습니다. 게이트가 import 전에 돌아 class_name 캐시가 없었기 때문입니다. `export-godot.mjs`가 `.godot/global_script_class_cache.cfg`가 없을 때만 `godot --headless --import`를 먼저 실행합니다. 추가된 테스트는 [export-import-order](../tests/export-import-order.test.mjs)입니다. `.godot`를 뺀 cat-room-godot 사본에서 첫 실행은 import 후 export 성공, 두 번째 실행은 import 없이 성공함을 확인했습니다.
+ 7. 오래된 캐시 빌드 통과: 출시 점검 세션이 오래된 `.godot` 캐시가 남은 작업 사본에서 빌드하다 발견했습니다. 새 `class_name TouchScroll`이 추가됐는데 캐시가 있어 import가 건너뛰어졌고, 컴파일 게이트는 애드온 파일만 검사해 "passed (17 files)"로 통과했습니다. export 중 게임 스크립트 6개의 SCRIPT ERROR가 났는데도 빌드가 exit 0으로 끝나 `.ait`가 만들어졌습니다. 원인 둘: (a) import가 캐시가 있을 때 건너뛰어 새 class_name이 등록되지 않았고, (b) export 출력 판정이 `startsWith('SCRIPT ERROR')`라 색 코드·앞 공백이 붙은 줄을 놓쳤습니다. 수정: `export-godot.mjs`가 컴파일 게이트 전에 매번 `godot --headless --import`를 실행하고(증분이라 빠름, 실행 시간을 로그에 남김; `needsGodotImport`는 처음/갱신 로그 문구 구분에만 사용), import와 export 출력 모두 ANSI 색 코드를 제거한 뒤 줄 단위 `includes('SCRIPT ERROR')`로 검사합니다. 검출 함수 `findScriptErrors`는 [`export-dir.mjs`](../addons/apps_in_toss/tools/scripts/export-dir.mjs)의 순수 함수로 두었습니다. 추가된 테스트는 [export-script-errors](../tests/export-script-errors.test.mjs)입니다.
+
+게임 쪽 우회: cat-room-godot의 `npm run clean`은 export 폴더를 직접 비우는
+임시 조치이며, SDK 업데이트 후 없애도 됩니다.
+
+검증: `node --test tests/*.test.mjs` 37개와 Godot 4.7.2 애드온 검사
+(`tests/run-godot-addon.mjs`)가 통과합니다. cat-room-godot 복사본에 수정한
+애드온을 넣고 확인했습니다. `build:dev` 결과를 브라우저(375×812)에서 열어
+브리지 연결, 가시성 이벤트(숨김 → 소리 게이트에 hidden, 다시 보임 → 해제)가
+eval 없이 동작함을 확인했습니다. 이어서 정리 단계 없이 `build`를 실행해
+`build/godot-web`과 `.ait`에 mock 브리지·DevTools 패널이 없고 출시 브리지만
+들어감을 확인했습니다. 매니페스트의 webView 옵션(`bounces`,
+`allowsBackForwardNavigationGestures`)이 설정에 들어감, `doctor`가 게임 스크립트의
+eval을 경고함, 브리지를 뺀 빌드에서 "No interface" 오류 없이 게임 자체 경고만
+나옴을 확인했습니다. 미확인: 토스 앱·실기기 동작.
+
+참고: DevTools 패널 번들은 `process.env.NODE_ENV`를 참조하므로 SDK의 `preview`(Vite)로
+열어야 합니다. 단순 정적 서버로 열면 `process is not defined` 오류로 패널만 뜨지
+않습니다(3.2.0 패널도 같음, 게임 동작에는 영향 없음).
+잔여 갭(해결): Godot 번들에 `@apps-in-toss/debug-console` 연결 지점이 없어 `/ait:debug` 환경 3(실기기 원격 디버깅)을 쓸 수 없던 문제는 아래 "2026-10-16: 실기기 원격 디버깅 테스트 빌드"에서 `build --debug-console`로 해결했습니다.
+
+## 2026-10-16: 실기기 원격 디버깅 테스트 빌드
+
+토스 앱에서 연 테스트 번들에 앱인토스 디버거(`ait-devtools` MCP, `/ait:debug` 환경 3,
+relay-staging QR attach)를 붙일 수 있게 했습니다. 출시 번들에는 들어가지 않습니다.
+사용 순서는 [테스트 가이드](testing.md#실기기-원격-디버깅)에 있습니다.
+
+- 의존성: `@apps-in-toss/debug-console` 0.2.0(harness GitHub Release tarball)을 두 브리지
+  `dependencies`에 넣었습니다. 두 `package.json`·lockfile은 바이트가 같고,
+  [manifest-parity](../tests/manifest-parity.test.mjs)가 lockfile까지 비교합니다.
+- 별도 번들: `npm run build:debug-console`(Vite mode `debug-console`)이
+  `src/debug-console.ts`(`@apps-in-toss/debug-console/auto`)를 `dist/ait-debug-console.js`
+  IIFE(약 12KB)로 만듭니다. 출시 브리지 `src/index.ts`는 이 패키지를 import하지 않으며,
+  옵션 없이 만든 출시·mock 브리지 번들은 변경 전과 바이트가 같습니다. debug-console이
+  `import('@apps-in-toss/web-framework')`로 부르는 SDK는 빌드 때 브리지가 올린
+  `window.AppsInToss`로 바꿔 web-framework가 두 번 들어가지 않게 했습니다. 그래서
+  `index.html`에서 브리지 다음에 와야 합니다. `/auto`의 DEV 신호는 빌드에서 `false`로 고정됩니다.
+- 켜는 방법: `ait-godot build --debug-console` 또는 `AIT_DEBUG_CONSOLE=1`. 켜면
+  `pipeline-finalize`가 debug-console 번들을 만들고, `patch-export`가 브리지 다음에
+  `<script src="./ait-debug-console.js">`를 넣고, `write-platform-manifest`가
+  `"debugConsole": true`를 기록합니다. 빌드 로그 처음과 끝에 "테스트 전용 빌드 — 검수 제출 금지"를
+  출력합니다. 끄면(기본) 이전과 같은 결과입니다. `build:dev`(mock)에서는 이 옵션을 무시합니다.
+- 안전장치: `ait-debug-console.js`를 `export-dir.mjs`의 개발 전용 목록에 넣어 `build`가
+  export 폴더를 비우지 못할 때도 지웁니다. `verify-godot-export.mjs`는 release 검증에서
+  이 파일이나 `index.html` 참조, 매니페스트 `debugConsole: true`, 브리지 번들 안의
+  debug-console 코드(`__ait_debug_status`, `/ait-attach`)를 발견하면 실패합니다.
+  테스트 빌드 검증은 파일·참조 1회·브리지 다음 순서·매니페스트 기록을 확인합니다.
+  `doctor`는 export 폴더 매니페스트에 `debugConsole: true`가 남아 있으면 경고합니다.
+  추가된 테스트는 [debug-console](../tests/debug-console.test.mjs)(18개)이고, CI의
+  [브리지·패키징](../.github/workflows/bridge-package.yml)에 `build:debug-console` 단계를 넣었습니다.
+
+검증: `node --test tests/*.test.mjs` 56개, 두 브리지의 `tsc --noEmit`·production·mock·
+`build:debug-console` 빌드, `tests/run-minimal-package.mjs`, Godot 4.7.2
+`tests/run-godot-addon.mjs`가 통과합니다. cat-room-godot 커밋(`60c3246`)을 git worktree로
+꺼내 이 애드온(SDK `8fffd4b` + 이번 변경)과 새 템플릿 lock을 넣고 확인했습니다.
+`build --debug-console`의 `.ait`에는 `ait-debug-console.js`와 `"debugConsole": true`가 있었고,
+이어서 옵션 없이 `build`하자 `doctor`가 이전 테스트 빌드를 경고한 뒤 `.ait`에서 둘 다 빠졌습니다.
+테스트 빌드 결과를 정적 서버(375×812)로 열면 쿼리가 없을 때 debug-console이 아무것도 하지 않고
+(`__ait_debug_status`·`__sdk` 없음, relay 요청 없음) 게임이 입양 화면까지 뜹니다. 콘솔 오류는
+토스 밖에서 나는 게임의 Storage 경고뿐입니다. `?debug=1`만 붙이면 relay 주소가 없어
+`blocked-invalid-relay` 막대가 뜨고, `window.__sdk`는 브리지의 `window.AppsInToss` 객체를 그대로 씁니다.
+미확인: 토스 앱 실기기에서 QR attach와 디버거 도구(`take_screenshot`, `evaluate`, `call_sdk`, `run_tests`) 동작.

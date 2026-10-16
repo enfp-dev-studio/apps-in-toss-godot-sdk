@@ -41,6 +41,7 @@ node addons/apps_in_toss/tools/ait-godot.mjs preview
 | 처음 설치하고 게임을 빌드하기 | [설치·프로젝트 준비](docs/getting-started.md) |
 | 게임 코드에서 토스 기능 호출하기 | [API 사용법과 예제](docs/api-guide.md) |
 | 브라우저·토스 앱에서 테스트하기 | [테스트 범위와 실행 방법](docs/testing.md) |
+| 실기기 토스 앱에서 원격 디버깅하기 | [실기기 원격 디버깅](docs/testing.md#실기기-원격-디버깅) |
 | SDK를 수정하거나 업데이트하기 | [SDK 개발·업데이트 기록](docs/sdk-development.md) |
 
 ## 자동 검사 상태
