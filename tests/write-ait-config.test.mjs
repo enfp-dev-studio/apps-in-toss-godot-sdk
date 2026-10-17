@@ -181,3 +181,64 @@ test('GODOT_EXPORT_DIR이 게임 밖 절대경로면 절대경로 그대로 기�
     cleanup(outsideBase);
   }
 });
+
+test('appType nongame → navigationBar.withBackButton: true 기본값', () => {
+  const { game, result, config } = runWithManifest({ appType: 'nongame' });
+  try {
+    assert.ifError(result.error);
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(config, /navigationBar:\s*\{[^}]*"withBackButton"\s*:\s*true/s);
+    assert.ok(!config.includes('transparentBackground'), '비게임 기본값에 투명 배경이 없어야 한다');
+    assert.match(result.stdout, /appType: nongame/);
+  } finally {
+    cleanup(game);
+  }
+});
+
+test('appType game → navigationBar.transparentBackground: true 기본값', () => {
+  const { game, result, config } = runWithManifest({ appType: 'game' });
+  try {
+    assert.ifError(result.error);
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(config, /navigationBar:\s*\{[^}]*"transparentBackground"\s*:\s*true/s);
+    assert.ok(!config.includes('withBackButton'), '게임 기본값에 뒤로가기 버튼이 없어야 한다');
+  } finally {
+    cleanup(game);
+  }
+});
+
+test('appType 기본값보다 매니페스트 navigationBar가 우선한다', () => {
+  const { game, result, config } = runWithManifest({
+    appType: 'nongame',
+    navigationBar: { withBackButton: false, theme: 'dark' },
+  });
+  try {
+    assert.ifError(result.error);
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(config, /"withBackButton"\s*:\s*false/);
+    assert.match(config, /"theme"\s*:\s*"dark"/);
+  } finally {
+    cleanup(game);
+  }
+});
+
+test('appType이 없으면 navigationBar를 넣지 않고 안내만 한다', () => {
+  const { game, result, config } = runWithManifest({});
+  try {
+    assert.equal(result.status, 0, result.stderr);
+    assert.ok(!config.includes('navigationBar'));
+    assert.match(result.stdout, /appType이 없어/);
+  } finally {
+    cleanup(game);
+  }
+});
+
+test('알 수 없는 appType은 실패한다', () => {
+  const { game, result } = runWithManifest({ appType: 'webview' });
+  try {
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /appType must be "game" or "nongame"/);
+  } finally {
+    cleanup(game);
+  }
+});

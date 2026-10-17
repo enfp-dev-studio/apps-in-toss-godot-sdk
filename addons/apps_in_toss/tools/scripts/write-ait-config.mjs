@@ -167,6 +167,22 @@ if (manifest.navigationBar !== undefined) {
   navigationBar = nav;
 }
 
+// appType: 게임·비게임에 맞는 navigationBar 기본값을 매니페스트 값 아래에 깐다(매니페스트 우선).
+//   nongame: 토스 내비게이션 바 뒤로가기 버튼(비게임 출시 체크리스트, iOS는 이것 말고 하위 화면을 나갈 길이 없다)
+//   game:    투명 배경(네비게이션 바 설정 문서의 게임 권장값)
+// 없으면 기본값을 넣지 않는다(이전과 같음).
+const navigationBarDefaults = {
+  game: { transparentBackground: true },
+  nongame: { withBackButton: true },
+};
+const appType = manifest.appType;
+if (appType !== undefined && !Object.hasOwn(navigationBarDefaults, appType)) {
+  throw new Error(`Game manifest appType must be "game" or "nongame": ${JSON.stringify(appType)}`);
+}
+if (appType !== undefined) {
+  navigationBar = { ...navigationBarDefaults[appType], ...(navigationBar ?? {}) };
+}
+
 const indent = (value) => JSON.stringify(value, null, 2).replaceAll('\n', '\n  ');
 const navigationBarLine = navigationBar !== undefined ? `  navigationBar: ${indent(navigationBar)},\n` : '';
 
@@ -190,4 +206,9 @@ ${navigationBarLine}  webBundleDir,
 // 생성물은 항상 게임 리포(ait build가 cwd로 읽는 곳)에 둔다.
 const configPath = path.join(projectDir, 'apps-in-toss.config.ts');
 fs.writeFileSync(configPath, config);
-console.log(`[AIT config] apps-in-toss.config.ts <- ${path.relative(projectDir, manifestPath)} (appName: ${appName})`);
+console.log(
+  `[AIT config] apps-in-toss.config.ts <- ${path.relative(projectDir, manifestPath)} (appName: ${appName}, appType: ${appType ?? 'unset'})`,
+);
+if (appType === undefined) {
+  console.log('[AIT config] appType이 없어 navigationBar 기본값을 넣지 않았습니다. 매니페스트에 "appType": "game" 또는 "nongame"을 적으세요.');
+}

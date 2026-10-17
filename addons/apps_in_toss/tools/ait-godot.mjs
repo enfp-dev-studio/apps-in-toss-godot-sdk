@@ -55,7 +55,9 @@ const usage = `ait-godot — Apps in Toss × Godot 게임 파이프라인 (Unity
 게임 리포(project.godot가 있는 루트)에서 실행합니다. 이 CLI는 SDK 애드온
 (addons/apps_in_toss/tools)에 내장되어 있어 별도 설치가 필요 없습니다.
 
-  ait-godot init <gameId> "<표시이름>"    .ait/ 생성 — Unity Configuration에 대응
+  ait-godot init <gameId> "<표시이름>" [--nongame]
+                                         .ait/ 생성 — Unity Configuration에 대응. 비게임 미니앱은 --nongame
+                                         (custom_shell.html이 없으면 템플릿을 만들고, .gitignore에 빌드·비밀 파일 줄을 더한다)
   ait-godot addon:install [--force]      애드온 복사 (에디터에서 플러그인 활성화 필요)
   ait-godot doctor [--strict]            호환성 검사 — Unity Build Init 역할
   ait-godot build                        release 파이프라인 → <gameId>.ait — Build & Package 대응
@@ -71,6 +73,22 @@ const usage = `ait-godot — Apps in Toss × Godot 게임 파이프라인 (Unity
   GODOT_BIN           Godot 실행 파일 (기본: godot)
   AIT_PLATFORM_LOCK   init 시 복사할 lock (기본: 내장 preview 릴리스 lock)
   AIT_DEBUG_CONSOLE   1이면 build를 --debug-console 테스트 빌드로 실행`;
+
+// init이 게임 .gitignore에 더하는 줄(없는 줄만). 빌드 결과, Godot 캐시,
+// 실기기 디버거 relay 비밀값, Godot MCP 실행 파일. *.ait는 .ait/ 폴더 이름에도 맞으므로
+// 매니페스트·lock이 든 .ait/는 !.ait/로 다시 넣는다.
+const GITIGNORE_LINES = ['.godot/', 'build/', '*.ait', '!.ait/', '.ait_relay', '.mcp/'];
+
+function ensureGitignore(dir) {
+  const file = path.join(dir, '.gitignore');
+  const text = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
+  const have = new Set(text.split(/\r?\n/).map((line) => line.trim()));
+  const missing = GITIGNORE_LINES.filter((line) => !have.has(line));
+  if (missing.length === 0) return [];
+  const prefix = text === '' || text.endsWith('\n') ? '' : '\n';
+  fs.writeFileSync(file, `${text}${prefix}# Apps in Toss Godot SDK (ait-godot init)\n${missing.join('\n')}\n`);
+  return missing;
+}
 
 main();
 
@@ -112,8 +130,10 @@ function main() {
 }
 
 function cmdInit() {
-  const [gameId, displayName = gameId] = args.slice(1);
-  if (!gameId) fail('사용법: ait-godot init <gameId> "<표시이름>"');
+  const positional = args.slice(1).filter((arg) => !arg.startsWith('--'));
+  const appType = args.includes('--nongame') ? 'nongame' : 'game';
+  const [gameId, displayName = gameId] = positional;
+  if (!gameId) fail('사용법: ait-godot init <gameId> "<표시이름>" [--nongame]');
   if (!/^[a-zA-Z0-9][a-zA-Z0-9-]*$/.test(gameId)) fail(`gameId는 영문·숫자·하이픈만: "${gameId}"`);
   if (!fs.existsSync(path.join(gameDir, 'project.godot'))) {
     fail(`project.godot가 없습니다: ${gameDir}\n먼저 Godot에서 프로젝트를 만드세요.`);
@@ -123,12 +143,20 @@ function cmdInit() {
   fs.copyFileSync(lockSource, path.join(gameDir, '.ait', 'platform.lock.json'));
   const manifest = JSON.parse(fs.readFileSync(path.join(templatesDir, 'game.manifest.example.json'), 'utf8'));
   manifest.gameId = gameId;
+  manifest.appType = appType;
   manifest.displayName = displayName;
   fs.writeFileSync(
     path.join(gameDir, '.ait', 'game.manifest.json'),
     `${JSON.stringify(manifest, null, 2)}\n`,
   );
-  console.log(`[ait-godot] .ait/ 생성 완료 — gameId: ${gameId}, 채널: ${manifest.releaseChannel}`);
+  console.log(`[ait-godot] .ait/ 생성 완료 — gameId: ${gameId}, appType: ${appType}, 채널: ${manifest.releaseChannel}`);
+  const shellPath = path.join(gameDir, 'custom_shell.html');
+  if (!fs.existsSync(shellPath)) {
+    fs.copyFileSync(path.join(templatesDir, 'custom_shell.html'), shellPath);
+    console.log('[ait-godot] custom_shell.html 생성 — Web export 프리셋의 html/custom_html_shell을 res://custom_shell.html로 두세요');
+  }
+  const added = ensureGitignore(gameDir);
+  if (added.length > 0) console.log(`[ait-godot] .gitignore에 추가: ${added.join(', ')}`);
   console.log('[ait-godot] 다음: ait-godot addon:install --force');
 }
 

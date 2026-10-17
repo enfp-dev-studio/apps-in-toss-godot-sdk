@@ -68,6 +68,22 @@ if (fs.existsSync(target) && fs.realpathSync(source) === fs.realpathSync(target)
   process.exit(0);
 }
 
+// Godot 4.4+가 스크립트마다 만드는 .uid 파일 중 SDK가 배포하지 않는 것은 게임 쪽에서 생긴 값이다.
+// 지우고 다시 복사하면 Godot이 새 uid를 만들어 게임 리포에 불필요한 변경이 생기므로 지켜 둔다.
+function collectUids(dir, base = dir, out = new Map()) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (entry.name === 'node_modules') continue;
+      collectUids(full, base, out);
+    } else if (entry.isFile() && entry.name.endsWith('.uid')) {
+      out.set(path.relative(base, full), fs.readFileSync(full));
+    }
+  }
+  return out;
+}
+
+let keptUids = new Map();
 if (fs.existsSync(target)) {
   const installed = fs.readFileSync(path.join(target, 'plugin.cfg'), 'utf8').match(/version="?([^"\n]+)"?/)?.[1];
   if (installed === pluginVersion && !force) {
@@ -77,8 +93,19 @@ if (fs.existsSync(target)) {
   if (!force) {
     fail(`애드온이 이미 있습니다(${installed}). 다른 버전(${pluginVersion})이 필요하면 --force로 재설치하세요.`);
   }
+  keptUids = collectUids(target);
   fs.rmSync(target, { recursive: true, force: true });
 }
 fs.cpSync(source, target, { recursive: true });
+let restored = 0;
+for (const [rel, content] of keptUids) {
+  const uidPath = path.join(target, rel);
+  const scriptPath = uidPath.slice(0, -'.uid'.length);
+  if (!fs.existsSync(uidPath) && fs.existsSync(scriptPath)) {
+    fs.writeFileSync(uidPath, content);
+    restored += 1;
+  }
+}
+if (restored > 0) console.log(`[ait-godot] 게임 쪽 .uid ${restored}개를 그대로 두었습니다.`);
 console.log(`[ait-godot] 설치 완료: ${target} (SDK ${pluginVersion})`);
 console.log('[ait-godot] Godot Editor → Project Settings → Plugins → "Apps in Toss Godot SDK" 활성화');

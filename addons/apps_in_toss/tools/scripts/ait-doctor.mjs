@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 import { resolveSdkDir } from './sdk-dir.mjs';
 import { resolveProfile, logProfileBanner } from './build-profiles.mjs';
+import { checkAppType, checkShellViewport, findMcpBridgeAutoload, findTestAdIdLines, TEST_AD_ID_PREFIX } from './doctor-checks.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 // 내장 모드: root = addonDir(addons/apps_in_toss). 그 외에는 패키지 루트.
@@ -126,6 +127,7 @@ if (resolvedProfileInfo.profile.doctorStrict && !strict) {
   );
 }
 if (resolvedProfileInfo.manifest) logProfileBanner(resolvedProfileInfo);
+for (const warning of checkAppType(resolvedProfileInfo.manifest)) warnings.push(warning);
 
 const projectFile = path.join(projectDir, 'project.godot');
 const projectText = readText(projectFile, 'Godot project');
@@ -135,6 +137,14 @@ if (projectText) {
   const customTheme = iniValue(projectText, 'theme/custom');
   exact('Godot project feature', feature, lock.godot?.feature);
   exact('Godot renderer', renderer, lock.godot?.renderer);
+
+  // Godot MCP run_project가 잠시 넣는 오토로드. 세션이 비정상 종료되면 남는다. 출시 빌드에 실리면 안 된다.
+  const mcpBridge = findMcpBridgeAutoload(projectText);
+  if (mcpBridge) {
+    mismatch(
+      `project.godot has a Godot MCP autoload (${mcpBridge}). Stop the MCP session (stop_project/detach_project) or remove the line before a release build, and never commit it.`,
+    );
+  }
 
   if (!customTheme) {
     mismatch('Godot project has no gui/theme/custom setting; Korean glyph fallback is not guaranteed.');
@@ -175,6 +185,10 @@ if (exportPresetText) {
   const shellPath = resolveProjectResource(customShell);
   if (!shellPath || !fs.existsSync(shellPath)) {
     mismatch(`Godot custom HTML shell file is missing: ${customShell ?? 'unset'}`);
+  } else {
+    for (const problem of checkShellViewport(fs.readFileSync(shellPath, 'utf8'))) {
+      warnings.push(`${customShell}: ${problem}`);
+    }
   }
 }
 
@@ -222,6 +236,13 @@ if (!addonSource) {
   } else {
     const installedPlugin = readText(path.join(installedAddon, 'plugin.cfg'), 'Installed addon plugin.cfg');
     if (installedPlugin) exact('Installed AIT Godot SDK version', iniValue(installedPlugin, 'version'), lock.aitGodotSdk?.version);
+    // tools/에는 CLI와 브리지 node_modules가 있다. .gdignore가 없으면 Godot이 스캔·import해 에디터가 느려지고
+    // node_modules의 그림·소리가 export에 실릴 수 있다.
+    if (fs.existsSync(path.join(installedAddon, 'tools')) && !fs.existsSync(path.join(installedAddon, 'tools/.gdignore'))) {
+      warnings.push(
+        'addons/apps_in_toss/tools/.gdignore is missing — Godot scans the CLI and bridge node_modules. Reinstall the addon from the SDK (addon:install --force) or add an empty .gdignore there.',
+      );
+    }
   }
 }
 
@@ -318,6 +339,21 @@ if (fs.existsSync(projectDir)) {
         warnings.push(`${shown}:${index + 1} uses JavaScriptBridge.eval — 출시 체크리스트는 외부 코드 실행(eval)을 금지합니다. JavaScriptBridge.get_interface()로 바꾸세요.`);
       }
     });
+    const adLines = findTestAdIdLines(text);
+    if (adLines.length > 0) {
+      const shown = path.relative(projectDir, file) || '.';
+      warnings.push(
+        `${shown}:${adLines.join(',')} has a test ad group ID (${TEST_AD_ID_PREFIX}…) — 개발·QR 테스트에는 맞지만, 검수 번들 전에 콘솔에서 발급한 광고 그룹 ID로 바꾸세요.`,
+      );
+    }
+  }
+}
+
+// 실기기 디버거 relay 비밀값(.ait_relay)이 git에 올라가지 않는지 본다. git 저장소가 아니면 건너뛴다.
+if (fs.existsSync(path.join(projectDir, '.ait_relay'))) {
+  const ignored = spawnSync('git', ['-C', projectDir, 'check-ignore', '-q', '.ait_relay'], { encoding: 'utf8' });
+  if (!ignored.error && ignored.status === 1) {
+    warnings.push('.ait_relay (실기기 디버거 relay 비밀값) is not ignored by git — .gitignore에 .ait_relay를 넣으세요. 값은 커밋하거나 출력하지 마세요.');
   }
 }
 
