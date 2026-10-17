@@ -53,6 +53,16 @@ export function findTestAdIdLines(text) {
   return found;
 }
 
+// Web 프리셋이 모바일 VRAM 압축(vram_texture_compression/for_mobile)을 켰는데 프로젝트가 ETC2/ASTC import를
+// 켜지 않으면 Godot export가 "configuration errors"만 찍고(이유 없이) 실패한다. 그 경우 고칠 점을 돌려준다.
+export function checkVramCompression(projectText, presetText) {
+  const forMobile = /^vram_texture_compression\/for_mobile=true$/m.test(String(presetText ?? ''));
+  if (!forMobile) return null;
+  const importEtc2Astc = /^textures\/vram_compression\/import_etc2_astc=true$/m.test(String(projectText ?? ''));
+  if (importEtc2Astc) return null;
+  return 'Web export preset has vram_texture_compression/for_mobile=true but project.godot lacks rendering/textures/vram_compression/import_etc2_astc=true — Godot export fails with an empty "configuration errors" message. Enable Project Settings → Rendering → Textures → VRAM Compression → Import ETC2 ASTC.';
+}
+
 // 매니페스트의 appType·navigationBar 조합을 검사해 알릴 점을 돌려준다.
 export function checkAppType(manifest) {
   if (!manifest || typeof manifest !== 'object') return [];

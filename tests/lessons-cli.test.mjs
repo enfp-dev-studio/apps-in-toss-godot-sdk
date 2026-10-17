@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url';
 import {
   checkAppType,
   checkShellViewport,
+  checkVramCompression,
   findMcpBridgeAutoload,
   findTestAdIdLines,
 } from '../addons/apps_in_toss/tools/scripts/doctor-checks.mjs';
@@ -71,6 +72,13 @@ describe('doctor 검사 함수', () => {
   it('테스트 광고 그룹 ID 줄 번호를 돌려준다', () => {
     assert.deepEqual(findTestAdIdLines('a\nconst AD := "ait-ad-test-rewarded-id"\nb\n"ait-ad-test-banner-id"'), [2, 4]);
     assert.deepEqual(findTestAdIdLines('const AD := "real-group-id"'), []);
+  });
+
+  it('모바일 VRAM 압축 프리셋은 ETC2/ASTC import가 필요하다', () => {
+    const preset = '[preset.0.options]\nvram_texture_compression/for_mobile=true\n';
+    assert.match(checkVramCompression('[rendering]\n', preset), /import_etc2_astc=true/);
+    assert.equal(checkVramCompression('[rendering]\ntextures/vram_compression/import_etc2_astc=true\n', preset), null);
+    assert.equal(checkVramCompression('[rendering]\n', 'vram_texture_compression/for_mobile=false\n'), null);
   });
 
   it('appType 조합을 검사한다', () => {
@@ -146,6 +154,14 @@ describe('doctor 통합', () => {
     const { stderr } = runDoctor(gameDir);
     assert.match(stderr, /WARN res:\/\/custom_shell\.html: viewport meta에 maximum-scale=1, user-scalable=no가 없어/);
     assert.match(stderr, /viewport-fit=cover가 없어/);
+  });
+
+  it('모바일 VRAM 압축과 ETC2/ASTC import가 어긋나면 strict에서 실패한다', () => {
+    const gameDir = makeGame({ shell: fs.readFileSync(shellTemplate, 'utf8') });
+    fs.appendFileSync(path.join(gameDir, 'export_presets.cfg'), 'vram_texture_compression/for_mobile=true\n');
+    assert.match(runDoctor(gameDir).stderr, /ERROR Web export preset has vram_texture_compression\/for_mobile=true/);
+    fs.appendFileSync(path.join(gameDir, 'project.godot'), '\n[rendering]\ntextures/vram_compression/import_etc2_astc=true\n');
+    assert.doesNotMatch(runDoctor(gameDir).all, /import_etc2_astc/);
   });
 
   it('셸 템플릿이면 viewport 경고가 없다', () => {

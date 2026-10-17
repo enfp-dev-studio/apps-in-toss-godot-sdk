@@ -15,6 +15,7 @@
 | mock 브리지·DevTools 패널·debug-console이 출시 export에 남음 | 실패 |
 | export 폴더가 압축 해제 100MiB 초과(`.ait` 한도 100MB) | 실패(100MB~100MiB는 경고) |
 | Godot MCP `McpBridge` 오토로드가 `project.godot`에 남음 | 실패 |
+| 프리셋 모바일 VRAM 압축인데 ETC2/ASTC import 꺼짐(export가 이유 없이 실패하는 경우) | 실패 |
 | Thread Support 켜짐, Godot 기본 로딩 화면, iframe | 실패 |
 | 게임 스크립트의 `JavaScriptBridge.eval` | 경고 |
 | 게임 스크립트의 테스트 광고 그룹 ID(`ait-ad-test-…`) | 경고 |

@@ -125,7 +125,7 @@ Project Settings의 `gui/theme/custom`에 그 Theme를 연결하세요.
 | `display/window/size/viewport_width`·`viewport_height` | 세로 화면이면 360×640 | `canvas_items` + `expand`이면 UI 1단위가 min(폭/360, 높이/640) CSS px라 360×640 이상 기기에서 1 CSS px 이상입니다. 기준을 390×844로 두면 375×667에서 0.79배가 되어 13px 글자가 10.3px, 44px 터치 영역이 34.8px로 줄어듭니다 |
 | `display/window/stretch/mode`·`aspect` | `canvas_items`, `expand` | 넓은 기기에서는 더 많이 보이고 글자는 줄지 않습니다 |
 | `application/run/low_processor_mode` | 정지 화면이 많은 비게임은 `true` | 바뀔 때만 그려 배터리를 아낍니다. 계속 움직이는 게임은 끕니다 |
-| `rendering/textures/vram_compression/import_etc2_astc` | `true`(프리셋 `vram_texture_compression/for_mobile`도) | 모바일 GPU 압축 텍스처. 메모리·번들 크기 |
+| `rendering/textures/vram_compression/import_etc2_astc` | `true`(프리셋 `vram_texture_compression/for_mobile`도) | 모바일 GPU 압축 텍스처. 메모리·번들 크기. 프리셋만 켜고 이 값을 끄면 export가 이유 없이 "configuration errors"로 실패합니다(`doctor`가 strict에서 잡음) |
 
 Export 프리셋의 `exclude_filter`에는 게임에 쓰지 않는 폴더(`addons/apps_in_toss/sample/*`, 원본 그림·문서·도구)를 넣습니다.
 개발용 도구는 출시 프리셋에서 빼고 두 번째 프리셋(예: `Apps in Toss Web (dev tools)`)에만 넣은 뒤,
@@ -145,7 +145,8 @@ node addons/apps_in_toss/tools/ait-godot.mjs doctor --strict
 
 `doctor`는 출시 전에 고칠 것도 알립니다. 셸 viewport meta의 확대 막기·`viewport-fit=cover`, 게임 스크립트의
 테스트 광고 그룹 ID(`ait-ad-test-…`), `appType` 없음, git에서 무시되지 않는 `.ait_relay`, `addons/apps_in_toss/tools/.gdignore` 없음은
-경고입니다. Godot MCP가 남긴 `McpBridge` 오토로드가 `project.godot`에 있으면 strict에서 실패합니다(출시 빌드에 실리면 안 됨).
+경고입니다. Godot MCP가 남긴 `McpBridge` 오토로드가 `project.godot`에 있거나(출시 빌드에 실리면 안 됨), 프리셋의 모바일 VRAM 압축에
+맞는 ETC2/ASTC import가 꺼져 있으면 strict에서 실패합니다.
 
 ## 5. 브라우저에서 실행
 

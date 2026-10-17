@@ -287,7 +287,8 @@ cat-room-godot(비게임, Godot 4.7.2 Web)을 만들며 SDK 위에 따로 짠 �
     매니페스트 값 아래에 깝니다. cat-room은 설정에 뒤로가기 버튼이 없어 iOS에서 하위 화면을 나갈 길이 없었습니다.
   - `init --nongame`, `init`이 셸 템플릿(`tools/templates/custom_shell.html` = `docs/examples/custom-shell.html`)과 `.gitignore` 줄을 만듭니다.
     템플릿은 확대 막기·`viewport-fit=cover`·캔버스 제스처·해상도 상한·WebGL 2 안내를 담습니다.
-  - `doctor`: 셸 viewport meta, 테스트 광고 ID, `appType`, `.ait_relay` git 무시, `tools/.gdignore` 경고. Godot MCP의 `McpBridge` 오토로드는 strict 실패.
+  - `doctor`: 셸 viewport meta, 테스트 광고 ID, `appType`, `.ait_relay` git 무시, `tools/.gdignore` 경고. Godot MCP의 `McpBridge` 오토로드와,
+    프리셋 `vram_texture_compression/for_mobile=true`인데 `import_etc2_astc`가 꺼진 경우는 strict 실패(브라우저 스모크 중 export가 이유 없이 실패해 찾음).
     검사 함수는 [`doctor-checks.mjs`](../addons/apps_in_toss/tools/scripts/doctor-checks.mjs)에 있습니다.
   - `verify-godot-export.mjs`: export 폴더가 100MiB를 넘으면 실패, 100MB를 넘으면 경고(`.ait`는 압축 해제 100MB 이하, 단위는 문서에 없음).
   - `addon:install --force`가 SDK에 없는 게임 쪽 `.uid`를 지킵니다.
@@ -297,10 +298,16 @@ cat-room-godot(비게임, Godot 4.7.2 Web)을 만들며 SDK 위에 따로 짠 �
 - 확인한 사실(앱인토스 문서): 비게임 체크리스트의 뒤로가기·확대 항목, 게임 바와 종료 확인 모달(SDK 2.9.2+), `graniteEvent` 시그니처,
   `SafeArea.get`(동기)·`subscribe`, iOS IndexedDB 7일 삭제와 QR·라이브 오리진, 테스트 스킴 `queryParams`, 압축 해제 100MB,
   `getCompletedOrRefundedOrders` 첫 페이지만, QR 결제는 실제 결제, 테스트 광고 ID 네 가지, 파트너 API 분당 3,000회.
-- 검증: `node --test tests/*.test.mjs` 95개(새 테스트: [lessons-cli](../tests/lessons-cli.test.mjs) 27개, 설정 생성 5개, 브리지 전송 2개),
+- 검증: `node --test tests/*.test.mjs` 97개(새 테스트: [lessons-cli](../tests/lessons-cli.test.mjs) 29개, 설정 생성 5개, 브리지 전송 2개),
   두 브리지의 `tsc --noEmit`·production·mock·`build:debug-console` 빌드(출시 번들에 debug-console 코드 없음), `tests/run-minimal-package.mjs`,
   Godot 4.7.2 `tests/run-godot-addon.mjs`(컴파일 게이트 23개 파일, [모듈 검사](../tests/gdscript/lessons-modules.gd) 82개), API 가이드·주의사항 문서의
   GDScript 예제 14개 컴파일. 모듈 검사를 쓰다가 헤드리스 기본 창이 64×64라 그 밖의 누름을 GUI가 받지 않는 것을 확인해 테스트 가이드에 적었습니다.
+- 브라우저 스모크(임시 프로젝트, 375×812): SDK 원본 CLI로 `addon:install` → `init --nongame`(매니페스트 `appType`, 셸, `.gitignore`) →
+  실제 Godot Web export `build:dev` → DevTools 3.8.0 mock에서 확인했습니다. `AIT.build_kind()` = `dev`, `AIT.back.push` 뒤 `backEvent` 구독(`subscribePathArgs`),
+  mock `__ait:backEvent` 한 번에 handler 한 번 → 구독 해제 → 다음 뒤로가기는 가로채지 않음, Safe Area mock 54/34 CSS px → 51.84/32.64 UI(×0.96),
+  `get_user_hash()`, `AITSaveSlot`이 식별키 기준 키로 쓰고 새로고침 뒤 읽음, 전면 광고 표시 동안 게이트 `ad:<id>`로 닫힘 → 끝나면 열림,
+  생성 설정에 `withBackButton: true`, 셸 viewport meta·로딩 화면 걷기·해상도 상한. 같은 스모크에서 모바일 VRAM 압축 프리셋과 ETC2/ASTC import가
+  어긋나 export가 이유 없이 실패하는 것을 찾아 `doctor` 검사로 넣었습니다.
 - 미확인: 토스 앱 실기기에서 바 뒤로가기 버튼이 `backEvent`로 오는지, 첫 화면 종료, Safe Area 실제 값, Sample 루프 이음매,
   사운드 게이트가 광고·결제 중 실제로 소리를 멈추는지, `AITSaveSlot`의 실제 저장 유지. cat-room-godot에는 아직 적용하지 않았습니다
   (앱의 `Platform`·`Sound`·`Game`을 SDK 모듈로 바꾸는 일은 앱 쪽 작업).

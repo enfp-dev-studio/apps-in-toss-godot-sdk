@@ -6,7 +6,14 @@ import { fileURLToPath } from 'node:url';
 
 import { resolveSdkDir } from './sdk-dir.mjs';
 import { resolveProfile, logProfileBanner } from './build-profiles.mjs';
-import { checkAppType, checkShellViewport, findMcpBridgeAutoload, findTestAdIdLines, TEST_AD_ID_PREFIX } from './doctor-checks.mjs';
+import {
+  checkAppType,
+  checkShellViewport,
+  checkVramCompression,
+  findMcpBridgeAutoload,
+  findTestAdIdLines,
+  TEST_AD_ID_PREFIX,
+} from './doctor-checks.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 // 내장 모드: root = addonDir(addons/apps_in_toss). 그 외에는 패키지 루트.
@@ -182,6 +189,8 @@ if (exportPresetText) {
     lock.godot?.web?.threadSupport,
   );
   exact('Godot custom HTML shell', customShell, lock.godot?.web?.customHtmlShell);
+  const vramProblem = checkVramCompression(projectText, exportPresetText);
+  if (vramProblem) mismatch(vramProblem);
   const shellPath = resolveProjectResource(customShell);
   if (!shellPath || !fs.existsSync(shellPath)) {
     mismatch(`Godot custom HTML shell file is missing: ${customShell ?? 'unset'}`);

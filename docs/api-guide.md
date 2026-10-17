@@ -289,7 +289,8 @@ func end_cutscene() -> void:
 ```
 
 효과음·배경음 끄기 설정은 Master가 아니라 SFX·Music 같은 각자의 버스로 두세요. 게이트가 Master를 다시 켭니다.
-결제 결과가 끝내 오지 않을 때를 대비해 주문 구독을 타임아웃 뒤 `dispose`하면 게이트도 풀립니다.
+광고의 `dismissed`나 결제 결과가 끝내 오지 않으면(2026-10-08 AdMob 장애처럼) 게이트도 닫힌 채로 남습니다.
+대기 상태를 타임아웃으로 풀 때 그 구독을 `dispose`하면 게이트도 함께 풀립니다.
 
 로딩 직후 터치 없이 소리를 재생하려면 WebView의 `mediaPlaybackRequiresUserAction`가
 false여야 합니다. 이 값과 게임 중 당겨서 새로고침을 막는 `pullToRefreshEnabled: false`는
