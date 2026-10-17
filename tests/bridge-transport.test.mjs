@@ -45,6 +45,13 @@ module.exports = {
   Environment: {
     initialURL: 'intoss://cat-room-godot/visit?code=abc',
   },
+  graniteEvent: {
+    addEventListener: function (event, args) {
+      track({ path: 'graniteEvent.addEventListener', event, args, owner: this });
+      module.exports.__lastGranite = { event, args };
+      return () => { track({ disposed: 'graniteEvent.addEventListener', event }); };
+    },
+  },
 };
 `;
 
@@ -146,6 +153,37 @@ describe('bridge transport (vm + fake WebFramework)', () => {
 
     bridge.disposeSubscription(11);
     assert.ok(fake.__calls.some((c) => c.disposed === 'GoogleAdMob.loadAppsInTossAdMob'));
+  });
+
+  it('subscribePathArgs passes leading args before the handlers (graniteEvent backEvent)', async () => {
+    assert.equal(bridge.hasBridgeMethod('subscribePathArgs'), true);
+    const { cb, payloads } = collectCallback();
+    bridge.subscribePathArgs(21, 'graniteEvent.addEventListener', JSON.stringify(['backEvent']), '{}', cb);
+    await flush();
+    const { event, args } = fake.__lastGranite;
+    assert.equal(event, 'backEvent');
+    assert.equal(typeof args.onEvent, 'function');
+    assert.equal(typeof args.onError, 'function');
+    assert.equal('options' in args, false, 'empty options are not passed');
+    const call = fake.__calls.find((c) => c.path === 'graniteEvent.addEventListener');
+    assert.equal(call.owner, fake.graniteEvent);
+
+    args.onEvent();
+    await flush();
+    assert.deepEqual(payloads.at(-1), { kind: 'subscription_event', subscriptionId: 21 });
+
+    bridge.disposeSubscription(21);
+    assert.ok(fake.__calls.some((c) => c.disposed === 'graniteEvent.addEventListener' && c.event === 'backEvent'));
+  });
+
+  it('subscribePathArgs rejects non-array args with a subscription error', async () => {
+    const { cb, payloads } = collectCallback();
+    bridge.subscribePathArgs(22, 'graniteEvent.addEventListener', JSON.stringify({ event: 'backEvent' }), '{}', cb);
+    await flush();
+    assert.equal(payloads.length, 1);
+    assert.equal(payloads[0].kind, 'subscription_error');
+    assert.equal(payloads[0].subscriptionId, 22);
+    assert.match(payloads[0].error.message, /JSON array/);
   });
 
   it('has() is framework-only; hasBridgeMethod() covers bridge methods', () => {

@@ -1,5 +1,5 @@
 // CI Godot 애드온 검사 — 일회용 임시 프로젝트에 애드온을 복사해
-// headless 에디터 import + GDScript 컴파일 게이트 + AdMob 수명 검사를 실행한다.
+// headless 에디터 import + GDScript 컴파일 게이트 + AdMob 수명 검사 + 모듈 검사를 실행한다.
 // 사용자 게임 파일을 건드리지 않으며, 성공·실패 모두 임시 폴더를 정리한다
 // (실패도 throw → finally 정리 뒤 exitCode로 종료).
 //
@@ -74,9 +74,10 @@ function main() {
     if (!fs.existsSync(path.join(addonSrc, 'ait.gd'))) throw new Error(`애드온 원본 없음: ${addonSrc}`);
     copyTree(addonSrc, path.join(fixture, 'addons/apps_in_toss'));
 
-    const lifecycleSrc = path.join(repoRoot, 'tests/gdscript/admob-lifecycle.gd');
     fs.mkdirSync(path.join(fixture, 'tests'), { recursive: true });
-    fs.copyFileSync(lifecycleSrc, path.join(fixture, 'tests/admob-lifecycle.gd'));
+    for (const name of ['admob-lifecycle.gd', 'lessons-modules.gd']) {
+      fs.copyFileSync(path.join(repoRoot, 'tests/gdscript', name), path.join(fixture, 'tests', name));
+    }
 
     fs.writeFileSync(
       path.join(fixture, 'project.godot'),
@@ -119,6 +120,17 @@ function main() {
     if (!lifeOut.includes('admob lifecycle check passed')) {
       throw new Error(`수명 검사 성공 마커 없음:\n${lifeOut}`);
     }
+    // cat-room-godot에서 옮긴 모듈(뒤로가기·Safe Area·사운드 게이트·저장·한글·터치 스크롤)
+    const lessonsOut = run(godotBin, ['--headless', '--path', fixture, '--script', 'res://tests/lessons-modules.gd'], {
+      cwd: repoRoot,
+      timeoutMs: 180_000,
+      label: 'lessons modules',
+    });
+    const lessonsMatch = lessonsOut.match(/lessons modules check passed \((\d+) checks\)/);
+    if (!lessonsMatch) {
+      throw new Error(`모듈 검사 성공 마커 없음:\n${lessonsOut}`);
+    }
+    console.log(`[godot-ci] 모듈 검사 통과 (${lessonsMatch[1]} checks)`);
     console.log('[godot-ci] 전부 통과');
   } finally {
     if (keepFixture) {

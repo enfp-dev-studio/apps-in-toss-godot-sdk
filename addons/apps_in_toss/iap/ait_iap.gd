@@ -4,9 +4,14 @@ class_name AITIAP
 signal purchase_succeeded(subscription_id: int, event: Dictionary)
 signal purchase_failed(subscription_id: int, error: Dictionary)
 signal product_grant_requested(subscription_id: int, grant_request_id: int, order_id: String)
+## 주문(create_*_purchase_order)을 시작한 때부터 결과(purchase_succeeded·purchase_failed)·dispose까지.
+## 결제 화면이 떠 있는 동안이며, AIT.sound(사운드 게이트)가 이 신호로 소리를 멈춥니다.
+signal order_started(subscription_id: int)
+signal order_ended(subscription_id: int)
 
 var _core: AITCore
 var _active: Dictionary = {}
+var _ordering: Dictionary = {}
 
 func _init(core: AITCore) -> void:
     _core = core
@@ -55,6 +60,8 @@ func get_subscription_info_and_wait(order_id: String, timeout_ms: int = 0) -> Di
 func create_one_time_purchase_order(sku: String) -> int:
     var subscription_id := _core.create_subscription_id()
     _active[subscription_id] = true
+    _ordering[subscription_id] = true
+    order_started.emit(subscription_id)
     _core.start_iap_one_time_purchase(subscription_id, sku)
     return subscription_id
 
@@ -64,6 +71,8 @@ func create_subscription_purchase_order(sku: String, offer_id: String = "") -> i
     var options := {"sku": sku}
     if not offer_id.is_empty():
         options["offerId"] = offer_id
+    _ordering[subscription_id] = true
+    order_started.emit(subscription_id)
     _core.start_iap_subscription_purchase(subscription_id, options)
     return subscription_id
 
@@ -76,16 +85,23 @@ func reject_product_grant(subscription_id: int, grant_request_id: int, message: 
 func dispose(subscription_id: int) -> void:
     _active.erase(subscription_id)
     _core.dispose_subscription(subscription_id)
+    _end_order(subscription_id)
 
 func _on_subscription_event(subscription_id: int, event: Variant) -> void:
     if not _active.has(subscription_id):
         return
     purchase_succeeded.emit(subscription_id, event if typeof(event) == TYPE_DICTIONARY else {"data": event})
+    _end_order(subscription_id)
 
 func _on_subscription_error(subscription_id: int, error: Dictionary) -> void:
     if not _active.has(subscription_id):
         return
     purchase_failed.emit(subscription_id, error)
+    _end_order(subscription_id)
+
+func _end_order(subscription_id: int) -> void:
+    if _ordering.erase(subscription_id):
+        order_ended.emit(subscription_id)
 
 func _on_nested_callback(subscription_id: int, nested_id: int, name: String, payload: Variant) -> void:
     if not _active.has(subscription_id) or name != "processProductGrant":
