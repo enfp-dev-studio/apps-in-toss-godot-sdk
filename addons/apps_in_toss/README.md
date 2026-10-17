@@ -56,6 +56,17 @@ var admob_sub := AIT.admob.load_admob({"adGroupId": "광고그룹ID"})
 var cached := await AIT.admob.is_admob_loaded_and_wait({"adGroupId": "광고그룹ID"}, 15_000)
 ```
 
+미니앱 화면 규칙용 모듈도 있습니다. 모두 부르거나 켜야 동작합니다(자세한 예제는 [API 사용법](../../docs/api-guide.md)).
+
+| 이름 | 하는 일 |
+| --- | --- |
+| `AIT.back` | 닫을 것이 있을 때만 시스템 뒤로가기(`backEvent`) 구독, 첫 화면은 플랫폼 기본(종료) |
+| `AIT.safe_area` | Safe Area 인셋을 Godot UI 단위로 |
+| `AIT.sound` | `enable()` 뒤 백그라운드·광고·결제 중 Master 버스 정지 |
+| `AITSaveSlot` | 사용자 식별키 기준 SDK 저장소 저장, 읽기 실패 시 새로 시작하지 않음 |
+| `AITKorean`, `AITTouchScroll` | 한글 keep-all·조사, 버튼 위 끌기 스크롤 |
+| `AIT.build_kind()` | `debug`·`dev`·`test`·`release` |
+
 `AIT.is_available()`은 Web export에 주입된 브리지(실전) 또는 mock 브리지(개발
 빌드)가 있을 때 true입니다. 브리지가 없는 에디터·브라우저에서는 false이며, 호출은
 `AIT_BRIDGE_UNAVAILABLE` 에러로 비동기 반환됩니다.

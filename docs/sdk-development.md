@@ -264,3 +264,44 @@ relay-staging QR attach)를 붙일 수 있게 했습니다. 출시 번들에는 
 토스 밖에서 나는 게임의 Storage 경고뿐입니다. `?debug=1`만 붙이면 relay 주소가 없어
 `blocked-invalid-relay` 막대가 뜨고, `window.__sdk`는 브리지의 `window.AppsInToss` 객체를 그대로 씁니다.
 미확인: 토스 앱 실기기에서 QR attach와 디버거 도구(`take_screenshot`, `evaluate`, `call_sdk`, `run_tests`) 동작.
+
+## 2026-10-18: cat-room-godot에서 배운 것 반영
+
+cat-room-godot(비게임, Godot 4.7.2 Web)을 만들며 SDK 위에 따로 짠 것 가운데 다른 Godot 미니앱에도 반드시 필요한 것을 SDK로 옮겼습니다.
+항목별 분류(애드온 코드·문서·앱 전용)와 cat-room 위치는 [정리 문서](lessons-cat-room-godot.md)에 있습니다.
+새 모듈은 모두 부르거나 켜야 동작하고, `appType`이 없는 매니페스트의 생성 설정은 이전과 같습니다.
+
+- 애드온 모듈:
+  - `AIT.back`(`AITBack`): 닫을 것이 있을 때만 `graniteEvent` `backEvent`를 구독하고 비면 풀어, 첫 화면에서는 플랫폼 기본 동작(종료)이 됩니다.
+    `addEventListener(event, handlers)`처럼 구독 객체 앞에 인자를 받는 API를 위해 브리지에 `subscribePathArgs`를 더했습니다(두 복사본 동일).
+    `AITCore.start_path_subscription`에 `args` 인자가 생겼고 기본값은 빈 배열입니다.
+  - `AIT.safe_area`(`AITSafeArea`): `SafeArea.get`·`SafeArea.subscribe`, 없으면 CSS `env()`를 DOM으로 잽니다. CSS px를 UI 단위로 바꿉니다.
+  - `AIT.sound`(`AITSoundGate`): 멈출 이유 집합. `enable()` 뒤 백그라운드·광고·결제 동안 Master 버스를 끕니다. 이를 위해
+    `AIT.ads`·`AIT.admob`에 `show_started`·`show_ended`·`is_showing`, `AIT.iap`에 `order_started`·`order_ended` 신호를 더했습니다.
+  - `AITSaveSlot`: 사용자 식별키 기준 키, 읽기 재시도, 읽기 실패면 새로 시작하지 않음, 깨진 JSON 원본 보관, 숨김 때 flush, 데스크톱은 `user://`.
+  - `AITKorean`(`keep_all`, `josa`), `AITTouchScroll`(cat-room `TouchScroll`), `AIT.build_kind()`·`is_test_run()`,
+    `AIT.get_anonymous_key()`·`get_user_hash()`(`AITAuth`).
+  - 모든 애드온 스크립트의 `.uid`를 배포합니다(`tools/` 제외). `tools/.gdignore`를 배포해 Godot이 CLI와 `node_modules`를 스캔하지 않습니다.
+- CLI:
+  - 매니페스트 `appType`(`game`·`nongame`): `nongame`이면 `navigationBar.withBackButton: true`, `game`이면 `transparentBackground: true`를
+    매니페스트 값 아래에 깝니다. cat-room은 설정에 뒤로가기 버튼이 없어 iOS에서 하위 화면을 나갈 길이 없었습니다.
+  - `init --nongame`, `init`이 셸 템플릿(`tools/templates/custom_shell.html` = `docs/examples/custom-shell.html`)과 `.gitignore` 줄을 만듭니다.
+    템플릿은 확대 막기·`viewport-fit=cover`·캔버스 제스처·해상도 상한·WebGL 2 안내를 담습니다.
+  - `doctor`: 셸 viewport meta, 테스트 광고 ID, `appType`, `.ait_relay` git 무시, `tools/.gdignore` 경고. Godot MCP의 `McpBridge` 오토로드는 strict 실패.
+    검사 함수는 [`doctor-checks.mjs`](../addons/apps_in_toss/tools/scripts/doctor-checks.mjs)에 있습니다.
+  - `verify-godot-export.mjs`: export 폴더가 100MiB를 넘으면 실패, 100MB를 넘으면 경고(`.ait`는 압축 해제 100MB 이하, 단위는 문서에 없음).
+  - `addon:install --force`가 SDK에 없는 게임 쪽 `.uid`를 지킵니다.
+- 문서: [출시 전 점검](release-checklist.md), [Godot Web 주의사항](godot-web-notes.md)을 새로 썼고, API 가이드(뒤로가기·Safe Area·사운드 게이트·저장·한글·
+  결제 지급 3단계와 오류 코드·광고 미리 불러오기·서버 호출 한도), 설치 가이드(`appType`·셸·프로젝트 설정·개발 도구 프리셋), 테스트 가이드
+  (mock 보상 이벤트 없음, QR 결제는 실제 결제, 디버거 붙지 않을 때, 헤드리스 점검·캡처, Godot MCP)를 고쳤습니다.
+- 확인한 사실(앱인토스 문서): 비게임 체크리스트의 뒤로가기·확대 항목, 게임 바와 종료 확인 모달(SDK 2.9.2+), `graniteEvent` 시그니처,
+  `SafeArea.get`(동기)·`subscribe`, iOS IndexedDB 7일 삭제와 QR·라이브 오리진, 테스트 스킴 `queryParams`, 압축 해제 100MB,
+  `getCompletedOrRefundedOrders` 첫 페이지만, QR 결제는 실제 결제, 테스트 광고 ID 네 가지, 파트너 API 분당 3,000회.
+- 검증: `node --test tests/*.test.mjs` 95개(새 테스트: [lessons-cli](../tests/lessons-cli.test.mjs) 27개, 설정 생성 5개, 브리지 전송 2개),
+  두 브리지의 `tsc --noEmit`·production·mock·`build:debug-console` 빌드(출시 번들에 debug-console 코드 없음), `tests/run-minimal-package.mjs`,
+  Godot 4.7.2 `tests/run-godot-addon.mjs`(컴파일 게이트 23개 파일, [모듈 검사](../tests/gdscript/lessons-modules.gd) 82개), API 가이드·주의사항 문서의
+  GDScript 예제 14개 컴파일. 모듈 검사를 쓰다가 헤드리스 기본 창이 64×64라 그 밖의 누름을 GUI가 받지 않는 것을 확인해 테스트 가이드에 적었습니다.
+- 미확인: 토스 앱 실기기에서 바 뒤로가기 버튼이 `backEvent`로 오는지, 첫 화면 종료, Safe Area 실제 값, Sample 루프 이음매,
+  사운드 게이트가 광고·결제 중 실제로 소리를 멈추는지, `AITSaveSlot`의 실제 저장 유지. cat-room-godot에는 아직 적용하지 않았습니다
+  (앱의 `Platform`·`Sound`·`Game`을 SDK 모듈로 바꾸는 일은 앱 쪽 작업).
+- 버전: 플러그인·lock 버전(0.2.0)은 그대로 두었습니다. 배포할 때 올립니다.

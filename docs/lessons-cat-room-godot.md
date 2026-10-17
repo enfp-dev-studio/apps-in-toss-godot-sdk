@@ -158,3 +158,9 @@ cat-room 위치는 `room-v2` 브랜치(`db6e830`) 기준입니다. 공식 규칙
 
 브라우저 mock과 Godot 헤드리스로 확인할 수 있는 것만 자동 검사로 확인합니다. 토스 내비게이션 바의 뒤로가기 버튼이
 `backEvent`로 오는지, iOS·안드로이드 WebView에서 Safe Area 값과 Sample 루프 이음매, 실제 저장 유지는 실기기에서 확인해야 합니다.
+
+## 반영 결과
+
+브랜치 `lessons/cat-room-godot`에 (a)·(b) 항목을 모두 넣었습니다. 바뀐 내용과 검증은
+[SDK 개발 기록 2026-10-18](sdk-development.md#2026-10-18-cat-room-godot에서-배운-것-반영)에 있습니다.
+후속 후보: 한글 입력 DOM 시트 모듈, 배너 광고(`TossAds`) 모듈, `homeEvent`, 실기기에서 확인한 뒤 cat-room-godot을 SDK 모듈로 바꾸기.

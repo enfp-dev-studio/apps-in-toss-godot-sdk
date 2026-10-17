@@ -11,10 +11,11 @@
 | --- | --- |
 | [회귀 테스트](../.github/workflows/regressions.yml) | Node 24/26에서 설치 안전성, SDK 캐시, API 매니페스트·생성 파일 일치, 브리지 호출·이벤트 전달 |
 | [브리지·패키징](../.github/workflows/bridge-package.yml) | 소스·내장 브리지 타입 검사, production/mock/debug-console 빌드, 최소 HTML 입력의 `.ait` 패키징 |
-| [Godot 애드온](../.github/workflows/godot-addon.yml) | Godot 4.7.2 headless import, GDScript 구문 검사, AdMob 브리지 부재 오류·구독 해제 |
+| [Godot 애드온](../.github/workflows/godot-addon.yml) | Godot 4.7.2 headless import, GDScript 구문 검사, AdMob 브리지 부재 오류·구독 해제, [모듈 검사](../tests/gdscript/lessons-modules.gd)(한글·뒤로가기·Safe Area·사운드 게이트·광고/결제 수명 신호·저장·터치 스크롤) |
 | [export 폴더 정리](../tests/export-dir.test.mjs) | 프로젝트 안 export 폴더는 비워도 되고 소스·프로젝트 바깥은 비우지 않음, release에 개발 전용 파일이 섞이면 검증 실패 |
 | [설정 생성](../tests/write-ait-config.test.mjs) | 매니페스트의 `webView`·`permissions`·`navigationBar` 반영과 기본값·검증, 잘못된 키·조합은 실패 |
 | [eval 금지](../tests/no-eval.test.mjs) | 애드온 GDScript에 `JavaScriptBridge.eval`이 없음 |
+| [CLI 규칙](../tests/lessons-cli.test.mjs) | `doctor`의 셸 확대 막기·`McpBridge`·`.ait_relay`·테스트 광고 ID·`appType`·`tools/.gdignore` 검사, export 100MB 한도, `addon:install`의 `.uid` 보존, `init`의 셸 템플릿·`.gitignore` |
 | [debug-console](../tests/debug-console.test.mjs) | 테스트 빌드에서만 debug-console을 브리지 다음에 주입, release에 남으면 검증 실패, 매니페스트 `debugConsole` 기록과 `doctor` 경고 |
 | 별도 확인 | 전체 Godot Web export, 브라우저 게임 플레이, 토스 앱·실기기 동작 |
 
@@ -60,8 +61,9 @@ DevTools 패널을 뜻합니다. 아래는 설치된 DevTools 3.8.0 구현 기�
 | 게임 화면·조작 | Godot Web 게임의 화면, 입력, 게임 로직 | 기기별 성능과 WebView 동작 |
 | 로그인·사용자 키 | 모의 사용자·로그인 응답에 따른 화면과 오류 처리 | 실제 인증, 서버 토큰 교환 |
 | 인앱결제 | 모의 상품·주문, 결제 실패·보류, 지급 콜백과 미결 주문 복구 처리 | 실제 결제 승인·환불, 서버 지급 검증 |
-| 전면 광고·AdMob | 로드·표시·종료·보상 이벤트, 광고 없음 오류 처리 | 실제 광고 송출과 보상 조건 |
-| 저장소·게임센터 | 브라우저 저장소 읽기·쓰기, 모의 프로필·점수 처리 | 토스 저장소와 실제 랭킹 반영 |
+| 전면 광고·AdMob | 로드·표시·종료 이벤트, 광고 없음 오류 처리. `showFullScreenAd` mock은 `clicked` → `dismissed`만 보내고 `userEarnedReward`를 보내지 않습니다 | 실제 광고 송출과 보상 지급 |
+| 저장소·게임센터 | 브라우저 저장소 읽기·쓰기, 모의 프로필·점수 처리 | 토스 저장소와 실제 랭킹 반영, 다시 열었을 때 저장 유지 |
+| 뒤로가기·Safe Area | 모의 `backEvent`, 모의 인셋 | 토스 바 뒤로가기 버튼이 `backEvent`로 오는지, 첫 화면에서 미니앱 종료, 안드로이드 백버튼, 기기별 인셋 |
 | 권한·네트워크 | 권한 거부·오프라인 등 모의 상태에 대한 처리 | OS 권한 창, 실제 통신과 기기 기능 |
 
 샘플 씬의 `?e2e=true`는 인자가 없는 API만 순회하며 `close_view`는 제외합니다.
@@ -83,6 +85,7 @@ DevTools 패널을 뜻합니다. 아래는 설치된 DevTools 3.8.0 구현 기�
 ./addons/apps_in_toss/tools/bridge/node_modules/.bin/ait deploy
 ```
 
+콘솔 QR 테스트의 인앱 결제는 **실제 결제**입니다. 로컬에서는 DevTools 모의 결제로 확인하세요.
 브라우저의 모의 주문·광고 이벤트가 통과해도 실제 결제 승인, 서버 지급 검증,
 광고 송출과 보상을 검증한 것은 아닙니다. 게임에서 사용하는 기능을 토스 앱에서
 확인하세요. 가시성 이벤트(`AIT.app_events`)는 headless 자동 검사 대상이 아니므로
@@ -148,11 +151,42 @@ SDK 3.x 번들을 출시하면 2.x로 되돌릴 수 없고, 2026-10-05부터 3.x
 - Godot 화면은 canvas 하나라 DOM 스냅샷에는 게임 UI가 나오지 않습니다. 화면은
   `take_screenshot`, 상태는 `evaluate`와 `measure_safe_area`로 봅니다.
 
+붙지 않을 때(cat-room-godot 실기기 QA에서 겪은 것):
+
+- 디버거(`ait-devtools`)는 한 세션만 잡을 수 있습니다. 다른 Claude 세션이 디버거를 쥐고 있으면 도구 호출이 거부됩니다.
+  그 세션을 끝내거나 디버거를 놓게 한 뒤 붙습니다.
+- QR attach에는 게임 폴더의 relay 비밀값 파일 `.ait_relay`가 필요합니다. `.gitignore`에 넣고(`init`이 넣습니다) 값을 커밋하거나 출력하지 마세요.
+  `doctor`는 이 파일이 git에서 무시되지 않으면 경고합니다.
+- 앱은 열리는데 아래 디버그 막대가 없고 relay가 요청을 하나도 받지 못하면(`page-not-opened`), debug-console이
+  URL에서 `debug=1`·`relay=`를 받지 못한 것입니다. 폰에서 ⋯ → 웹 디버그 툴즈 → System 탭에서 페이지 URL에
+  `debug=1`이 있는지 봅니다. 문서상 테스트 스킴의 사용자 쿼리는 `queryParams=`(URL 인코딩한 JSON)로 넘기므로
+  ([미니앱 테스트하기](https://developers-apps-in-toss.toss.im/guide/operation/toss)), 일반 쿼리가 빠졌다면 그 방식을 시도합니다.
+
 **검수 번들에 쓰지 마세요.** 테스트 빌드 `.ait`에는 원격 디버깅 표면이 들어 있습니다.
 검수·출시용 `.ait`는 옵션 없이 `build`를 다시 실행해 만듭니다. `build`는 export 폴더를
 비우고 다시 만들며, `ait-debug-console.js`가 파일이나 `index.html` 참조로 남거나
 매니페스트에 `debugConsole: true`가 있으면 검증이 실패합니다. `doctor`는 export 폴더의
 매니페스트에 `debugConsole: true`가 남아 있으면 경고합니다.
+
+## Godot 헤드리스 점검과 화면 캡처
+
+게임 쪽 자동 점검은 `godot --headless --path . --script res://tests/<점검>.gd`(`extends SceneTree`)로 돌립니다.
+SDK의 [모듈 검사](../tests/gdscript/lessons-modules.gd)처럼 AITCore를 상속한 가짜 코어로 브리지를 흉내 내면
+뒤로가기·광고·결제 흐름도 브리지 없이 확인할 수 있습니다.
+
+- 헤드리스 기본 창(root viewport)은 64×64입니다. 버튼을 누르는 점검은 `root.size = Vector2i(400, 700)`처럼 키운 뒤 해야
+  GUI가 누름을 받습니다(작은 창 밖의 누름은 조용히 무시돼 점검이 헛통과할 수 있습니다).
+- 마우스 입력은 `root.push_input(event, true)`로 넣습니다. 헤드리스는 `Input.parse_input_event`로 넣은 터치를 창으로 보내지 않으므로
+  터치 길은 `--resolution 375x812`로 창을 띄워 확인합니다.
+- `--script` 실행에서 게임의 `class_name` 스크립트가 오토로드보다 먼저 컴파일되어 오토로드 이름을 못 찾을 수 있습니다.
+  그런 스크립트는 실행 중에 `load()`로 불러 쓰세요.
+- `low_processor_mode`(필요할 때만 그리기)에서는 정지 화면이면 `frame_post_draw`가 오지 않아 캡처가 끝나지 않습니다.
+  캡처하는 동안 `OS.low_processor_usage_mode = false`로 끕니다.
+- 화면 크기별 캡처는 360×640, 375×667, 375×812, 390×844, 430×932를 찍어 글자·버튼이 잘리지 않는지 봅니다.
+
+Godot MCP(`godot-mcp-runtime`)의 `run_project`·`attach_project`는 실행하는 동안 `project.godot`에 `McpBridge`
+오토로드를 넣고 `.mcp/` 폴더를 만듭니다. 세션이 비정상 종료되면 오토로드가 남을 수 있으니 커밋하지 말고
+(`stop_project`·`detach_project`로 정리), `.mcp/`는 `.gitignore`에 넣습니다. 남아 있으면 `doctor --strict`와 `build`가 실패합니다.
 
 ## 2026-09-24 샘플 실행 결과
 
