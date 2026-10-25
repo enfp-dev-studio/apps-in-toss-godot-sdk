@@ -264,3 +264,25 @@ relay-staging QR attach)를 붙일 수 있게 했습니다. 출시 번들에는 
 토스 밖에서 나는 게임의 Storage 경고뿐입니다. `?debug=1`만 붙이면 relay 주소가 없어
 `blocked-invalid-relay` 막대가 뜨고, `window.__sdk`는 브리지의 `window.AppsInToss` 객체를 그대로 씁니다.
 미확인: 토스 앱 실기기에서 QR attach와 디버거 도구(`take_screenshot`, `evaluate`, `call_sdk`, `run_tests`) 동작.
+
+## 2026-10-25: Unity SDK 3.9.0 대응
+
+- 기준: [공식 3.9.0 릴리스](https://github.com/toss/apps-in-toss-unity-sdk/releases/tag/release/v3.9.0)
+  (2026-10-24 UTC), 태그가 가리키는 UPM 커밋
+  `c2892282018b44e1666b364a7a97711a130761d6`.
+  릴리스 본문의 `ad787dd`는 생성 원본 커밋이며 고정할 UPM 태그 커밋과 다릅니다.
+- 비교 기준은 원격 main에 고정돼 있던 `18814fe5b5a2af5cd2a11a7a5bae53403fafa15e`입니다.
+  Unity `Runtime/` C#·jslib API 파일은 동일합니다. Editor·Unity WebGL 로더·측정·개발 콘솔과
+  BuildConfig 변경은 Godot API로 옮기지 않았습니다.
+- 실제 npm web-framework 3.8.0/3.9.0의 `dist/index.d.ts`·구현 비교에서는
+  `IAP.getCompletedOrRefundedOrders(params?)`에 `{key?: string | null}`이 추가됐습니다.
+  양쪽 매니페스트와 생성기에 선택 인자 기본값을 반영하고, IAP 래퍼에 옵션을 전달합니다.
+  기존 무인자 호출과 `_and_wait(timeout_ms)`는 유지하며 옵션은 시간제한 다음에 받습니다.
+  `getPendingOrders` 설명도 '결제 완료 후 미지급 주문'으로 바로잡았습니다.
+- web-framework·간접 CLI와 DevTools는 실제 상류 의존성대로 각각 3.9.0으로 고정했습니다.
+  Godot 4.7.2, 플러그인 0.2.0, TypeScript·Vite 및 무관한 잠금 의존성은 유지합니다.
+- DevTools 3.9.0은 기존 3.8.1의 광고·결제 오류/이벤트 mock 개선을 포함합니다.
+  기존 브리지는 오류와 이벤트를 그대로 전달합니다. 카탈로그 38개 경로가 실제 mock 함수로
+  해석되는 것을 확인했지만, 완료·환불 주문의 `key`는 mock에서 무시됩니다.
+- 새 GDScript 회귀 검사는 기본 페이지·커서·nullable 커서·기존 시간제한 호출과 생성 API를 확인합니다.
+  실제 검사 결과와 미검증 범위는 [3.9.0 검사 기록](testing.md#2026-10-25-sdk-390-자동-검사)에 있습니다.

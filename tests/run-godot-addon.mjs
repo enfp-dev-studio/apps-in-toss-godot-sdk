@@ -77,6 +77,7 @@ function main() {
     const lifecycleSrc = path.join(repoRoot, 'tests/gdscript/admob-lifecycle.gd');
     fs.mkdirSync(path.join(fixture, 'tests'), { recursive: true });
     fs.copyFileSync(lifecycleSrc, path.join(fixture, 'tests/admob-lifecycle.gd'));
+    fs.copyFileSync(path.join(repoRoot, 'tests/gdscript/iap-pagination.gd'), path.join(fixture, 'tests/iap-pagination.gd'));
 
     fs.writeFileSync(
       path.join(fixture, 'project.godot'),
@@ -119,6 +120,13 @@ function main() {
     if (!lifeOut.includes('admob lifecycle check passed')) {
       throw new Error(`수명 검사 성공 마커 없음:\n${lifeOut}`);
     }
+    const paginationOut = run(godotBin, ['--headless', '--path', fixture, '--script', 'res://tests/iap-pagination.gd'], {
+      cwd: repoRoot, timeoutMs: 180_000, label: 'iap pagination',
+    });
+    if (!paginationOut.includes('iap pagination check passed')) {
+      throw new Error(`IAP 페이지 조회 검사 성공 마커 없음:\n${paginationOut}`);
+    }
+    console.log('[godot-ci] IAP 페이지 조회 통과 (기본값·커서·기존 시간제한 호출)');
     console.log('[godot-ci] 전부 통과');
   } finally {
     if (keepFixture) {

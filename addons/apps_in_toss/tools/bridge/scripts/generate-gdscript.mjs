@@ -30,7 +30,10 @@ const lines = [
 ];
 
 for (const api of manifest) {
-  const params = api.args.map((a) => `${a}: Variant`).join(', ');
+  const params = api.args.map((a) => {
+    const value = Object.hasOwn(api.defaults ?? {}, a) ? ` = ${JSON.stringify(api.defaults[a])}` : '';
+    return `${a}: Variant${value}`;
+  }).join(', ');
   const args = api.args.join(', ');
   lines.push(`func ${api.name}(${params}) -> int:`);
   lines.push(`    return _core.invoke(${JSON.stringify(api.path)}, [${args}])`);

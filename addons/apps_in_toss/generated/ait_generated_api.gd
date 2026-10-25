@@ -73,8 +73,8 @@ func iap_get_product_item_list() -> int:
 func iap_get_pending_orders() -> int:
     return _core.invoke("IAP.getPendingOrders", [])
 
-func iap_get_completed_or_refunded_orders() -> int:
-    return _core.invoke("IAP.getCompletedOrRefundedOrders", [])
+func iap_get_completed_or_refunded_orders(options: Variant = {}) -> int:
+    return _core.invoke("IAP.getCompletedOrRefundedOrders", [options])
 
 func iap_complete_product_grant(options: Variant) -> int:
     return _core.invoke("IAP.completeProductGrant", [options])

@@ -1,4 +1,4 @@
-// Source/embedded parity + upstream 3.8.0 version pins.
+// Source/embedded parity + upstream 3.9.0 version pins.
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
@@ -11,9 +11,10 @@ const repoRoot = path.resolve(here, '..');
 const read = (p) => fs.readFileSync(path.join(repoRoot, p), 'utf8');
 const readJson = (p) => JSON.parse(read(p));
 
-describe('bridge source/embedded parity + 3.8.0 pins', () => {
+describe('bridge source/embedded parity + 3.9.0 pins', () => {
   it('both api-manifest.json copies carry the latest mapped APIs', () => {
     const expected = [
+      { name: 'iap_get_completed_or_refunded_orders', path: 'IAP.getCompletedOrRefundedOrders', args: ['options'], defaults: { options: {} } },
       { name: 'navigation_bar_set_options', path: 'NavigationBar.setOptions', args: ['options'] },
       { name: 'migration_get_origin_storage', path: 'Migration.getOriginStorage', args: [] },
       { name: 'user_create_anonymous_key_auth_code', path: 'User.createAnonymousKeyAuthCode', args: [] },
@@ -57,6 +58,8 @@ describe('bridge source/embedded parity + 3.8.0 pins', () => {
     assert.equal(manifest.length, 38);
     const api = read('addons/apps_in_toss/generated/ait_generated_api.gd');
     const catalog = read('addons/apps_in_toss/generated/ait_generated_catalog.gd');
+    assert.ok(api.includes('func iap_get_completed_or_refunded_orders(options: Variant = {}) -> int:'));
+    assert.ok(api.includes('_core.invoke("IAP.getCompletedOrRefundedOrders", [options])'));
     for (const entry of manifest) {
       assert.ok(api.includes(`func ${entry.name}(`), `generated api has ${entry.name}`);
       assert.ok(api.includes(`_core.invoke("${entry.path}"`), `generated api invokes ${entry.path}`);
@@ -64,16 +67,16 @@ describe('bridge source/embedded parity + 3.8.0 pins', () => {
     }
   });
 
-  it('web-framework and devtools are pinned to 3.8.0 everywhere', () => {
+  it('web-framework and devtools are pinned to 3.9.0 everywhere', () => {
     for (const p of ['bridge/package.json', 'addons/apps_in_toss/tools/bridge/package.json']) {
       const pkg = readJson(p);
-      assert.equal(pkg.dependencies['@apps-in-toss/web-framework'], '3.8.0', p);
-      assert.equal(pkg.devDependencies['@apps-in-toss/devtools'], '3.8.0', p);
+      assert.equal(pkg.dependencies['@apps-in-toss/web-framework'], '3.9.0', p);
+      assert.equal(pkg.devDependencies['@apps-in-toss/devtools'], '3.9.0', p);
     }
     const lock = readJson('addons/apps_in_toss/tools/templates/platform.lock.json');
-    assert.equal(lock.webFramework.version, '3.8.0');
-    assert.equal(lock.unitySdk.packageVersion, '3.8.0');
-    assert.equal(lock.unitySdk.commit, '18814fe5b5a2af5cd2a11a7a5bae53403fafa15e');
+    assert.equal(lock.webFramework.version, '3.9.0');
+    assert.equal(lock.unitySdk.packageVersion, '3.9.0');
+    assert.equal(lock.unitySdk.commit, 'c2892282018b44e1666b364a7a97711a130761d6');
     assert.equal(read('addons/apps_in_toss/plugin.cfg').match(/version="([^"]+)"/)[1], '0.2.0');
   });
 
