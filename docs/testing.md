@@ -11,7 +11,7 @@
 | --- | --- |
 | [회귀 테스트](../.github/workflows/regressions.yml) | Node 24/26에서 설치 안전성, SDK 캐시, API 매니페스트·생성 파일 일치, 브리지 호출·이벤트 전달 |
 | [브리지·패키징](../.github/workflows/bridge-package.yml) | 소스·내장 브리지 타입 검사, production/mock/debug-console 빌드, 최소 HTML 입력의 `.ait` 패키징 |
-| [Godot 애드온](../.github/workflows/godot-addon.yml) | Godot 4.7.2 headless import, GDScript 구문 검사, AdMob 브리지 부재 오류·구독 해제 |
+| [Godot 애드온](../.github/workflows/godot-addon.yml) | Godot 4.7.2 headless import, GDScript 구문 검사, AdMob 브리지 부재 오류·구독 해제, IAP 페이지 키·기존 시간제한 호출 |
 | [export 폴더 정리](../tests/export-dir.test.mjs) | 프로젝트 안 export 폴더는 비워도 되고 소스·프로젝트 바깥은 비우지 않음, release에 개발 전용 파일이 섞이면 검증 실패 |
 | [설정 생성](../tests/write-ait-config.test.mjs) | 매니페스트의 `webView`·`permissions`·`navigationBar` 반영과 기본값·검증, 잘못된 키·조합은 실패 |
 | [eval 금지](../tests/no-eval.test.mjs) | 애드온 GDScript에 `JavaScriptBridge.eval`이 없음 |
@@ -52,8 +52,9 @@ GODOT_BIN=/Applications/Godot.app/Contents/MacOS/Godot \
 ## 브라우저 시뮬레이터의 테스트 범위
 
 여기서 시뮬레이터는 `build:dev`와 `preview`로 실행하는 브라우저 mock 및
-DevTools 패널을 뜻합니다. 아래는 설치된 DevTools 3.8.0 구현 기준이며,
-카탈로그의 37개 API 모두 mock 응답이 있습니다.
+DevTools 패널을 뜻합니다. 아래는 설치된 DevTools 3.9.0 구현 기준이며,
+카탈로그의 38개 API 모두 mock 응답이 있습니다.
+완료·환불 주문 조회의 `key` 페이지 이동은 mock에 구현돼 있지 않아 토스 앱 확인이 필요합니다.
 
 | 항목 | 브라우저에서 확인할 수 있는 범위 | 토스 앱에서 확인할 항목 |
 | --- | --- | --- |
@@ -200,3 +201,28 @@ Godot이 export PNG를 가져오며 만든 `.import` 파일이 `.ait`에 실린 
 
 실제 토스 로그인·결제·광고 송출, 익명 키 인증 코드의 서버 교환, 실기기 공유 시트와
 게임 전체 플레이는 이 기록에 포함하지 않습니다.
+
+## 2026-10-25 SDK 3.9.0 자동 검사
+
+격리된 SDK 작업 트리에서 실행했습니다. 아래 결과는 3.9.0 검사이며,
+위 3.8.0 실제 Web 샘플 실행 기록을 새 버전의 실행 결과로 간주하지 않습니다.
+
+| 자동 검사 | 결과 |
+| --- | --- |
+| Node 24.22.1 / 26.12.1 회귀 테스트 | 각각 62개 통과 |
+| 양쪽 `npm ci` (Node 24.22.1, npm 11.20.0) | 통과 |
+| 양쪽 타입 검사·production/mock 빌드 | 통과 |
+| 양쪽 debug-console 빌드·출시 브리지의 디버그 코드 배제 | 통과 |
+| 생성 GDScript 재생성 일치 | 통과 |
+| Godot 4.7.2 headless import·구문 게이트 | 통과 (애드온 17개 파일) |
+| AdMob 수명·IAP 페이지 조회 GDScript 회귀 검사 | 통과 |
+| 실제 DevTools mock 함수 경로 확인 | 38개 카탈로그 경로 모두 확인 |
+| 최소 HTML `.ait` 패키징 | 통과 (1,856 bytes) |
+
+IAP 회귀 검사는 기록용 core로 실제 래퍼·생성 API의 인자 전달을 확인합니다.
+실제 페이지 이동 응답, 전체 Godot Web export·브라우저 플레이, 토스 실기기
+인증·결제·광고는 이번 업데이트에서 실행하지 않았습니다.
+
+설치 중 기존 Vite 8.2.2에 대한 `npm audit` high 경고를 확인했습니다
+([개발 서버 관련 권고](https://github.com/advisories/GHSA-587h-7wmj-h5pm)).
+이는 기존 잠금 버전에도 있는 항목이며 이번 SDK 호환성 변경에서 도구 버전을 함께 올리지는 않았습니다.

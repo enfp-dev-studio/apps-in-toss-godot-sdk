@@ -1,11 +1,11 @@
 # Apps in Toss Godot bridge
 
-Godot의 `JavaScriptBridge` 호출을 `@apps-in-toss/web-framework`(3.8.0)로 전달하는
+Godot의 `JavaScriptBridge` 호출을 `@apps-in-toss/web-framework`(3.9.0)로 전달하는
 브리지입니다. 공식 Unity SDK의 `.jslib` 레이어에 대응합니다. 이 리포에는 루트
 npm 스크립트가 없으니, 이 디렉터리 안에서 직접 실행하세요.
 
 ```bash
-npm install              # 의존성 설치 (web-framework 3.8.0, devtools 3.8.0)
+npm install              # 의존성 설치 (web-framework 3.9.0, devtools 3.9.0)
 npm run build            # 실전 번들 → dist/apps-in-toss-godot-bridge.js
 npm run generate         # api-manifest.json에서 GDScript 카탈로그 재생성
 npx tsc --noEmit         # 타입 검사

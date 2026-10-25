@@ -24,7 +24,7 @@ const APIS: Array[Dictionary] = [
 	{"name": "generate_haptic_feedback", "path": "generateHapticFeedback", "args": ["type"]},
 	{"name": "iap_get_product_item_list", "path": "IAP.getProductItemList", "args": []},
 	{"name": "iap_get_pending_orders", "path": "IAP.getPendingOrders", "args": []},
-	{"name": "iap_get_completed_or_refunded_orders", "path": "IAP.getCompletedOrRefundedOrders", "args": []},
+	{"name": "iap_get_completed_or_refunded_orders", "path": "IAP.getCompletedOrRefundedOrders", "args": ["options"]},
 	{"name": "iap_complete_product_grant", "path": "IAP.completeProductGrant", "args": ["options"]},
 	{"name": "iap_get_subscription_info", "path": "IAP.getSubscriptionInfo", "args": ["options"]},
 	{"name": "game_open_leaderboard", "path": "Game.openLeaderboard", "args": []},

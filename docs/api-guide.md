@@ -15,7 +15,7 @@
 | 이벤트 | 백/포그라운드 가시성 변화 |
 | 기타 | 저장소·배치 처리, 권한·공유·공유 링크·진입 주소·클립보드·햅틱, 바이럴, 내비게이션 바 |
 
-현재 카탈로그는 38개 항목이며, Unity SDK 3.8.0 / web-framework 3.8.0을 기준으로 합니다.
+현재 카탈로그는 38개 항목이며, Unity SDK 3.9.0 / web-framework 3.9.0을 기준으로 합니다.
 카탈로그와 별도로 결제·광고·게임 이벤트의 구독과 해제를 관리하는 래퍼와
 가시성 감지(`AIT.app_events`)를 제공합니다.
 AdMob load/show 두 항목은 일반 호출로 사용할 수 없으므로 `AIT.admob`을 사용하세요.
@@ -27,7 +27,7 @@ AdMob load/show 두 항목은 일반 호출로 사용할 수 없으므로 `AIT.a
 브리지가 없는 Godot 에디터나 일반 브라우저에서는 false이며,
 호출은 `AIT_BRIDGE_UNAVAILABLE` 오류로 비동기 반환됩니다.
 
-DevTools 3.8.0 mock은 카탈로그의 모든 API를 제공하지만, 토스 앱 버전에 따라
+DevTools 3.9.0 mock은 카탈로그의 모든 API를 제공하지만, 토스 앱 버전에 따라
 최근 추가된 API는 없을 수 있습니다. 기능별 지원 여부는 `AIT.has_api()`로 확인하세요. [브라우저 테스트 범위](testing.md#브라우저-시뮬레이터의-테스트-범위)
 
 ## 기본 호출과 광고 이벤트
@@ -231,3 +231,25 @@ API 항목의 원본은 [api-manifest.json](../bridge/api-manifest.json)이며,
 있습니다. 게임 상태는 SDK 저장소(`storage_*`)나 서버에 두세요. 오리진 이전
 데이터를 병합해야 할 때만 `migration_get_origin_storage`로 이전·현재 덤프를
 비교합니다(원본은 `Migration.getOriginStorage`, mock에는 없을 수 있습니다).
+
+## 완료·환불 주문의 다음 페이지 조회 (3.9.0)
+
+응답의 `hasNext`가 참이면 `nextKey`를 다음 요청의 `key`로 전달합니다.
+첫 페이지는 기존처럼 옵션 없이 조회할 수 있습니다.
+
+```gdscript
+var first := await AIT.iap.get_completed_or_refunded_orders_and_wait(5000)
+if first.get("ok", false):
+    var page: Dictionary = first.get("result", {})
+    if page.get("hasNext", false):
+        var next := await AIT.iap.get_completed_or_refunded_orders_and_wait(
+            5000, {"key": page.get("nextKey")}
+        )
+```
+
+요청 ID를 반환하는 `get_completed_or_refunded_orders({"key": next_key})`와
+생성 API `AIT.api.iap_get_completed_or_refunded_orders({"key": next_key})`도 같은 옵션을 받습니다.
+`_and_wait`의 첫 번째 인자는 기존과 같은 시간제한(ms)입니다.
+DevTools 3.9.0은 `key`를 무시하고 `hasNext: false`인 한 페이지만 반환하므로
+실제 페이지 이동은 토스 앱에서 확인해야 합니다.
+`get_pending_orders`는 결제 완료 후 상품이 아직 지급되지 않은 주문을 조회합니다.
