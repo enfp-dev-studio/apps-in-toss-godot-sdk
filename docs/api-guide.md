@@ -151,20 +151,21 @@ func _make_invite_link(code: String) -> void:
     print(String(response.get("result")))
 ```
 
+`AIT.entry()`로 읽으세요. 페이지 주소(경로·쿼리)와 `Environment.initialURL`을 함께 보고, 콘솔 테스트 스킴이
+사용자 쿼리를 `queryParams=<URL 인코딩한 JSON>`으로 넘기는 경우도 `query`에 펼쳐 합칩니다.
+`url.get_slice("code=")`처럼 직접 자르면 테스트 스킴에서 깨집니다.
+
 ```gdscript
 func _read_invite_code() -> void:
-    if not AIT.has_api("Share.createLink"):
-        return  # 구버전 토스 앱
-    var value: Variant = AIT.get_value("Environment.initialURL")
-    if typeof(value) != TYPE_STRING: return
-    var url := String(value)
-    if url.is_empty() or not url.contains("code="):
-        return
-    var code := url.get_slice("code=", 1).get_slice("&", 0)
-    print(code)
+    var entry := AIT.entry()  # { path, query, initial_url, deployment_id, toss_app_version }
+    var code := String(entry["query"].get("code", ""))
+    if code != "":
+        print("invite %s on %s" % [code, entry["path"]])
 ```
 
 `Environment.initialURL`은 앱에 처음 진입할 때 쓴 스킴 URL만 담고, 이후 이동은 반영되지 않습니다.
+토스 최근 목록은 예전 테스트 빌드를 다시 열 수 있습니다. 테스트 화면에는 `AIT.build_info()`의 `kind`·`time`·`commit`·`label`
+(`AIT_BUILD_LABEL`로 넣은 테스트 번호)과 `deployment_id`를 보여 주면 어떤 빌드인지 바로 압니다.
 `ogImageUrl`은 토스앱 Android 5.240.0 / iOS 5.239.0 이상에서만 동작합니다.
 링크 값은 조작될 수 있으니 서버에서 검증해야 합니다.
 
@@ -208,6 +209,42 @@ func _on_admob_failed(subscription_id: int, error: Dictionary) -> void:
 닫힘 이벤트에서 보상을 주던 게임의 보상이 누락됐습니다
 ([공지](https://techchat-apps-in-toss.toss.im/t/4951)). 닫힘 이벤트가 오지 않을 때를
 대비해 로딩·버튼 비활성 같은 대기 상태도 타임아웃으로 풀어 주는 것이 안전합니다.
+
+## 광고 미리 불러오기와 보상(AITAdSlot)
+
+`AITAdSlot`은 광고 그룹 하나를 미리 불러 두고 보여 주는 도우미입니다(`AIT.ads`·`AIT.admob` 공통).
+실기기와 커뮤니티에서 확인한 규칙을 담았습니다.
+
+- 모든 슬롯이 줄을 서서 한 번에 하나만 불러옵니다(안드로이드 토스 5.266.0에서 동시에 부르면 이벤트가 오지 않음).
+  같은 광고 그룹 ID는 다시 부르지 않습니다.
+- 불러오기 제한 시간은 75초(AdMob이 60초 걸린 사례)이고, 넘으면 그 구독을 끊고 2·4·8·16·32초 뒤 다시 부릅니다.
+  토스 답변(커뮤니티 5057)대로 불러오기는 느릴 수 있으니 줄이지 마세요.
+- 보여 준 광고가 끝나면 `finished(result, event)`를 보내고, 그 뒤에 다음 광고를 불러옵니다(닫히기 전에 다음 광고를 부르면
+  "이미 열려 있음" 오류 사례, 커뮤니티 5091).
+- `result`: `"rewarded"`(`userEarnedReward` 받음), `"closed"`, `"not_shown"`(impression 없이 끝남 — "끝까지 안 봤어요"가 아니라
+  "광고가 안 나왔어요"로 안내), `"failed"`. 보상은 `"rewarded"`에서만 주세요.
+
+```gdscript
+var reward_ad: AITAdSlot
+
+func _ready() -> void:
+    reward_ad = AITAdSlot.new(AIT.admob, "콘솔 광고 그룹 ID")
+    reward_ad.finished.connect(_on_reward_ad_finished)
+    reward_ad.load_ad()
+
+
+func _on_watch_pressed() -> void:
+    if not reward_ad.show_ad():
+        print("아직 광고를 불러오는 중이에요")
+
+
+func _on_reward_ad_finished(result: String, _event: Dictionary) -> void:
+    match result:
+        "rewarded":
+            print("보상 지급")
+        "not_shown":
+            print("광고가 안 나왔어요. 잠시 뒤 다시 해 주세요")
+```
 
 ## 뒤로가기와 내비게이션 바
 
@@ -258,11 +295,20 @@ func _apply_insets() -> void:
 
 셸의 viewport meta에 `viewport-fit=cover`가 없으면 iOS에서 CSS 값이 0입니다. `init`이 만드는 셸 템플릿에는 들어 있습니다.
 
+위쪽 인셋은 내비 바가 투명할 때만 더합니다. `SafeArea`의 `top`은 상태 바 높이인데, 불투명한 토스 내비 바 아래에서는
+WebView가 이미 바 아래에서 시작하므로 더하면 빈 띠가 생깁니다(cat-room-godot 실기기). `build`·`build:dev`가
+`navigationBar.transparentBackground`(매니페스트 `appType: "game"`이면 기본 true)를 index.html에 남기고,
+`AIT.safe_area.top_mode`가 `"auto"`(기본)이면 그 값을 따릅니다. `"always"`·`"never"`로 고정할 수 있습니다.
+인셋을 짧은 간격으로 다시 읽지 마세요(앱브릿지 호출 제한). `changed` 신호와 창 크기 변경으로 충분합니다.
+
 ## 백그라운드와 오디오(BGM)
 
-앱이 백그라운드로 가도 BGM이 계속 재생된다는 문의가 반복되므로 웹뷰의
-`document.visibilitychange`를 `AIT.app_events`로 제공합니다. 구독은 자동으로
-시작되며, 가시성이 변할 때 신호를 받습니다.
+앱이 백그라운드로 가도 BGM이 계속 재생된다는 문의가 반복되므로 화면 떠남·돌아옴을 `AIT.app_events`로 제공합니다.
+토스 WebView에서는 `visibilitychange`만으로 놓치는 경우가 있어(hidden만 오고 visible이 안 옴, 처음부터 hidden,
+iOS 18.7은 AudioContext `interrupted`가 먼저 옴) 브리지가 `visibilitychange`·`pagehide`·`pageshow`·`blur`·`focus`·
+AudioContext 끊김·터치를 모으고 상태를 바꾼 첫 신호만 씁니다. 화면을 누르고 손을 떼면 돌아온 것으로 봅니다.
+`visibility_changed(is_visible)`와 함께 `life_changed(is_visible, source)`가 어느 신호로 정했는지 알려 줍니다.
+앱인토스 SDK에는 앱 닫힘·종료 이벤트가 없으니 저장은 화면을 떠날 때 하세요.
 
 가시성 하나로만 끄고 켜면 광고를 보는 중에 앱이 다시 보일 때 소리가 켜집니다.
 사운드 게이트 `AIT.sound`는 멈출 이유를 모아 두고 하나라도 남으면 Master 버스를 끕니다.
@@ -289,8 +335,36 @@ func end_cutscene() -> void:
 ```
 
 효과음·배경음 끄기 설정은 Master가 아니라 SFX·Music 같은 각자의 버스로 두세요. 게이트가 Master를 다시 켭니다.
-광고의 `dismissed`나 결제 결과가 끝내 오지 않으면(2026-10-08 AdMob 장애처럼) 게이트도 닫힌 채로 남습니다.
-대기 상태를 타임아웃으로 풀 때 그 구독을 `dispose`하면 게이트도 함께 풀립니다.
+버스는 `default_bus_layout.tres`에 두거나 `AITSoundGate.ensure_bus(&"Sfx")`로 만드세요. Godot 4.7 Web에서
+`AudioServer.add_bus()`·`move_bus()`를 부르면 버스 순서가 섞여 모든 소리가 사라질 수 있습니다(godot#119026, 4.8에서 수정, `doctor`가 경고).
+
+광고의 `dismissed`가 끝내 오지 않으면(2026-10-08 AdMob 장애처럼) 게이트도 닫힌 채로 남습니다. `AIT.ads`·`AIT.admob`의
+보여 주기 보호가 보이는 상태로 90초 동안 이벤트가 없거나 화면에 돌아온 뒤 3초가 지나면 표시를 끝내고 `show_ended`를
+보냅니다(`show_guard.idle_seconds`·`return_seconds`로 조정). 결제 결과가 오지 않을 때는 주문 구독을 `dispose`하면 게이트도 풀립니다.
+
+iOS는 백그라운드에서 돌아와도 Web Audio가 멈춘 채라 화면을 누를 때까지 소리가 안 나고, 누르면 밀린 소리가 한꺼번에
+납니다(WebKit 버그). `AIT.sound.enable_audio_recovery()`를 켜면 떠날 때 소리를 줄여 직접 멈추고, 돌아온 뒤 첫 터치에
+다시 켜며, 그래도 시간이 흐르지 않으면 오디오 컨텍스트를 새로 만듭니다. 새로 만들면 재생 중이던 소리가 끝난 것으로
+처리되므로 `track_player()`로 등록한 플레이어는 게이트가 닫힐 때의 자리에서 다시 틀고 `audio_renewed`를 보냅니다.
+등록하지 않은 플레이어는 이 신호에서 다시 트세요. **실기기에서 확인하지 않은 기능이라 기본은 꺼져 있습니다.**
+
+```gdscript
+extends Node
+
+@onready var music: AudioStreamPlayer = $Music
+@onready var ambience: AudioStreamPlayer = $Ambience
+
+
+func _ready() -> void:
+    AIT.sound.enable()
+    AIT.sound.enable_audio_recovery()  # iOS 복귀 소리 복구(실기기 미검증)
+    AIT.sound.track_player(music)  # 등록한 플레이어는 게이트가 다시 튼다
+    AIT.sound.audio_renewed.connect(_on_audio_renewed)
+
+
+func _on_audio_renewed() -> void:
+    ambience.play()  # 등록하지 않은 플레이어는 직접 다시 튼다
+```
 
 로딩 직후 터치 없이 소리를 재생하려면 WebView의 `mediaPlaybackRequiresUserAction`가
 false여야 합니다. 이 값과 게임 중 당겨서 새로고침을 막는 `pullToRefreshEnabled: false`는
@@ -382,8 +456,23 @@ func _build_list(parent: Control) -> void:
      (즉시 승인 뒤 앱이 닫혀 놓친 주문은 미결 목록에 없을 수 있습니다)
    - 한 번 실행하는 동안 같은 주문은 한 번만 요청합니다(앱 브릿지 과도 호출 금지).
 
-웹 SDK의 `IAP.getCompletedOrRefundedOrders`는 인자가 없고 첫 페이지만 줍니다. 최근 주문 위주라 대사에는 충분합니다.
+`IAP.getCompletedOrRefundedOrders`는 web-framework 3.9.0부터 `key`로 다음 페이지를 읽습니다([아래](#완료환불-주문의-다음-페이지-조회-390)).
 결제 결과가 끝내 오지 않을 때를 대비해 감시 타이머로 버튼 잠금을 풀고 주문 구독을 `dispose`하세요.
+
+web-framework 3.9.0부터 지급 콜백이 실패하면 토스에 바로 '지급 안 됨'으로 알립니다. `reject_product_grant`, 응답 전
+`dispose`, 페이지 종료가 모두 여기에 해당하며, `purchase_failed`가 그 오류로 한 번만 오고 뒤에 오는 이벤트는 없습니다.
+`reject_product_grant`의 오류 코드는 기본 `PRODUCT_NOT_GRANTED_BY_PARTNER`입니다. `product_grant_requested`에 연결된 함수가
+없으면 SDK가 `AIT_NO_GRANT_HANDLER`로 바로 거절합니다(그냥 두면 토스가 30초 기다린 뒤 환불 화면을 띄웁니다).
+주문 전에 연결하고, 콜백의 응답은 30초 안에 주세요.
+
+### 서버 없는 비소모품
+
+서버 없이 비소모품(광고 제거 등)을 팔 때는 기기에 남은 기록과 주문 목록으로 보유 여부를 정합니다.
+
+- 가진 것: `COMPLETED` 주문과 미결(`get_pending_orders`) 주문. `REFUNDED`만 뺍니다.
+- 한 번 읽은 목록에 주문이 없다고 빼지 마세요(목록은 페이지 단위이고 호출이 실패할 수 있습니다). 보유 상태는 저장에
+  캐시하고, 새 기기에서는 주문 목록(`hasNext`면 `nextKey`로 다음 페이지)으로 되살립니다.
+- 환불을 반영할 때만 `REFUNDED`를 보고 지웁니다.
 
 `purchase_failed`의 `error.code`는 web-framework 값을 그대로 전달합니다
 ([IAP.createOneTimePurchaseOrder](https://developers-apps-in-toss.toss.im/documentation/sdk/domains-api/iap/iap.createonetimepurchaseorder)).
@@ -408,6 +497,12 @@ func _build_list(parent: Control) -> void:
 콘솔 QR 테스트의 결제는 실제 결제입니다. 로컬에서는 DevTools 모의 결제로 확인하세요.
 샘플 씬의 미결 주문 복구도 참고하세요.
 
+## 앱브릿지 호출 한도
+
+토스는 앱브릿지를 짧은 시간에 너무 많이 부른 앱의 노출을 중지합니다(커뮤니티 5024: `getStorageItem`을 10초에 1000번 넘게 호출,
+모든 브릿지에 같은 한도). 저장·햅틱·Safe Area·광고 불러오기를 `_process`나 짧은 타이머에서 부르지 말고, 값은 캐시하고
+바뀔 때만 부르세요. `AITCore`는 같은 경로를 10초에 300번 넘게 부르면 한 번 경고합니다(`AIT.core.call_rate_warn`, 0이면 끔).
+
 ## API 목록과 권한
 
 API 항목의 원본은 [api-manifest.json](../bridge/api-manifest.json)이며,
@@ -431,13 +526,19 @@ API 항목의 원본은 [api-manifest.json](../bridge/api-manifest.json)이며,
 첫 페이지는 기존처럼 옵션 없이 조회할 수 있습니다.
 
 ```gdscript
-var first := await AIT.iap.get_completed_or_refunded_orders_and_wait(5000)
-if first.get("ok", false):
-    var page: Dictionary = first.get("result", {})
-    if page.get("hasNext", false):
-        var next := await AIT.iap.get_completed_or_refunded_orders_and_wait(
-            5000, {"key": page.get("nextKey")}
-        )
+func _load_all_orders() -> Array:
+    var orders: Array = []
+    var options := {}
+    while true:
+        var response := await AIT.iap.get_completed_or_refunded_orders_and_wait(5000, options)
+        if not bool(response.get("ok", false)):
+            break
+        var page: Dictionary = response.get("result", {})
+        orders.append_array(page.get("orders", []))
+        if not bool(page.get("hasNext", false)):
+            break
+        options = {"key": page.get("nextKey")}
+    return orders
 ```
 
 요청 ID를 반환하는 `get_completed_or_refunded_orders({"key": next_key})`와

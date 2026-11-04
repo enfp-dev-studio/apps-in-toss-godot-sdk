@@ -59,7 +59,8 @@ npm --prefix addons/apps_in_toss/tools/bridge ci
 `webView`, `permissions`, `navigationBar`는 선택 필드입니다. `build`·`build:dev`가
 매니페스트를 읽어 `apps-in-toss.config.ts`를 다시 만듭니다. 값 검사는
 `write-ait-config.mjs`가 수행하며, 허용되지 않은 키·조합은 실패합니다.
-`webView`는 아래 기본값 위에 매니페스트 값을 덮어씁니다.
+`webView`는 아래 기본값(캔버스 하나를 채우는 Godot 앱 기준) 위에 매니페스트 값을 덮어씁니다.
+web-framework 기본값(`bounces: true`, `allowsInlineMediaPlayback: false`)과 다르니 바꿀 값만 매니페스트에 적으세요.
 
 ```json
 {
@@ -169,7 +170,10 @@ SDK의 연동 확인 화면을 사용하려면 메인 씬의 `Control` 노드에
 node addons/apps_in_toss/tools/ait-godot.mjs build
 ```
 
-설정 검사 → Godot Web export → 브리지 주입·검증 → `.ait` 패키징 순으로 진행합니다.
+설정 검사 → Godot Web export → 엔진 JS 패치 → 브리지 주입·검증 → `.ait` 패키징 → 최종 `.ait` 검사 순으로 진행합니다.
+엔진 JS 패치는 검수가 반려하는 `JavaScriptBridge.eval` 구현을 빈 함수로 바꾸고 소리 복구 훅을 넣습니다([Godot Web 주의사항](godot-web-notes.md#eval-없이-dom-쓰기)).
+최종 검사는 `node addons/apps_in_toss/tools/ait-godot.mjs verify-ait`로 따로 실행할 수도 있습니다. 셸에 `GODOT_EXPORT_PRESET`이
+남아 있으면 출시 `build`가 멈춥니다. 테스트 번호를 `AIT_BUILD_LABEL=QR-12`처럼 주면 `AIT.build_info()`로 화면에 보여 줄 수 있습니다.
 `build`는 export 전에 `build/godot-web`을 비우며, 개발·테스트 전용 파일
 (`apps-in-toss-godot-bridge.mock.js`, `ait-devtools-panel.js`, `ait-debug-console.js`)이
 release 결과에 남으면 검사가 실패합니다. export 폴더가 압축 해제 기준 100MiB를 넘어도 실패합니다

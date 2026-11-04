@@ -67,6 +67,23 @@ func make_loop(pcm: PackedByteArray, mix_rate: int, frames: int) -> AudioStreamW
 ```
 
 - 백그라운드·광고·결제 중 정지는 `AIT.sound`(사운드 게이트)로 합니다. 끄기 설정은 각자의 버스로 둡니다.
+- 실행 중 `AudioServer.add_bus()`·`move_bus()`를 부르면 Web의 JS 버스 순서가 섞여 Master가 출력에서 떨어지고 아무 소리도
+  나지 않거나, 다른 버스가 꺼지거나 커집니다(godot#119026, 4.8에서 수정, 데스크톱은 정상). 버스는 `default_bus_layout.tres`에
+  두거나 `AITSoundGate.ensure_bus()`(`bus_count`를 늘려 끝에 붙임)로 만드세요. `doctor`가 이 호출을 경고합니다.
+- 반복 재생 중인 Sample 소리를 `stream_paused`나 트리 일시정지로 멈췄다가 풀면 처음부터 다시 납니다(godot#123964, 4.8에서 수정).
+- iOS는 백그라운드로 갈 때 Web Audio를 끊고, 돌아와 `resume()`해도 `currentTime`이 멈춰 있다가 화면을 누르면 밀린 소리가
+  한꺼번에 납니다(WebKit 버그 276016·263627·240646, godot#53945). 새로 만든 컨텍스트는 바로 소리가 납니다.
+  SDK 빌드의 엔진은 컨텍스트를 새로 만들 수 있게 고쳐져 있고, `AIT.sound.enable_audio_recovery()`가 이를 씁니다(실기기 미검증).
+- WKWebView에서는 시작할 때 만든 컨텍스트가 `running`이어도 첫 터치 전에는 소리가 안 날 수 있어, 브리지가 첫 터치에
+  `resume()`하고 1샘플 무음을 틉니다. 위치 워크릿(`index.audio.position.worklet.js`)을 못 불러오면 모든 샘플이 소리를 내지
+  않으므로 Blob URL로 다시 시도하고, 4초 안에 안 되면 소리 없는 대역 노드를 씁니다(재생 위치 보고만 빠짐).
+
+## 화면 떠남·돌아옴
+
+토스 WebView에서 `visibilitychange`만 들으면 놓치는 경우가 있었습니다(hidden만 오고 visible이 오지 않음, 처음부터 hidden이라
+이벤트가 없음, 첫 `pageshow`가 hidden 상태에서 옴, iOS 18.7은 AudioContext `interrupted`가 hidden보다 먼저 옴).
+브리지가 여러 신호를 모아 상태를 바꾼 첫 신호만 쓰고 나머지는 기록만 하며, 손을 떼면 돌아온 것으로 봅니다
+(`AIT.app_events`, 최근 신호는 `AIT.app_events.runtime_state()`). SDK에는 앱 닫힘·종료 이벤트가 없습니다.
 
 ## 배너 광고
 
@@ -82,8 +99,12 @@ func make_loop(pcm: PackedByteArray, mix_rate: int, frames: int) -> AudioStreamW
 
 ## eval 없이 DOM 쓰기
 
-출시 체크리스트는 외부 코드 실행(eval)을 금지합니다. `JavaScriptBridge.eval` 대신 `get_interface`와 `create_callback`으로
-DOM API를 직접 부르면 됩니다. `AITSafeArea`의 CSS 인셋 측정이 예입니다.
+출시 체크리스트는 외부 코드 실행(eval)을 금지하고, 검수는 번들 글자에 "eval"이 있으면 반려합니다. 2026-11-04 Godot 번들이
+엔진 `index.js`의 `JavaScriptBridge.eval` 구현 때문에 반려됐고, 호출만 지운 번들도 남은 글자(함수·변수 이름, 오류 문구) 때문에
+다시 반려됐습니다. 그래서 SDK의 `build`·`build:dev`는 export 직후 그 함수를 빈 함수로 바꿉니다. SDK로 만든 빌드에서
+`JavaScriptBridge.eval`은 아무것도 실행하지 않고 nil을 돌려주니 `get_interface`와 `create_callback`으로 DOM API를 직접 부르세요.
+`AITSafeArea`의 CSS 인셋 측정이 예입니다. `index.wasm` 안의 엔진 이름 글자(`evaluator` 등)는 고칠 수 없어, 이것까지 반려되면
+엔진을 `javascript_eval=no`로 다시 빌드해야 합니다(검증하지 않음).
 
 ```gdscript
 func css_padding_top(css: String) -> float:

@@ -129,7 +129,7 @@ cat-room 위치는 `room-v2` 브랜치(`db6e830`) 기준입니다. 공식 규칙
 | 텍스처: VRAM 압축 `for_mobile`(ETC2/ASTC), import 기본값, 오디오 WAV는 압축(QOA)·배경음은 OGG | b | `project.godot` `[importer_defaults]`, `export_presets.cfg` | 출시 점검 문서 |
 | 앱 브릿지 과도 호출 금지: 햅틱은 프레임 루프에서 부르지 않는다, 화면 켜두기는 화면을 벗어날 때 끈다, 모든 SDK 호출은 `AIT.has_api`로 확인 | b | `platform.gd` `haptic`·`set_awake` | 출시 점검 문서 |
 | 라이트 모드, 진입 즉시 바텀시트 없음, 외부 링크·`location` 이동·iframe 없음 | b | 출시 점검 노트 | 출시 점검 문서(공식 체크리스트 링크와 Godot에서 볼 곳) |
-| eval: 앱·SDK는 `JavaScriptBridge.eval`을 쓰지 않고 엔진 JS에만 구현이 있다 | 이미 반영 | — | 변경 없음 |
+| eval: 검수는 엔진 `index.js`의 `JavaScriptBridge.eval` 구현과 남은 "eval" 글자 자체를 반려한다(2026-11-04 두 번 반려) | a | `tools/web-template.mjs` 5)·6), `scrub-bundle.mjs`, `check-release.mjs` | `engine-patch.mjs`, 브리지 `evaluate` 이름 바꾸기, export·최종 `.ait` 검사([2026-11-04 기록](sdk-development.md#2026-11-04-cat-room-godot-실기기-사례-반영과-39-정리)) |
 
 ## 앱 전용으로 남기는 것(c)
 
@@ -164,3 +164,20 @@ cat-room 위치는 `room-v2` 브랜치(`db6e830`) 기준입니다. 공식 규칙
 브랜치 `lessons/cat-room-godot`에 (a)·(b) 항목을 모두 넣었습니다. 바뀐 내용과 검증은
 [SDK 개발 기록 2026-10-18](sdk-development.md#2026-10-18-cat-room-godot에서-배운-것-반영)에 있습니다.
 후속 후보: 한글 입력 DOM 시트 모듈, 배너 광고(`TossAds`) 모듈, `homeEvent`, 실기기에서 확인한 뒤 cat-room-godot을 SDK 모듈로 바꾸기.
+
+## 2026-11-04 추가(`db6e830` 이후 cat-room 수정)
+
+이 문서는 cat-room `db6e830`(10-17) 기준이었습니다. 그 뒤 cat-room에서 고친 것을 모은 노트(2026-11-04)는 아래처럼 SDK에 반영했습니다.
+cat-room 코드를 보지 못하고 노트 설명대로 다시 구현했으니, cat-room을 SDK 모듈로 바꿀 때 실기기로 다시 확인하세요.
+
+| 노트 | SDK 반영 | 미검증 |
+| --- | --- | --- |
+| 1-1 엔진 eval 반려 | `engine-patch.mjs`, 브리지 `evaluate`, `release-scan.mjs`, `verify-ait.mjs`, `doctor --strict` | 실제 검수 통과, wasm 글자 |
+| 2-1·2-2 iOS 소리 | 엔진 소리 훅, 브리지 `web-runtime.ts`, `AIT.sound.enable_audio_recovery()`·`audio_renewed` | 실기기 전부 |
+| 2-3 `add_bus` | `AITSoundGate.ensure_bus()`, `doctor` 경고 | — |
+| 2-4 화면 신호 | 브리지 신호 모으기, `AIT.app_events.life_changed`, bfcache `pagehide` 구독 유지 | 실기기 신호 순서 |
+| 2-5 광고 | `AITShowGuard`, `AITAdSlot` | 실제 광고 이벤트 |
+| 2-6 Safe Area | `top_mode`, `ait-app-config` | 실기기 값 |
+| 3-1 최종 `.ait` | `verify-ait.mjs`, 출시 프리셋 고정, `<script src>`만 보기 | — |
+| 3-2 로딩 화면 | 셸 템플릿 크기 합·오가는 막대·다시 시도 | — |
+| 4 작은 것 | `wipe()`, `AIT.entry()`, `AIT.build_info()`, WebView 기본값, `doctor` 버전, `ait-godot sim`, 비소모품 문서 | `sim`은 시뮬레이터 실행 안 해 봄 |

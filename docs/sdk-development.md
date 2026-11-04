@@ -64,6 +64,9 @@ Unity SDK와 npm web-framework, DevTools의 버전이 같다고 가정하지 말
 - Godot 버전이 명시된 CI 워크플로와 문서도 함께 갱신합니다.
 - 구문 검사 외에 샘플의 실제 Web export, 브라우저 로딩·API 호출, `.ait` 패키징을 확인합니다.
 - 테스트 결과와 미검증 범위를 PR에 기록하고, 검토 후 지원 버전을 올립니다.
+- [engine-patch.mjs](../addons/apps_in_toss/tools/scripts/engine-patch.mjs)는 4.7.2 엔진 JS의 정확한 코드 조각에 붙습니다.
+  새 엔진에서 조각을 못 찾으면 `build`가 멈추므로, 새 템플릿의 `godot.js`로 `tests/release-eval.test.mjs`의 실제 템플릿 검사를
+  돌리고 조각을 갱신하세요(Godot 4.8은 Sample 소리 버그 #123996를 고쳤으니 소리 훅도 다시 확인).
 
 검증용 엔진은 별도 경로에서 실행할 수 있습니다. `GODOT_BIN`으로 경로를 지정하면
 사용자가 기존에 설치한 Godot 앱을 바꾸지 않고도 새 버전을 시험할 수 있습니다.
@@ -193,6 +196,8 @@ cat-room-godot 게임에 SDK를 적용하며 4건(1~4)을 발견했고, 수정 �
    그 API를 호출하지 않으면 실행되지 않습니다. 엔진에서 아예 빼는 방법(커스텀
    Web 템플릿 빌드)은 이 SDK에서 검증하지 않았습니다. 추가된 테스트는
    [no-eval](../tests/no-eval.test.mjs)입니다.
+   (2026-11-04 정정: 검수는 이 엔진 코드와 "eval" 글자 자체를 반려합니다. 아래 2026-11-04 기록대로
+   export 뒤 엔진 JS를 고칩니다.)
 4. 브리지 탐색: `AITCore`가 `get_interface("AppsInTossGodot")` 직접 조회 대신
    `window` 속성으로 브리지를 찾아, 브리지가 아직 없을 때
     `No interface 'AppsInTossGodot' registered` 오류를 찍지 않습니다. 이 항목의
@@ -334,3 +339,45 @@ cat-room-godot(비게임, Godot 4.7.2 Web)을 만들며 SDK 위에 따로 짠 �
   해석되는 것을 확인했지만, 완료·환불 주문의 `key`는 mock에서 무시됩니다.
 - 새 GDScript 회귀 검사는 기본 페이지·커서·nullable 커서·기존 시간제한 호출과 생성 API를 확인합니다.
   실제 검사 결과와 미검증 범위는 [3.9.0 검사 기록](testing.md#2026-10-25-sdk-390-자동-검사)에 있습니다.
+
+## 2026-11-04: cat-room-godot 실기기 사례 반영과 3.9 정리
+
+cat-room-godot 출시 준비(검수 반려 2회, iOS 실기기 -33~-105)에서 앱 쪽으로 고치거나 우회한 것 가운데 다른 Godot 앱에도
+필요한 것을 정리한 노트(2026-11-04)를 기준으로 반영했습니다. cat-room의 11월 코드는 이 저장소에서 볼 수 없어 노트의 설명대로
+다시 구현했습니다. 실기기로 맞춘 동작(특히 iOS 소리 복구)은 실기기에서 다시 확인해야 합니다.
+
+- 먼저 합침: `lessons/cat-room-godot`(뒤로가기·Safe Area·사운드 게이트·저장 칸·UI 도우미·doctor 점검)과
+  `codex/toss-sdk-3.9.0`(web-framework·DevTools 3.9.0, Unity `release/v3.9.0` = `c2892282`, 주문 페이지 조회).
+  `.gd.uid` 충돌은 `main` 값(51e1fb1)을 지켰습니다.
+- 1-1 검수 eval 반려: [engine-patch.mjs](../addons/apps_in_toss/tools/scripts/engine-patch.mjs)가 export 직후 `_godot_js_eval`을
+  빈 `_godot_js_off`로 바꾸고 wasm 가져오기 표 값도 바꿉니다(출시 템플릿은 키가 `$e`처럼 짧아 글자가 모두 사라짐, 디버그 템플릿은 키가 남음).
+  브리지 빌드는 `@webview-bridge/web`의 `evaluate` 옵션 이름을 `dispatch`로 바꾸고 출시·debug-console 번들에 글자가 남으면 멈춥니다.
+  [release-scan.mjs](../addons/apps_in_toss/tools/scripts/release-scan.mjs)로 export 폴더와 최종 `.ait`(`project-package.json` 포함)를 검사하고,
+  `doctor --strict`는 게임의 `JavaScriptBridge.eval`에서 실패합니다. 엔진 직접 빌드(`javascript_eval=no`)는 확인하지 않았습니다.
+- 2-1·2-2 iOS 소리: 엔진 패치가 `window.__godotAudio`, 출력 앞 페이더, 드라이버 인자 기록, 위치 워크릿 훅,
+  `GodotAudio.aitRecreate()`(버스·위치 워크릿·출력 드라이버 다시 잇기)를 넣고, 다른 컨텍스트의 위치 워크릿을 다시 쓰던 엔진 버그를
+  고칩니다. 브리지 [web-runtime.ts](../bridge/src/web-runtime.ts)가 첫 터치 소리 풀기, 위치 워크릿 Blob 재시도·대역 노드(항상),
+  떠날 때 페이드·직접 멈춤과 돌아온 뒤 첫 터치에서 멈춘 컨텍스트 새로 만들기(`AIT.sound.enable_audio_recovery()`, 기본 꺼짐)를 맡습니다.
+  `AITSoundGate`는 `audio_renewed`에서 등록 플레이어를 닫힐 때의 자리에서 다시 틉니다. **실기기 미검증**(가짜 AudioContext 테스트만).
+- 2-3 `add_bus`: `AITSoundGate.ensure_bus()`, `doctor` 경고. 상류 수정 godot#123996(4.8, beta2 뒤 머지)으로 확인된 버그입니다.
+- 2-4 화면 신호: 브리지가 여러 신호를 모아 첫 신호만 쓰고(`AIT.app_events.life_changed`, `runtime_state()`), bfcache `pagehide`에서는
+  구독을 끊지 않습니다(광고·결제 중 이벤트 끊김 위험).
+- 2-5 광고: `AITShowGuard`(90초·돌아온 뒤 3초)를 `AIT.ads`·`AIT.admob`에 넣고, `AITAdSlot`(한 번에 하나, 그룹 중복 막기,
+  75초 제한과 다시 부르기, 닫힌 뒤 다음 광고, `rewarded`·`not_shown` 결과)을 더했습니다.
+- 2-6 Safe Area: 위쪽 인셋은 빌드 설정의 `navigationBar.transparentBackground`가 참일 때만(`top_mode`). `write-ait-config`가
+  `build/ait-app-config.json`을 쓰고 엔진 패치 단계가 index.html에 JSON으로 넣습니다.
+- 3-1 최종 `.ait` 검사: [verify-ait.mjs](../addons/apps_in_toss/tools/scripts/verify-ait.mjs)(`build` 마지막, `ait-godot verify-ait`).
+  출시 `build`는 `GODOT_EXPORT_PRESET`이 lock 프리셋과 다르면 멈추고, 플랫폼 매니페스트에 `exportPreset`과 빌드 도장을 남깁니다.
+  `<script src>`만 보도록 고쳐 셸 코드의 글자를 잘못 잡지 않습니다. pck의 `scripts/dev/` 검사는 SDK에 그런 규칙이 없어 넣지 않았습니다.
+- 3-2 셸 템플릿: 크기를 모를 때 `config.fileSizes` 합·오가는 막대, 실패 화면의 다시 시도.
+- 4: `AITSaveSlot.wipe()`가 `:broken` 백업과 예전 키까지 지움(예전 키를 남기면 다음 읽기가 되살림), `AIT.entry()`(`queryParams` 포함),
+  `AIT.build_info()`, 캔버스 WebView 기본값 네 개, `doctor` 버전 맞추기, `ait-godot sim`, API 가이드의 서버 없는 비소모품 절.
+- 5: eval이 엔진에 있어도 된다고 적은 곳과 iOS 복귀 소리 설명을 고쳤습니다.
+- 3.9.0 상류 정리: 지급 콜백 실패가 바로 '지급 안 됨'이 되는 동작(릴리스 노트에만 있음)에 맞춰 `reject_product_grant`에
+  `PRODUCT_NOT_GRANTED_BY_PARTNER` 코드를 붙이고, `product_grant_requested`에 연결이 없으면 `AIT_NO_GRANT_HANDLER`로 바로 거절합니다.
+  `AITCore`가 같은 경로 10초 300번 초과를 경고합니다(커뮤니티 5024: 10초 1000번 초과로 노출 중지). `vite` 8.2.2 → 8.3.5(개발 의존성 경고).
+  npm 최신은 3.9.0이고 3.10.0-beta.0(`openOneViral`, 허용 앱 전용)은 베타라 올리지 않았습니다.
+- 검증: `node --test tests/*.test.mjs`, 두 브리지의 타입 검사·production·mock·debug-console 빌드, 최소 `.ait` 패키징,
+  Godot 4.7.2 모듈 검사, 실제 4.7.2 출시·디버그 템플릿에 엔진 패치 적용. 결과는 [테스트 기록](testing.md#2026-11-04-sdk-점검)에 있습니다.
+- 감시: 커뮤니티 5134(wasm·외부 코드 실행 판정), web-framework 3.10.0 정식(DevTools 3.10의 peer 범위가 web-framework 3.10 이상),
+  Godot 4.8(#123996)·4.7.3, Unity의 IDBFS 숨김 flush(`user://` 저장을 쓰는 게임만), Windows `ait build` 경로(5003은 글이 내려감).

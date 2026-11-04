@@ -17,7 +17,12 @@
 | Godot MCP `McpBridge` 오토로드가 `project.godot`에 남음 | 실패 |
 | 프리셋 모바일 VRAM 압축인데 ETC2/ASTC import 꺼짐(export가 이유 없이 실패하는 경우) | 실패 |
 | Thread Support 켜짐, Godot 기본 로딩 화면, iframe | 실패 |
-| 게임 스크립트의 `JavaScriptBridge.eval` | 경고 |
+| 출시 번들의 JS·HTML·JSON(게임 `package.json` 포함)에 "eval" 글자·Function 생성자 | 실패(export 검사와 최종 `.ait` 검사) |
+| 출시 프리셋이 아닌 프리셋으로 내보냄(셸에 남은 `GODOT_EXPORT_PRESET`) | 실패 |
+| 게임 스크립트의 `JavaScriptBridge.eval` | 실패(`build`의 strict `doctor`), 그 밖에는 경고 |
+| 최종 `.ait`가 지금 export와 다른 빌드, 테스트 빌드 | 경고 |
+| 게임 스크립트의 `AudioServer.add_bus`·`move_bus`(Web에서 소리가 사라질 수 있음) | 경고 |
+| 앱 버전이 매니페스트·`project.godot`·`package.json`에서 다름 | 경고 |
 | 게임 스크립트의 테스트 광고 그룹 ID(`ait-ad-test-…`) | 경고 |
 | 셸 viewport meta에 확대 막기·`viewport-fit=cover` 없음 | 경고 |
 | 매니페스트 `appType` 없음, 비게임인데 `withBackButton: false` | 경고 |
@@ -49,7 +54,7 @@
 
 | 공식 항목 | Godot에서 |
 | --- | --- |
-| (게임) 백그라운드 전환 시 즉시 정지, 돌아오면 다시 재생 | `AIT.sound.enable()` |
+| (게임) 백그라운드 전환 시 즉시 정지, 돌아오면 다시 재생 | `AIT.sound.enable()`. iOS는 돌아와도 Web Audio가 멈춘 채라 첫 터치까지 소리가 없을 수 있음 — `enable_audio_recovery()`(실기기 미검증)와 `audio_renewed`에서 다시 틀기를 실기기로 확인 |
 | 인앱 광고 재생 중 음악 정지, 끝나면 다시 재생 | `AIT.sound`가 `show_started`~`show_ended` 동안 정지 |
 | 인앱 결제·토스페이 진행 중 음악 정지 | `AIT.sound`가 주문 동안 정지(토스페이는 `silence`로 직접) |
 | (게임) 사운드 On/Off 설정 | 설정은 SFX·Music 버스로(Master는 게이트가 씀) |
@@ -68,17 +73,18 @@
 | 완료 뒤 결과가 반영됨, 기기를 바꿔도 유지 | 즉시 승인 → 결제 화면이 닫힌 뒤 서버 지급 → 대사([결제 지급 규칙](api-guide.md#결제-지급-규칙)) |
 | 실패 사유를 사용자가 인지 | `purchase_failed`의 `error.code`별 안내 |
 | 취소하면 주문 화면으로 | `USER_CANCELED`면 화면을 그대로 둠 |
-| 결제 내역을 사용자가 확인 | `get_completed_or_refunded_orders`(웹은 첫 페이지만)와 서버 기록으로 내역 화면 |
+| 결제 내역을 사용자가 확인 | `get_completed_or_refunded_orders`(3.9.0부터 `key`로 다음 페이지)와 서버 기록으로 내역 화면 |
+| 지급 콜백을 30초 안에 응답 | `product_grant_requested`를 주문 전에 연결(없으면 SDK가 바로 거절). 거절·dispose·페이지 종료는 3.9.0부터 바로 '지급 안 됨' |
 | 실제 결제 확인 | 콘솔 QR 테스트는 실제 결제 |
 
 ## 인앱 광고
 
 | 공식 항목 | Godot에서 |
 | --- | --- |
-| 사전 로딩, 재생 시점에 실시간 로딩하지 않음 | 화면 진입 때 `load_full_screen_ad`, 실패는 간격을 늘려 몇 번만 다시 |
+| 사전 로딩, 재생 시점에 실시간 로딩하지 않음 | `AITAdSlot.load_ad()`(한 번에 하나, 75초 제한, 간격을 늘려 다섯 번까지 다시) |
 | 테스트 광고가 아닌 실제 광고 | 검수 번들 전 `ait-ad-test-…`를 콘솔 ID로(`doctor` 경고) |
 | 리워드 광고를 끝까지 보면 보상 | `userEarnedReward`에서만 지급(브라우저 mock은 이 이벤트를 보내지 않음) |
-| 광고가 끝나면 미니앱 화면으로 | `dismissed`·`failedToShow`에서 대기 상태를 풀고 구독 `dispose` |
+| 광고가 끝나면 미니앱 화면으로 | `dismissed`·`failedToShow`에서 대기 상태를 풀고 구독 `dispose`. 둘 다 오지 않으면 보여 주기 보호가 끝냄(90초·돌아온 뒤 3초) |
 | (비게임) 배너는 스크롤 가능한 화면에만 / (게임) 배너는 상단 또는 하단에만 | 배너는 DOM으로 캔버스 위에 겹침([방법](godot-web-notes.md#배너-광고)) |
 
 ## 보안과 안정성
@@ -87,7 +93,7 @@
 | --- | --- |
 | 앱 브릿지를 짧은 시간에 과도하게 호출하지 않음, 반복문·타이머·화면 갱신의 중복 호출 없음 | 햅틱·로그·광고 불러오기를 `_process`에서 부르지 않음. 화면 켜두기(`setScreenAwakeMode`)는 화면을 벗어날 때 끔 |
 | 호출 실패 시 재시도 횟수와 간격 제어 | 재시도는 횟수 상한과 간격(백오프)을 둠 |
-| 외부 코드 실행(eval) 금지 | SDK는 `JavaScriptBridge.eval`을 쓰지 않음. 게임도 `get_interface`만 |
+| 외부 코드 실행(eval) 금지 | 검수는 번들의 "eval" 글자 자체를 반려함. `build`가 엔진의 `JavaScriptBridge.eval` 구현을 빈 함수로 바꾸고 최종 `.ait`를 검사(`ait-godot verify-ait`). 게임은 `get_interface`만 쓰고, `package.json` 스크립트 이름에도 그 글자를 쓰지 않음 |
 | 토스 도메인 밖으로 이동·렌더링 금지, HTTPS·`wss://`만 | `location` 이동·iframe 없음, 서버 주소는 `https://` |
 | 모든 SDK 호출 전 지원 여부 확인 | `AIT.has_api()` |
 

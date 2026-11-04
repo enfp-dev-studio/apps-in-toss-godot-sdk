@@ -11,10 +11,12 @@
 | --- | --- |
 | [회귀 테스트](../.github/workflows/regressions.yml) | Node 24/26에서 설치 안전성, SDK 캐시, API 매니페스트·생성 파일 일치, 브리지 호출·이벤트 전달 |
 | [브리지·패키징](../.github/workflows/bridge-package.yml) | 소스·내장 브리지 타입 검사, production/mock/debug-console 빌드, 최소 HTML 입력의 `.ait` 패키징 |
-| [Godot 애드온](../.github/workflows/godot-addon.yml) | Godot 4.7.2 headless import, GDScript 구문 검사, AdMob 브리지 부재 오류·구독 해제, IAP 페이지 키·기존 시간제한 호출, [모듈 검사](../tests/gdscript/lessons-modules.gd)(한글·뒤로가기·Safe Area·사운드 게이트·광고/결제 수명 신호·저장·터치 스크롤) |
+| [Godot 애드온](../.github/workflows/godot-addon.yml) | Godot 4.7.2 headless import, GDScript 구문 검사, AdMob 브리지 부재 오류·구독 해제, IAP 페이지 키·기존 시간제한 호출, [모듈 검사](../tests/gdscript/lessons-modules.gd)(한글·뒤로가기·Safe Area·사운드 게이트·광고 보여 주기 보호·`AITAdSlot`·결제 지급 거절·저장·`AIT.entry`·터치 스크롤) |
 | [export 폴더 정리](../tests/export-dir.test.mjs) | 프로젝트 안 export 폴더는 비워도 되고 소스·프로젝트 바깥은 비우지 않음, release에 개발 전용 파일이 섞이면 검증 실패 |
 | [설정 생성](../tests/write-ait-config.test.mjs) | 매니페스트의 `webView`·`permissions`·`navigationBar` 반영과 기본값·검증, 잘못된 키·조합은 실패 |
 | [eval 금지](../tests/no-eval.test.mjs) | 애드온 GDScript에 `JavaScriptBridge.eval`이 없음 |
+| [검수 eval 대응](../tests/release-eval.test.mjs) | 엔진 JS 패치(실제 4.7.2 템플릿 포함, 로컬에 있을 때), "eval"·Function 글자 검사, export 폴더·최종 `.ait` 검사(출시 프리셋·개발 파일·`project-package.json`), 앱 설정 JSON 넣기 |
+| [브리지 실행 보조](../tests/bridge-transport.test.mjs) | 화면 신호 모으기(첫 신호만), bfcache `pagehide`에서 구독 유지, 첫 터치 소리 풀기, iOS 복귀 복구(가짜 AudioContext) |
 | [CLI 규칙](../tests/lessons-cli.test.mjs) | `doctor`의 셸 확대 막기·`McpBridge`·`.ait_relay`·테스트 광고 ID·`appType`·`tools/.gdignore` 검사, export 100MB 한도, `addon:install`의 `.uid` 보존, `init`의 셸 템플릿·`.gitignore` |
 | [debug-console](../tests/debug-console.test.mjs) | 테스트 빌드에서만 debug-console을 브리지 다음에 주입, release에 남으면 검증 실패, 매니페스트 `debugConsole` 기록과 `doctor` 경고 |
 | 별도 확인 | 전체 Godot Web export, 브라우저 게임 플레이, 토스 앱·실기기 동작 |
@@ -109,12 +111,19 @@ QR 테스트가 "지금은 서비스를 사용할 수 없어요"로 실패하면
 SDK 3.x 번들을 출시하면 2.x로 되돌릴 수 없고, 2026-10-05부터 3.x 미만 신규
 등록이 제한됩니다. QR·DevTools에서 충분히 확인한 뒤 배포하세요.
 
-출시 체크리스트의 외부 코드 실행(eval) 검수에는 다음처럼 답합니다. 애드온과
-샘플의 GDScript는 `JavaScriptBridge.eval`을 쓰지 않으며, `doctor`는 게임
-스크립트의 `JavaScriptBridge.eval` 사용을 경고합니다. Godot 엔진 JS 자체에는
-`JavaScriptBridge.eval` 구현용 eval 코드가 들어 있지만, 게임과 SDK가 그 API를
-호출하지 않으면 실행되지 않습니다. 엔진에서 아예 빼는 방법(커스텀 Web 템플릿
-빌드)은 이 SDK에서 검증하지 않았습니다.
+외부 코드 실행(eval) 검수: 2026-11-04 cat-room-godot 번들이 엔진 `index.js`의 `JavaScriptBridge.eval` 구현(`_godot_js_eval`)
+때문에 반려됐고, 호출을 지운 번들도 남은 "eval" 글자(함수·변수 이름, 오류 문구) 때문에 다시 반려됐습니다. 검사기는 글자 자체를
+보는 것으로 봅니다. 그래서 `build`와 `build:dev`는 export 직후 `engine-patch.mjs`로 그 함수를 이름에 그 글자가 없는 빈 함수로
+바꾸고(`JavaScriptBridge.eval`은 nil), 브리지 번들의 `evaluate` 옵션 이름도 바꿉니다. 출시 export 검사와 최종 `.ait` 검사
+(`ait-godot verify-ait`, `build`의 마지막 단계)는 `.ait`에 들어가는 JS·HTML·JSON(게임 `package.json`인 `project-package.json` 포함)에
+그 글자나 Function 생성자가 있으면 실패합니다. 남은 위험은 `index.wasm` 안의 엔진 이름 글자(`evaluator` 등)입니다. 이것까지
+반려되면 엔진을 `javascript_eval=no`로 다시 빌드해야 하며 이 SDK에서는 검증하지 않았습니다(wasm 허용 여부는 커뮤니티 5134에서 답변 대기).
+
+iOS 소리는 실기기에서 직접 확인하세요. `AIT.sound.enable_audio_recovery()`를 켠 빌드로 ① 배경음을 튼 채 홈으로 나갔다가 돌아와
+화면을 누르면 소리가 다시 나는지(밀린 소리가 한꺼번에 나지 않는지) ② 전면 광고를 본 뒤 ③ 결제 화면을 닫은 뒤를 봅니다.
+웹 디버그 툴즈 Log의 `[AIT audio]`와 `AIT.app_events.runtime_state()`의 신호 기록이 원인을 좁히는 데 도움이 됩니다.
+macOS에서는 `ait-godot preview`를 띄운 채 `ait-godot sim`으로 iOS 시뮬레이터 Safari에서 열어 볼 수 있습니다
+(시뮬레이터는 WKWebView 실기기와 다를 수 있습니다).
 
 ## 실기기 원격 디버깅
 
@@ -263,3 +272,23 @@ IAP 회귀 검사는 기록용 core로 실제 래퍼·생성 API의 인자 전�
 설치 중 기존 Vite 8.2.2에 대한 `npm audit` high 경고를 확인했습니다
 ([개발 서버 관련 권고](https://github.com/advisories/GHSA-587h-7wmj-h5pm)).
 이는 기존 잠금 버전에도 있는 항목이며 이번 SDK 호환성 변경에서 도구 버전을 함께 올리지는 않았습니다.
+
+## 2026-11-04 SDK 점검
+
+cat-room-godot 노트 반영과 3.9 정리 뒤, 임시 게임 프로젝트(SDK 원본 CLI로 `addon:install`, `init`, `appType: "game"`,
+샘플 씬, 한글 글꼴)와 Godot 4.7.2 비스레드 Web 템플릿으로 확인했습니다. 브라우저는 Claude 앱 안의 Chromium입니다.
+
+| 확인한 항목 | 결과 |
+| --- | --- |
+| `build:dev`의 엔진 JS 패치 | 통과 — `index.js`에 "eval" 0곳, 소리 훅, `ait-app-config` JSON(`transparentBackground: true`) |
+| 패치한 엔진으로 실행, 샘플 `?e2e=true` | 통과 — 성공 14개, 실패 0개(3.9.0부터 완료·환불 주문 조회가 인자를 받아 대상에서 빠짐) |
+| `AIT.entry()`·`AIT.build_info()`·Safe Area 설정 읽기·`ensure_bus` | 통과 — `kind: "dev"`, 위쪽 인셋 포함(투명 바), `Music` 버스가 끝에 붙고 Master로 보냄 |
+| 화면 신호 | 통과 — `blur`→hidden, `focus`→visible, 신호 기록(`runtime_state()`) |
+| iOS 복귀 복구 흉내(`resume()`을 막아 시간이 멈춘 상태) | 통과 — 떠날 때 페이더 0·직접 멈춤·Master 끔, 돌아온 뒤 첫 터치 0.6초 뒤 새 컨텍스트(running), 옛 컨텍스트 closed, 버스·페이더가 새 컨텍스트로, 등록 플레이어 다시 재생(`audio_renewed`), 위치 워크릿 보고 정상 |
+| `AIT_BUILD_LABEL=demo-1 build` | 통과 — 출시 프리셋 확인, strict doctor, 엔진 패치, 11개 파일(46.48 MiB), `ait-demo.ait` 13개 항목 `verify-ait` 통과, 빌드 도장 |
+| 셸에 개발 도구 프리셋이 남은 출시 `build` | 멈춤(의도), 테스트 빌드(`AIT_DEBUG_CONSOLE=1`)는 통과 |
+| API 가이드·주의사항의 GDScript 예제 17개 | 애드온과 함께 컴파일 통과 |
+
+처음 실행에서 게임이 쓰는 내장 CLI(`ait-godot.mjs`)의 `build`·`build:dev`에 엔진 패치 단계가 빠져 있던 것을 찾아 넣고,
+모든 빌드 경로의 단계 순서를 검사하는 테스트를 더했습니다. 확인하지 못한 것: iOS·안드로이드 실기기의 소리 복구와 신호 순서,
+실제 검수 통과 여부(wasm 안의 엔진 글자), 실제 광고·결제 이벤트, `ait-godot sim`(시뮬레이터를 켜지 않음).
