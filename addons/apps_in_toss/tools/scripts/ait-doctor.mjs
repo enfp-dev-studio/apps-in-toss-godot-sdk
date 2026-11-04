@@ -12,8 +12,7 @@ import {
   checkVramCompression,
   findMcpBridgeAutoload,
   findTestAdIdLines,
-  TEST_AD_ID_PREFIX,
-} from './doctor-checks.mjs';
+  TEST_AD_ID_PREFIX, findAudioBusEditLines } from './doctor-checks.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 // 내장 모드: root = addonDir(addons/apps_in_toss). 그 외에는 패키지 루트.
@@ -349,6 +348,13 @@ if (fs.existsSync(projectDir)) {
         mismatch(`${shown}:${index + 1} uses JavaScriptBridge.eval — 검수는 외부 코드 실행(eval)을 반려하고, SDK 빌드의 엔진은 이 호출에 nil만 돌려줍니다. JavaScriptBridge.get_interface()로 바꾸세요.`);
       }
     });
+    const busLines = findAudioBusEditLines(text);
+    if (busLines.length > 0) {
+      const shown = path.relative(projectDir, file) || '.';
+      warnings.push(
+        `${shown}:${busLines.join(',')} calls AudioServer.add_bus/move_bus — 웹(Godot 4.7)에서는 버스 순서가 섞여 소리가 모두 사라질 수 있습니다(godot#119026). 버스는 default_bus_layout.tres에 두거나 AITSoundGate.ensure_bus()로 만드세요.`,
+      );
+    }
     const adLines = findTestAdIdLines(text);
     if (adLines.length > 0) {
       const shown = path.relative(projectDir, file) || '.';

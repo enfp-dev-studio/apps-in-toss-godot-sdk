@@ -53,6 +53,17 @@ export function findTestAdIdLines(text) {
   return found;
 }
 
+// 웹(Godot 4.7)에서 AudioServer.add_bus()·move_bus()는 JS 버스 순서를 섞어 모든 소리가 사라질 수 있다
+// (godot#119026, 4.8에서 수정). 그 호출이 있는 줄 번호(1부터)를 돌려준다. 주석 줄은 뺀다.
+export function findAudioBusEditLines(text) {
+  const found = [];
+  String(text ?? '').split('\n').forEach((line, index) => {
+    const code = line.split('#')[0];
+    if (/AudioServer\s*\.\s*(add_bus|move_bus)\s*\(/.test(code)) found.push(index + 1);
+  });
+  return found;
+}
+
 // Web 프리셋이 모바일 VRAM 압축(vram_texture_compression/for_mobile)을 켰는데 프로젝트가 ETC2/ASTC import를
 // 켜지 않으면 Godot export가 "configuration errors"만 찍고(이유 없이) 실패한다. 그 경우 고칠 점을 돌려준다.
 export function checkVramCompression(projectText, presetText) {

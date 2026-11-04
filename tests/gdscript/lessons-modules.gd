@@ -249,6 +249,30 @@ func _sound_gate() -> void:
     core.subscription_event.emit(failed_ad, {"type": "failedToShow"})
     _check("gate unmutes after failedToShow", not gate.is_silenced())
 
+    # 화면 신호: 같은 상태의 뒤늦은 신호는 무시하고, 상태를 바꾼 신호의 출처를 남긴다
+    var life: Array = []
+    events.life_changed.connect(func(v: bool, s: String) -> void: life.append([v, s]))
+    events.apply_life(false, "blur")
+    events.apply_life(false, "visibilitychange")
+    events.apply_life(true, "touch")
+    _check("app_events first signal wins", life == [[false, "blur"], [true, "touch"]] and events.last_source == "touch", str(life))
+    _check("gate follows app_events", not gate.is_silenced())
+
+    # 컨텍스트 재생성: 등록한 플레이어를 게이트가 닫힐 때의 자리에서 다시 튼다(헤드리스는 재생하지 않으므로 신호만 본다)
+    var renewed := [0]
+    gate.audio_renewed.connect(func() -> void: renewed[0] += 1)
+    events.audio_event.emit("resumed")
+    _check("gate ignores resumed", renewed[0] == 0)
+    events.audio_event.emit("renewed")
+    _check("gate emits audio_renewed", renewed[0] == 1)
+
+    # ensure_bus: 없으면 bus_count를 늘려 끝에 만들고 Master로 보낸다, 있으면 그 인덱스
+    var bus_before := AudioServer.bus_count
+    var sfx := AITSoundGate.ensure_bus(&"AitTestSfx")
+    _check("ensure_bus creates at end", sfx == bus_before and AudioServer.bus_count == bus_before + 1 and AudioServer.get_bus_name(sfx) == "AitTestSfx" and AudioServer.get_bus_send(sfx) == &"Master")
+    _check("ensure_bus finds existing", AITSoundGate.ensure_bus(&"AitTestSfx") == sfx and AudioServer.bus_count == bus_before + 1)
+    AudioServer.bus_count = bus_before
+
     gate.silence("cutscene")
     _check("gate custom reason", gate.is_silenced())
     gate.disable()

@@ -1,4 +1,5 @@
 import * as WebFramework from '@apps-in-toss/web-framework';
+import { installWebRuntime } from './web-runtime.ts';
 
 type NamespaceRecord = Record<string, unknown>;
 type BridgeFunction = (...args: unknown[]) => unknown;
@@ -20,6 +21,9 @@ interface GodotBridge {
   has: (path: string) => boolean;
   keys: () => string[];
   getValue: typeof getValue;
+  runtimeSubscribe: (callback: GodotCallback) => void;
+  runtimeState: () => string;
+  audioRecovery: (enabled: boolean) => void;
 }
 
 type AppsInTossWindow = Window & {
@@ -27,6 +31,9 @@ type AppsInTossWindow = Window & {
   AppsInTossGodot?: GodotBridge;
   __AIT_VERBOSE?: boolean;
 };
+
+// 엔진보다 먼저 설치해야 위치 워크릿 훅과 초기 가시성 신호를 놓치지 않는다(web-runtime.ts).
+const runtime = installWebRuntime(window);
 
 const namespaces: NamespaceRecord = { ...WebFramework };
 const bridgeWindow = window as AppsInTossWindow;
@@ -278,6 +285,9 @@ const BRIDGE_METHODS = [
   'hasBridgeMethod',
   'keys',
   'getValue',
+  'runtimeSubscribe',
+  'runtimeState',
+  'audioRecovery',
 ];
 
 function hasBridgeMethod(name: string) {
@@ -361,9 +371,21 @@ bridgeWindow.AppsInTossGodot = {
   keys() {
     return Object.keys(namespaces);
   },
+  runtimeSubscribe(callback: GodotCallback) {
+    runtime.subscribe((event) => emitAsync(callback, event));
+  },
+  runtimeState() {
+    return JSON.stringify(runtime.state());
+  },
+  audioRecovery(enabled: boolean) {
+    runtime.setRecovery(Boolean(enabled));
+  },
 };
 
-window.addEventListener('pagehide', () => {
+// bfcache로 들어가는 pagehide(persisted)는 돌아올 수 있으므로 구독을 끊지 않는다.
+// 끊으면 열려 있던 광고·결제 구독의 이벤트가 돌아온 뒤에 오지 않는다.
+window.addEventListener('pagehide', (event) => {
+  if ((event as PageTransitionEvent).persisted) return;
   for (const dispose of subscriptions.values()) {
     try {
       dispose();

@@ -14,6 +14,7 @@ import {
   checkVramCompression,
   findMcpBridgeAutoload,
   findTestAdIdLines,
+  findAudioBusEditLines,
 } from '../addons/apps_in_toss/tools/scripts/doctor-checks.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -43,6 +44,11 @@ function runNode(script, args, env, cwd) {
 }
 
 describe('doctor 검사 함수', () => {
+  it('웹에서 소리를 없앨 수 있는 AudioServer.add_bus/move_bus 호출 줄을 찾는다(주석 제외)', () => {
+    const text = 'func _ready():\n\tAudioServer.add_bus(1)\n\t# AudioServer.move_bus(1, 2)\n\tAudioServer.bus_count += 1\n\tAudioServer . move_bus(2, 1)\n';
+    assert.deepEqual(findAudioBusEditLines(text), [2, 5]);
+  });
+
   it('셸 템플릿은 확대 막기와 viewport-fit=cover를 갖춘다', () => {
     assert.deepEqual(checkShellViewport(fs.readFileSync(shellTemplate, 'utf8')), []);
   });

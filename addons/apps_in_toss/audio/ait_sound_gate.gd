@@ -12,8 +12,19 @@ class_name AITSoundGate
 ## silence("내 이유")/unsilence("내 이유")를 씁니다.
 ## 효과음·배경음 끄기 같은 설정은 Master가 아니라 각자의 버스로 두세요(게이트가 Master를 다시 켭니다).
 ## track_player()로 등록한 플레이어는 멈춘 자리에서 이어 틉니다(배경음 등).
+##
+## iOS는 백그라운드에서 돌아와도 Web Audio가 멈춘 채라 화면을 누를 때까지 소리가 안 나고, 누르면 밀린 소리가
+## 한꺼번에 납니다. enable_audio_recovery()를 켜면 떠날 때 소리를 줄여 직접 멈추고, 돌아온 뒤 첫 터치에
+## 다시 켜며, 그래도 멈춰 있으면 오디오 컨텍스트를 새로 만듭니다(실기기 미검증, 기본 꺼짐).
+## 새로 만들면 재생 중이던 소리가 끝난 것으로 처리되므로, 등록한 플레이어는 게이트가 닫힐 때의 자리에서
+## 다시 틀고 audio_renewed를 보냅니다. 등록하지 않은 플레이어는 이 신호를 받아 게임이 다시 트세요.
+##
+## 웹(Godot 4.7)에서 AudioServer.add_bus()·move_bus()를 부르면 버스 순서가 섞여 모든 소리가 사라질 수 있습니다
+## (godot#119026, 4.8에서 수정). 버스는 default_bus_layout.tres에 두거나 ensure_bus()로 만드세요.
 
 signal changed(silenced: bool)
+## 오디오 컨텍스트를 새로 만든 뒤(등록한 플레이어를 다시 튼 다음) 보냅니다
+signal audio_renewed
 
 const HIDDEN := "hidden"
 
@@ -27,6 +38,8 @@ var _iap: AITIAP
 var _reasons := {}
 var _players: Array[Node] = []
 var _silenced := false
+# 게이트가 닫힐 때 재생 중이던 등록 플레이어: player -> [stream, position]
+var _resume_points := {}
 
 
 # AIT 오토로드(AppsInToss)가 모듈을 넘겨 만듭니다. 넘기지 않은 모듈의 이유는 자동으로 들지 않습니다.
@@ -85,12 +98,37 @@ func track_player(player: Node) -> void:
 
 func untrack_player(player: Node) -> void:
     _players.erase(player)
+    _resume_points.erase(player)
+
+
+## iOS 복귀 소리 복구를 켭니다(웹 빌드에서만, 실기기 미검증). enable()과 따로 켭니다.
+func enable_audio_recovery(on := true) -> void:
+    if not OS.has_feature("web"):
+        return
+    var bridge: Variant = JavaScriptBridge.get_interface("AppsInTossGodot")
+    if bridge != null and bool(bridge.hasBridgeMethod("audioRecovery")):
+        bridge.audioRecovery(on)
+
+
+## 이름으로 버스를 찾고, 없으면 끝에 만들어 인덱스를 돌려줍니다. 웹에서 AudioServer.add_bus()를
+## 부르면 소리가 모두 사라질 수 있어(godot#119026) bus_count를 늘려 붙입니다.
+static func ensure_bus(bus_name: StringName, send: StringName = &"Master") -> int:
+    var index := AudioServer.get_bus_index(bus_name)
+    if index != -1:
+        return index
+    index = AudioServer.bus_count
+    AudioServer.bus_count = index + 1
+    AudioServer.set_bus_name(index, bus_name)
+    if send != &"":
+        AudioServer.set_bus_send(index, send)
+    return index
 
 
 func _wire(on: bool) -> void:
     var pairs: Array = []
     if _app_events != null:
         pairs.append([_app_events.visibility_changed, _on_visibility])
+        pairs.append([_app_events.audio_event, _on_audio_event])
     for ads_module: Object in [_ads, _admob]:
         if ads_module != null:
             pairs.append([ads_module.show_started, _on_ad_started])
@@ -108,6 +146,8 @@ func _wire(on: bool) -> void:
 
 func _apply() -> void:
     var mute := enabled and not _reasons.is_empty()
+    if mute and not _silenced:
+        _remember_players()
     if mute != _silenced:
         AudioServer.set_bus_mute(bus_index, mute)
     var alive: Array[Node] = []
@@ -128,6 +168,29 @@ func _on_visibility(is_visible: bool) -> void:
         unsilence(HIDDEN)
     else:
         silence(HIDDEN)
+
+
+func _remember_players() -> void:
+    _resume_points.clear()
+    for p in _players:
+        if is_instance_valid(p) and bool(p.get("playing")) and not bool(p.get("stream_paused")):
+            _resume_points[p] = [p.get("stream"), float(p.call("get_playback_position"))]
+
+
+func _on_audio_event(state: String) -> void:
+    if state != "renewed":
+        return
+    for p: Variant in _resume_points.keys():
+        if not is_instance_valid(p) or not _players.has(p):
+            continue
+        var point: Array = _resume_points[p]
+        if p.get("stream") != point[0] or bool(p.get("playing")):
+            continue
+        p.call("play", point[1])
+        if _silenced:
+            p.set("stream_paused", true)
+    _resume_points.clear()
+    audio_renewed.emit()
 
 
 func _on_ad_started(subscription_id: int) -> void:

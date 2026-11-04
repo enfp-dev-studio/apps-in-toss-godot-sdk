@@ -34,6 +34,7 @@ describe('bridge source/embedded parity + 3.9.0 pins', () => {
       ['bridge/package.json', 'addons/apps_in_toss/tools/bridge/package.json'],
       ['bridge/package-lock.json', 'addons/apps_in_toss/tools/bridge/package-lock.json'],
       ['bridge/src/index.ts', 'addons/apps_in_toss/tools/bridge/src/index.ts'],
+      ['bridge/src/web-runtime.ts', 'addons/apps_in_toss/tools/bridge/src/web-runtime.ts'],
       ['bridge/src/debug-console.ts', 'addons/apps_in_toss/tools/bridge/src/debug-console.ts'],
       ['bridge/vite.config.ts', 'addons/apps_in_toss/tools/bridge/vite.config.ts'],
       ['bridge/tsconfig.json', 'addons/apps_in_toss/tools/bridge/tsconfig.json'],

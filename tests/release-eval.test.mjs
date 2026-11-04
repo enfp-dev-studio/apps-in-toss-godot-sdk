@@ -11,7 +11,7 @@ import path from 'node:path';
 import vm from 'node:vm';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
-import { disableJsBridgeExec, patchEngineCode, patchExportDir } from '../addons/apps_in_toss/tools/scripts/engine-patch.mjs';
+import { addAudioHooks, disableJsBridgeExec, ENGINE_PATCHES, patchEngineCode, patchExportDir } from '../addons/apps_in_toss/tools/scripts/engine-patch.mjs';
 import { referencesScript, scanReleaseText, scriptSources } from '../addons/apps_in_toss/tools/scripts/release-scan.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -28,10 +28,12 @@ const ENGINE = [
   'var IDHandler={_last_id:0};function _godot_js_fetch_create(){return 2}',
   'var wasmImports={Ue:_godot_js_emscripten_get_version,$e:_godot_js_eval,Ab:_godot_js_fetch_create};',
 ].join('');
+// 아래 축약 엔진에는 소리 코드가 없어 eval 패치만 쓴다(소리 훅은 실제 템플릿 검사에서 함께 확인한다).
+const EVAL_ONLY = ENGINE_PATCHES.filter((patch) => patch.apply === disableJsBridgeExec);
 
 describe('engine-patch.mjs', () => {
   it('replaces the JavaScriptBridge exec function and import entry, leaving no "eval" text', () => {
-    const { code, applied } = patchEngineCode(ENGINE);
+    const { code, applied } = patchEngineCode(ENGINE, EVAL_ONLY);
     assert.deepEqual(applied, ['JavaScriptBridge 실행 끄기']);
     assert.deepEqual(scanReleaseText('index.js', code), []);
     const sandbox = {};
@@ -43,8 +45,8 @@ describe('engine-patch.mjs', () => {
   });
 
   it('is idempotent', () => {
-    const once = patchEngineCode(ENGINE).code;
-    const twice = patchEngineCode(once);
+    const once = patchEngineCode(ENGINE, EVAL_ONLY).code;
+    const twice = patchEngineCode(once, EVAL_ONLY);
     assert.equal(twice.code, once);
     assert.deepEqual(twice.applied, []);
   });
@@ -53,6 +55,10 @@ describe('engine-patch.mjs', () => {
     const debug = ENGINE.replace('$e:_godot_js_eval', 'godot_js_eval:_godot_js_eval');
     const { code } = disableJsBridgeExec(debug);
     assert.match(code, /godot_js_eval:_godot_js_off/);
+  });
+
+  it('refuses to patch audio code it does not recognize', () => {
+    assert.throws(() => addAudioHooks('var GodotAudio={};'), /엔진 소리 코드가 예상과 다릅니다/);
   });
 
   it('fails loudly when the engine layout changes', () => {
@@ -65,7 +71,7 @@ describe('engine-patch.mjs', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ait-engine-'));
     try {
       fs.writeFileSync(path.join(dir, 'index.js'), ENGINE);
-      const { applied } = patchExportDir(dir);
+      const { applied } = patchExportDir(dir, EVAL_ONLY);
       assert.equal(applied.length, 1);
       assert.deepEqual(scanReleaseText('index.js', fs.readFileSync(path.join(dir, 'index.js'), 'utf8')), []);
     } finally {
@@ -81,8 +87,11 @@ describe('engine-patch.mjs', () => {
       const unzip = spawnSync('unzip', ['-q', '-o', template, 'godot.js', '-d', out]);
       assert.equal(unzip.status, 0);
       const { code, applied } = patchEngineCode(fs.readFileSync(path.join(out, 'godot.js'), 'utf8'));
-      assert.equal(applied.length, 1);
+      assert.equal(applied.length, ENGINE_PATCHES.length);
       assert.deepEqual(scanReleaseText('godot.js', code), []);
+      assert.equal(code.split('.connect(GodotAudio.ctx.destination)').length - 1, 0, 'every output goes through the fader');
+      assert.match(code, /window\.__godotAudio=GodotAudio/);
+      assert.deepEqual(patchEngineCode(code).applied, [], 'idempotent on the real engine');
     } finally {
       fs.rmSync(out, { recursive: true, force: true });
     }
@@ -114,7 +123,7 @@ function makeReleaseExport() {
     '<!doctype html><html><body><script src="./apps-in-toss-godot-bridge.js"></script><script src="./index.js"></script></body></html>\n',
   );
   fs.writeFileSync(path.join(exportDir, 'apps-in-toss-godot-bridge.js'), 'window.AppsInTossGodot = {};\n');
-  fs.writeFileSync(path.join(exportDir, 'index.js'), patchEngineCode(ENGINE).code);
+  fs.writeFileSync(path.join(exportDir, 'index.js'), patchEngineCode(ENGINE, EVAL_ONLY).code);
   fs.writeFileSync(path.join(exportDir, 'index.wasm'), 'wasm');
   fs.writeFileSync(path.join(exportDir, 'index.pck'), 'pck');
   const lockPath = path.join(exportDir, 'platform.lock.json');
@@ -199,7 +208,7 @@ async function makeGame(files, { manifest = RELEASE_MANIFEST } = {}) {
   writer.setMetadata({ isGame: true, packageJson: { name: 'game' } });
   const all = {
     'sources/index.html': '<!doctype html><script src="./apps-in-toss-godot-bridge.js"></script><script src="./index.js"></script>',
-    'sources/index.js': patchEngineCode(ENGINE).code,
+    'sources/index.js': patchEngineCode(ENGINE, EVAL_ONLY).code,
     'sources/apps-in-toss-godot-bridge.js': 'window.AppsInTossGodot={};',
     'bundle.json': '{"config":{"appName":"game"}}',
     'project-package.json': '{"name":"game","scripts":{"build":"ait-godot build"}}',

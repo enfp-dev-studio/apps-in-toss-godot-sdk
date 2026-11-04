@@ -92,7 +92,16 @@ before(() => {
   const js = ts.transpileModule(src, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
   }).outputText.replaceAll('@apps-in-toss/web-framework', fakePath);
-  windowObj = { addEventListener: () => {} };
+  // web-runtime.ts는 index.ts가 import한다. 같은 컨텍스트에서 CJS로 풀어 넘긴다.
+  const runtimeJs = ts.transpileModule(fs.readFileSync(path.join(repoRoot, 'bridge/src/web-runtime.ts'), 'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+  }).outputText;
+  // 이벤트를 테스트에서 직접 보낼 수 있게 등록된 리스너를 모은다.
+  windowObj = {
+    listeners: {},
+    addEventListener(type, fn) { (this.listeners[type] ??= []).push(fn); },
+    dispatch(type, event = {}) { for (const fn of this.listeners[type] ?? []) fn(event); },
+  };
   const sandbox = {
     window: windowObj,
     queueMicrotask,
@@ -100,6 +109,14 @@ before(() => {
     console,
     exports: {},
     require: (id) => {
+      if (id === './web-runtime.ts') {
+        if (!sandbox.__runtime) {
+          const mod = { exports: {} };
+          vm.runInContext(`(function (exports, module) {${runtimeJs}\n})`, sandbox)(mod.exports, mod);
+          sandbox.__runtime = mod.exports;
+        }
+        return sandbox.__runtime;
+      }
       if (id === fakePath) {
         if (!sandbox.__fake) sandbox.__fake = require(id);
         return sandbox.__fake;
@@ -211,5 +228,115 @@ describe('bridge transport (vm + fake WebFramework)', () => {
     assert.equal(payloads.length, 1);
     assert.equal(payloads[0].ok, false);
     assert.match(payloads[0].error.message, /not found/);
+  });
+});
+
+// web-runtime.ts: 화면 떠남·돌아옴 신호 모으기, 소리 풀기, iOS 복귀 복구(실기기 동작은 미검증).
+function fakeAudio() {
+  const calls = [];
+  const gain = {
+    value: 1,
+    cancelScheduledValues() {},
+    setValueAtTime(value) { calls.push(['gain', value]); this.value = value; },
+    linearRampToValueAtTime(value) { calls.push(['ramp', value]); this.value = value; },
+  };
+  const makeCtx = (name) => ({
+    name,
+    state: 'running',
+    currentTime: 5,
+    sampleRate: 48000,
+    destination: {},
+    listeners: {},
+    addEventListener(type, fn) { (this.listeners[type] ??= []).push(fn); },
+    setState(next) { this.state = next; for (const fn of this.listeners.statechange ?? []) fn(); },
+    resume() { calls.push(['resume', name]); return Promise.resolve(); },
+    suspend() { calls.push(['suspend', name]); this.setState('suspended'); return Promise.resolve(); },
+    createBuffer() { return {}; },
+    createBufferSource() { return { connect() {}, start() { calls.push(['silent', name]); } }; },
+  });
+  const audio = {
+    ctx: makeCtx('first'),
+    aitOutput: () => ({ gain }),
+    aitRecreate() { calls.push(['recreate']); this.ctx = makeCtx('renewed'); return this.ctx; },
+  };
+  return { calls, audio };
+}
+
+describe('bridge web runtime (lifecycle + audio)', () => {
+  let events;
+  let fakeAudioState;
+
+  it('reports the current state on subscribe, then only state-changing signals', async () => {
+    events = [];
+    bridge.runtimeSubscribe((json) => events.push(JSON.parse(json)));
+    await flush();
+    assert.deepEqual(events.map((e) => [e.kind, e.state, e.source]), [['life', 'visible', 'initial']]);
+
+    windowObj.dispatch('blur');
+    windowObj.dispatch('pagehide', { persisted: true });
+    windowObj.dispatch('focus');
+    await flush();
+    assert.deepEqual(events.slice(1).map((e) => [e.state, e.source]), [['hidden', 'blur'], ['visible', 'focus']]);
+    const state = JSON.parse(bridge.runtimeState());
+    const pagehide = state.signals.find((s) => s.signal === 'pagehide');
+    assert.equal(pagehide.used, false, 'second hidden signal is logged only');
+  });
+
+  it('keeps subscriptions on a bfcache pagehide and disposes them on a real one', async () => {
+    const { cb } = collectCallback();
+    bridge.subscribePath(77, 'GoogleAdMob.loadAppsInTossAdMob', JSON.stringify({ adGroupId: 'g9' }), cb);
+    await flush();
+    const disposedCount = () => fake.__calls.filter((c) => c.disposed === 'GoogleAdMob.loadAppsInTossAdMob').length;
+    const before = disposedCount();
+    windowObj.dispatch('pagehide', { persisted: true });
+    assert.equal(disposedCount(), before, 'persisted pagehide keeps the subscription');
+    windowObj.dispatch('pagehide', { persisted: false });
+    assert.equal(disposedCount(), before + 1, 'real pagehide disposes it');
+    windowObj.dispatch('focus');
+    await flush();
+  });
+
+  it('unlocks audio on the first touch only', async () => {
+    fakeAudioState = fakeAudio();
+    windowObj.__godotAudio = fakeAudioState.audio;
+    windowObj.dispatch('touchend');
+    windowObj.dispatch('touchend');
+    const first = fakeAudioState.calls.filter(([kind, name]) => name === 'first');
+    assert.deepEqual(first, [['resume', 'first'], ['silent', 'first']]);
+  });
+
+  it('treats an interrupted context as leaving the screen', async () => {
+    const before = events.length;
+    fakeAudioState.audio.ctx.setState('interrupted');
+    await flush();
+    assert.deepEqual(events.slice(before).map((e) => [e.state, e.source]), [['hidden', 'audio-interrupted']]);
+    fakeAudioState.audio.ctx.state = 'running';
+    windowObj.dispatch('focus');
+    await flush();
+  });
+
+  it('with recovery on: fades and suspends on hide, recreates a stalled context on the first touch back', async () => {
+    const { calls, audio } = fakeAudioState;
+    bridge.audioRecovery(true);
+    const before = events.length;
+    windowObj.dispatch('blur');
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    assert.ok(calls.some(([kind, v]) => kind === 'ramp' && v === 0), 'fader ramps to 0');
+    assert.ok(calls.some(([kind, name]) => kind === 'suspend' && name === 'first'), 'context suspended by the runtime');
+    await flush();
+    assert.deepEqual(events.slice(before).map((e) => e.source), ['blur'], 'own suspend is not a new signal');
+
+    windowObj.dispatch('focus');
+    assert.equal(calls.some(([kind]) => kind === 'recreate'), false, 'nothing happens until a touch');
+    windowObj.dispatch('touchend');
+    assert.ok(calls.some(([kind, v]) => kind === 'gain' && v === 1), 'fader restored on touch');
+    // currentTime가 그대로(5)라서 0.6초 뒤 멈춘 것으로 보고 새로 만든다.
+    await new Promise((resolve) => setTimeout(resolve, 700));
+    await flush();
+    assert.ok(calls.some(([kind]) => kind === 'recreate'));
+    assert.equal(audio.ctx.name, 'renewed');
+    assert.ok(calls.some(([kind, name]) => kind === 'silent' && name === 'renewed'));
+    assert.deepEqual(events.filter((e) => e.kind === 'audio').map((e) => e.state), ['renewed']);
+    bridge.audioRecovery(false);
   });
 });

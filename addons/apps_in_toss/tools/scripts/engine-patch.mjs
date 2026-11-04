@@ -79,9 +79,87 @@ export function disableJsBridgeExec(code) {
   return { code: next, changed: true };
 }
 
+// 소리 훅 — 브리지의 web-runtime.ts(첫 터치 소리 풀기, 위치 워크릿 대비, iOS 복귀 복구)가 쓴다.
+// 훅만 더하고 동작은 바꾸지 않는다. 바뀌는 것은 하나: 위치 워크릿 풀에서 다른 컨텍스트의 노드를
+// 다시 쓰지 않는다(컨텍스트를 새로 만든 뒤 모든 샘플이 "Failed to create PositionWorklet"로 실패하던 엔진 버그).
+//   window.__godotAudio      GodotAudio(컨텍스트·버스·샘플)
+//   GodotAudio.aitOutput()   출력 앞 페이더 GainNode(컨텍스트마다 하나, 기본 1). 떠날 때 줄여 튀는 소리를 막는다.
+//   GodotAudio.aitRecreate() 새 AudioContext로 버스·위치 워크릿·출력 드라이버를 다시 잇는다. 재생 중이던
+//                            샘플은 끝난 것으로 처리되므로 게임이 다시 튼다(AIT.sound의 audio_renewed).
+const AUDIO_RUNTIME = [
+  'GodotAudio._aitStateChange=onstatechange;window.__godotAudio=GodotAudio;',
+  'GodotAudio.aitOutput=function(){const ctx=GodotAudio.ctx;if(!GodotAudio._aitFader||GodotAudio._aitFader.context!==ctx){GodotAudio._aitFader=ctx.createGain();GodotAudio._aitFader.connect(ctx.destination)}return GodotAudio._aitFader};',
+  'GodotAudio.aitLoadPositionWorklet=function(ctx){const hooks=window.__aitAudioHooks;const path=GodotAudio._aitPositionWorkletPath;return hooks&&hooks.loadPositionWorklet?hooks.loadPositionWorklet(ctx,path):ctx.audioWorklet.addModule(path)};',
+  'GodotAudio.aitPositionWorkletNode=function(){const hooks=window.__aitAudioHooks;const stand=hooks&&hooks.positionWorkletNode?hooks.positionWorkletNode(GodotAudio.ctx):null;return stand||new AudioWorkletNode(GodotAudio.ctx,"godot-position-reporting-processor")};',
+  'GodotAudio.aitRecreate=function(){',
+  'const old=GodotAudio.ctx;if(!old){return null}const opts={};if(GodotAudio.sampleRate){opts["sampleRate"]=GodotAudio.sampleRate}',
+  'let ctx;try{ctx=new(window.AudioContext||window.webkitAudioContext)(opts)}catch(e){GodotRuntime.error("AudioContext recreate failed",e);return null}',
+  'const driver=GodotAudio.driver;',
+  'if(driver===GodotAudioWorklet&&GodotAudioWorklet.worklet){const node=GodotAudioWorklet.worklet;GodotAudioWorklet.worklet=null;node.port.onmessage=null;try{node.port.postMessage({cmd:"stop",data:null})}catch(e){}try{node.disconnect()}catch(e){}}',
+  'if(driver===GodotAudioScript&&GodotAudioScript.script){const node=GodotAudioScript.script;GodotAudioScript.script=null;node.onaudioprocess=null;try{node.disconnect()}catch(e){}}',
+  'for(const sampleNode of Array.from(GodotAudio.sampleNodes.values())){try{sampleNode.clear()}catch(e){}}',
+  'GodotAudio.ctx=ctx;',
+  'ctx.onstatechange=function(){let state=0;if(ctx.state==="running"){state=1}else if(ctx.state==="closed"){state=2}if(GodotAudio._aitStateChange){GodotAudio._aitStateChange(state)}};',
+  'for(const bus of GodotAudio.buses){const gain=bus._gainNode.gain.value;const solo=bus._soloNode.gain.value;const mute=bus._muteNode.gain.value;bus._gainNode=ctx.createGain();bus._soloNode=ctx.createGain();bus._muteNode=ctx.createGain();bus._gainNode.gain.value=gain;bus._soloNode.gain.value=solo;bus._muteNode.gain.value=mute;bus._gainNode.connect(bus._soloNode).connect(bus._muteNode);bus._sampleNodes=new Set}',
+  'for(const bus of GodotAudio.buses){const send=bus.getSend();if(send==null){if(bus.getId()===0){bus.getOutputNode().connect(GodotAudio.aitOutput())}}else{bus.connect(send)}}',
+  'GodotAudio.audioPositionWorkletNodes=[];GodotAudio.audioPositionWorkletPromise=GodotAudio.aitLoadPositionWorklet(ctx);',
+  'try{if(driver===GodotAudioWorklet&&GodotAudioWorklet._aitStart){GodotAudioWorklet.create(GodotAudioWorklet._aitChannels);GodotAudioWorklet.start_no_threads.apply(null,GodotAudioWorklet._aitStart)}',
+  'else if(driver===GodotAudioScript&&GodotAudioScript._aitCreate&&GodotAudioScript._aitStart){GodotAudioScript.create.apply(null,GodotAudioScript._aitCreate);GodotAudioScript.start.apply(null,GodotAudioScript._aitStart)}}',
+  'catch(e){GodotRuntime.error("Audio driver restart failed",e)}',
+  'old.onstatechange=null;old.close().catch(function(){});ctx.onstatechange();return ctx};',
+].join('');
+
+const AUDIO_EDITS = [
+  {
+    find: 'init:function(mix_rate,latency,onstatechange,onlatencyupdate){',
+    insertAfter: AUDIO_RUNTIME,
+  },
+  {
+    find: 'const path=GodotConfig.locate_file("godot.audio.position.worklet.js");GodotAudio.audioPositionWorkletPromise=ctx.audioWorklet.addModule(path);',
+    replace: 'GodotAudio._aitPositionWorkletPath=GodotConfig.locate_file("godot.audio.position.worklet.js");GodotAudio.audioPositionWorkletPromise=GodotAudio.aitLoadPositionWorklet(ctx);',
+  },
+  {
+    find: 'if(GodotAudio.audioPositionWorkletNodes.length>0){this._positionWorklet=GodotAudio.audioPositionWorkletNodes.pop()}else{this._positionWorklet=new AudioWorkletNode(GodotAudio.ctx,"godot-position-reporting-processor")}',
+    replace: 'while(this._positionWorklet==null&&GodotAudio.audioPositionWorkletNodes.length>0){const pooled=GodotAudio.audioPositionWorkletNodes.pop();if(pooled.context===GodotAudio.ctx){this._positionWorklet=pooled}}if(this._positionWorklet==null){this._positionWorklet=GodotAudio.aitPositionWorkletNode()}',
+  },
+  {
+    find: 'create:function(channels){const path=GodotConfig.locate_file("godot.audio.worklet.js");',
+    insertAfter: 'GodotAudioWorklet._aitChannels=channels;',
+  },
+  {
+    find: 'start_no_threads:function(p_out_buf,p_out_size,out_callback,p_in_buf,p_in_size,in_callback){',
+    insertAfter: 'GodotAudioWorklet._aitStart=[p_out_buf,p_out_size,out_callback,p_in_buf,p_in_size,in_callback];',
+  },
+  {
+    find: 'GodotAudioScript={script:null,create:function(buffer_length,channel_count){',
+    insertAfter: 'GodotAudioScript._aitCreate=[buffer_length,channel_count];',
+  },
+  {
+    find: 'start:function(p_in_buf,p_in_size,p_out_buf,p_out_size,onprocess){',
+    insertAfter: 'GodotAudioScript._aitStart=[p_in_buf,p_in_size,p_out_buf,p_out_size,onprocess];',
+  },
+  { find: '.connect(GodotAudio.ctx.destination)', replace: '.connect(GodotAudio.aitOutput())', count: 4 },
+];
+
+export function addAudioHooks(code) {
+  if (code.includes('GodotAudio.aitRecreate=')) return { code, changed: false };
+  for (const edit of AUDIO_EDITS) {
+    const count = code.split(edit.find).length - 1;
+    if (count !== (edit.count ?? 1)) {
+      throw new Error(
+        `엔진 소리 코드가 예상과 다릅니다(${count}번 찾음): ${edit.find.slice(0, 70)}… Godot 버전이 바뀌었다면 engine-patch.mjs를 갱신하세요.`,
+      );
+    }
+    const replacement = edit.replace ?? edit.find + edit.insertAfter;
+    code = code.split(edit.find).join(replacement);
+  }
+  return { code, changed: true };
+}
+
 // index.js에 적용할 패치 목록. 각 패치는 code를 받아 { code, changed }를 돌려준다.
 export const ENGINE_PATCHES = [
   { name: 'JavaScriptBridge 실행 끄기', apply: disableJsBridgeExec },
+  { name: '소리 훅(페이더·위치 워크릿·컨텍스트 재생성)', apply: addAudioHooks },
 ];
 
 export function patchEngineCode(code, patches = ENGINE_PATCHES) {
