@@ -114,8 +114,32 @@ if (debugConsoleMarker) {
   throw new Error(`Bridge bundle contains debug-console code (${debugConsoleMarker}). Rebuild the bridge with npm run build.`);
 }
 
-const totalBytes = files.reduce((sum, file) => sum + fs.statSync(path.join(exportDir, file)).size, 0);
-console.log(`Verified Godot Apps in Toss bundle: ${files.length} files, ${(totalBytes / 1024 / 1024).toFixed(2)} MiB`);
+const totalBytes = directorySize(exportDir);
+// .ait는 압축 해제 기준 100MB 이하여야 콘솔에 올라간다(미니앱 등록하기·FAQ). 단위가 MB·MiB 중
+// 무엇인지 문서에 없어서, 100MiB를 넘으면 실패하고 100MB(10^8 바이트)를 넘으면 경고한다.
+const BUNDLE_LIMIT_MIB = 100 * 1024 * 1024;
+const BUNDLE_LIMIT_MB = 100 * 1000 * 1000;
+const sizeText = `${(totalBytes / 1024 / 1024).toFixed(2)} MiB`;
+if (totalBytes > BUNDLE_LIMIT_MIB) {
+  throw new Error(
+    `Export is ${sizeText} uncompressed; Apps in Toss bundles must be 100MB or less uncompressed. ` +
+      'Shrink textures/audio (VRAM compression, OGG for music) or move non-startup assets to a CDN.',
+  );
+}
+if (totalBytes > BUNDLE_LIMIT_MB) {
+  console.warn(`[AIT verify] WARN export is ${sizeText} uncompressed — close to the 100MB bundle limit.`);
+}
+console.log(`Verified Godot Apps in Toss bundle: ${files.length} files, ${sizeText} (limit 100MB uncompressed)`);
+
+function directorySize(dir) {
+  let sum = 0;
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) sum += directorySize(full);
+    else if (entry.isFile()) sum += fs.statSync(full).size;
+  }
+  return sum;
+}
 
 function countOccurrences(text, needle) {
   return text.split(needle).length - 1;

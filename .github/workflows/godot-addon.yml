@@ -1,5 +1,5 @@
 # Godot 애드온 검사 — Godot 4.7.2 headless로 임시 프로젝트 import,
-# GDScript 컴파일 게이트, AdMob 수명 검사를 실행한다.
+# GDScript 컴파일 게이트, AdMob 수명 검사, 모듈 검사(tests/gdscript/lessons-modules.gd)를 실행한다.
 # Godot 버전은 platform.lock의 godot.version(4.7.2)을 따른다.
 name: Godot addon
 

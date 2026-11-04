@@ -9,6 +9,9 @@ var admob: AITAdMob
 var game: AITGame
 var status: AITStatus
 var app_events: AITAppEvents
+var back: AITBack
+var safe_area: AITSafeArea
+var sound: AITSoundGate
 var api: AITGeneratedAPI
 
 func _ready() -> void:
@@ -25,6 +28,15 @@ func _ready() -> void:
     status = AITStatus.new(core)
     app_events = AITAppEvents.new()
     api = AITGeneratedAPI.new(core)
+    back = AITBack.new(core)
+    back.name = "Back"
+    add_child(back)
+    safe_area = AITSafeArea.new(core)
+    safe_area.name = "SafeArea"
+    add_child(safe_area)
+    sound = AITSoundGate.new(app_events, ads, admob, iap)
+    sound.name = "Sound"
+    add_child(sound)
 
 func is_available() -> bool:
     return core != null and core.is_available()

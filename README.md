@@ -12,6 +12,7 @@
 
 - **로그인·결제·광고** — 토스 로그인, 인앱·구독 결제, 전면 광고와 AdMob
 - **게임에 필요한 기능** — 저장소, 게임센터, 공유, 클립보드, 햅틱 등
+- **미니앱 화면 규칙** — 시스템 뒤로가기, Safe Area, 사운드 게이트, 안전한 저장, 한글 줄바꿈, 터치 스크롤
 - **개발·빌드 도구** — 브라우저 테스트, 프로젝트 설정 검사, Web 빌드와 패키징
 
 지원 API와 사용 예제는 [API 사용법](docs/api-guide.md)에서 볼 수 있습니다.
@@ -42,6 +43,8 @@ node addons/apps_in_toss/tools/ait-godot.mjs preview
 | 게임 코드에서 토스 기능 호출하기 | [API 사용법과 예제](docs/api-guide.md) |
 | 브라우저·토스 앱에서 테스트하기 | [테스트 범위와 실행 방법](docs/testing.md) |
 | 실기기 토스 앱에서 원격 디버깅하기 | [실기기 원격 디버깅](docs/testing.md#실기기-원격-디버깅) |
+| 검수 전에 Godot 쪽에서 볼 것 확인하기 | [출시 전 점검](docs/release-checklist.md) |
+| Godot Web 엔진 동작(소리·입력·배너) 알아보기 | [Godot Web 주의사항](docs/godot-web-notes.md) |
 | SDK를 수정하거나 업데이트하기 | [SDK 개발·업데이트 기록](docs/sdk-development.md) |
 
 ## 자동 검사 상태

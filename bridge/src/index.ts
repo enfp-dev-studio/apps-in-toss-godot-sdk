@@ -12,6 +12,7 @@ interface GodotBridge {
   adsLoadFullScreenAd: typeof adsLoadFullScreenAd;
   adsShowFullScreenAd: typeof adsShowFullScreenAd;
   subscribePath: typeof subscribePath;
+  subscribePathArgs: typeof subscribePathArgs;
   hasBridgeMethod: typeof hasBridgeMethod;
   disposeSubscription: typeof disposeSubscription;
   resolveNested: (subscriptionId: number, nestedId: number, json: string) => boolean;
@@ -188,6 +189,7 @@ function startEventSubscription(
   path: string,
   optionsJson: string,
   callback: GodotCallback,
+  leadingArgs: unknown[] = [],
 ) {
   try {
     const options = parseOptions(optionsJson);
@@ -204,7 +206,7 @@ function startEventSubscription(
         }),
     };
     if (Object.keys(options).length > 0) params.options = options;
-    const dispose = Reflect.apply(fn, owner, [params]);
+    const dispose = Reflect.apply(fn, owner, [...leadingArgs, params]);
     const disposer: Disposer = typeof dispose === 'function' ? () => dispose() : () => undefined;
     subscriptions.set(subscriptionId, disposer);
   } catch (error) {
@@ -237,6 +239,27 @@ function subscribePath(
   startEventSubscription(subscriptionId, path, optionsJson, callback);
 }
 
+// graniteEvent.addEventListener('backEvent', { onEvent, onError })처럼 구독 객체 앞에
+// 인자를 받는 API용. argsJson은 구독 객체 앞에 넣을 인자 배열(JSON)이다.
+function subscribePathArgs(
+  subscriptionId: number,
+  path: string,
+  argsJson: string,
+  optionsJson: string,
+  callback: GodotCallback,
+) {
+  let leadingArgs: unknown[];
+  try {
+    const parsed: unknown = JSON.parse(argsJson || '[]');
+    if (!Array.isArray(parsed)) throw new Error('Bridge arguments must be a JSON array');
+    leadingArgs = parsed;
+  } catch (error) {
+    emitAsync(callback, { kind: 'subscription_error', subscriptionId, error: serializeError(error) });
+    return;
+  }
+  startEventSubscription(subscriptionId, path, optionsJson, callback, leadingArgs);
+}
+
 // start_event_subscription 계열의 가드는 프레임워크 경로가 아니라 이 브리지
 // 객체의 메서드를 검사해야 한다. has()는 프레임워크 네임스페이스 전용이므로
 // 별도 hasBridgeMethod를 둔다(추가 메서드를 노출할 때는 아래 목록도 갱신).
@@ -247,6 +270,7 @@ const BRIDGE_METHODS = [
   'adsLoadFullScreenAd',
   'adsShowFullScreenAd',
   'subscribePath',
+  'subscribePathArgs',
   'disposeSubscription',
   'resolveNested',
   'rejectNested',
@@ -317,6 +341,7 @@ bridgeWindow.AppsInTossGodot = {
   adsLoadFullScreenAd,
   adsShowFullScreenAd,
   subscribePath,
+  subscribePathArgs,
   hasBridgeMethod,
   disposeSubscription,
   resolveNested(subscriptionId: number, nestedId: number, json: string) {

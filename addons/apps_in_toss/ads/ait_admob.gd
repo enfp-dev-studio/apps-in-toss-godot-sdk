@@ -19,9 +19,16 @@ class_name AITAdMob
 signal admob_loaded(subscription_id: int)
 signal admob_event(subscription_id: int, event: Variant)
 signal admob_failed(subscription_id: int, error: Dictionary)
+## show_admob을 부른 때부터 닫힘(dismissed)·실패(failedToShow·오류)·dispose까지.
+## AIT.sound(사운드 게이트)가 이 신호로 광고 중 소리를 멈춥니다.
+signal show_started(subscription_id: int)
+signal show_ended(subscription_id: int)
+
+const SHOW_END_EVENTS := ["dismissed", "failedToShow"]
 
 var _core: AITCore
 var _active: Dictionary = {}
+var _showing: Dictionary = {}
 
 func _init(core: AITCore) -> void:
     _core = core
@@ -32,7 +39,10 @@ func load_admob(options: Dictionary = {}) -> int:
     return _start("GoogleAdMob.loadAppsInTossAdMob", options)
 
 func show_admob(options: Dictionary = {}) -> int:
-    return _start("GoogleAdMob.showAppsInTossAdMob", options)
+    var subscription_id := _start("GoogleAdMob.showAppsInTossAdMob", options)
+    _showing[subscription_id] = true
+    show_started.emit(subscription_id)
+    return subscription_id
 
 func is_admob_loaded_and_wait(options: Dictionary = {}, timeout_ms: int = 0) -> Dictionary:
     return await _core.invoke_and_wait("GoogleAdMob.isAppsInTossAdMobLoaded", [options], timeout_ms)
@@ -40,6 +50,11 @@ func is_admob_loaded_and_wait(options: Dictionary = {}, timeout_ms: int = 0) -> 
 func dispose(subscription_id: int) -> void:
     _active.erase(subscription_id)
     _core.dispose_subscription(subscription_id)
+    _end_show(subscription_id)
+
+## 표시 중인 광고인지(show_started 뒤 show_ended 전)
+func is_showing(subscription_id: int) -> bool:
+    return _showing.has(subscription_id)
 
 func _start(path: String, options: Dictionary) -> int:
     var subscription_id := _core.create_subscription_id()
@@ -51,10 +66,18 @@ func _on_subscription_event(subscription_id: int, event: Variant) -> void:
     if not _active.has(subscription_id):
         return
     admob_event.emit(subscription_id, event)
-    if typeof(event) == TYPE_DICTIONARY and String(event.get("type", "")) == "loaded":
+    var type := String(event.get("type", "")) if typeof(event) == TYPE_DICTIONARY else ""
+    if type == "loaded":
         admob_loaded.emit(subscription_id)
+    elif SHOW_END_EVENTS.has(type):
+        _end_show(subscription_id)
 
 func _on_subscription_error(subscription_id: int, error: Dictionary) -> void:
     if not _active.has(subscription_id):
         return
     admob_failed.emit(subscription_id, error)
+    _end_show(subscription_id)
+
+func _end_show(subscription_id: int) -> void:
+    if _showing.erase(subscription_id):
+        show_ended.emit(subscription_id)

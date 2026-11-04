@@ -36,7 +36,9 @@ GDScript의 `invoke(path, args)`는 `NavigationBar.setOptions`처럼 Promise로
 `userEarnedReward` 등의 이벤트를 전달합니다. `subscribePath`는 이 전달 방식을 다른
 이벤트형 API(`Game.subscribeInfoOverlayHidden`,
 `GoogleAdMob.loadAppsInTossAdMob` 등)에 재사용하는 범용 진입점입니다(GDScript
-`AITAdMob`·`AITGame` 모듈이 이 경로를 씁니다).
+`AITAdMob`·`AITGame` 모듈이 이 경로를 씁니다). `graniteEvent.addEventListener('backEvent', { onEvent })`처럼
+구독 객체 앞에 인자를 받는 API는 `subscribePathArgs(id, path, argsJson, optionsJson, callback)`로 부릅니다
+(`AITBack`이 씁니다).
 `has()`는 프레임워크 네임스페이스 전용이고, 브리지 자체 메서드 존재 확인은
 `hasBridgeMethod()`를 씁니다(GDScript 가드가 프레임워크 경로로 브리지 메서드를
 검사하던 버그 방지). 모든 브리지→Godot 콜백은 microtask로 비동기 배달되어

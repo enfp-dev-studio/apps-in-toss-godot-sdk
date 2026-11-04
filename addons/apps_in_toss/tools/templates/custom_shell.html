@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <!-- 제스처 확대 막기(비게임 출시 체크리스트, 지도 제외)와 Safe Area env() 값(viewport-fit=cover, 없으면 iOS에서 0) -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <title>$GODOT_PROJECT_NAME</title>
+  <style>
+    :root {
+      --ait-bg: #f2f4f6;
+      --ait-text-strong: #191f28;
+      --ait-text-subtle: #4e5968;
+      --ait-brand: #3182f6;
+    }
+    html, body {
+      margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
+      background: var(--ait-bg); overscroll-behavior: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+      word-break: keep-all; color: var(--ait-text-strong);
+    }
+    /* 캔버스 위 제스처는 게임이 처리한다: 확대·스크롤·길게 눌러 선택·돋보기 막기 */
+    #canvas {
+      display: block; position: fixed; inset: 0; width: 100%; height: 100%;
+      touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+      outline: none;
+    }
+    #ait-boot {
+      position: fixed; inset: 0; z-index: 3; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 12px; background: var(--ait-bg);
+      transition: opacity 0.25s ease;
+    }
+    #ait-boot.hide { opacity: 0; pointer-events: none; }
+    #ait-boot h1 { margin: 0; font-size: 20px; font-weight: 700; }
+    #ait-boot p { margin: 0; padding: 0 32px; font-size: 15px; line-height: 1.5; color: var(--ait-text-subtle); text-align: center; }
+    #ait-boot .bar { width: 160px; height: 6px; border-radius: 3px; background: rgba(49, 130, 246, 0.15); overflow: hidden; }
+    #ait-boot .bar i { display: block; width: 4%; height: 100%; background: var(--ait-brand); transition: width 0.2s; }
+    #ait-boot.err .bar { display: none; }
+  </style>
+  $GODOT_HEAD_INCLUDE
+</head>
+<body>
+  <canvas id="canvas" tabindex="0">WebGL을 지원하는 브라우저가 필요합니다.</canvas>
+  <!-- data-auto-hide="false"로 바꾸면 게임이 첫 화면을 그린 뒤
+       JavaScriptBridge.get_interface("AppsInTossShell").ready()로 직접 걷는다 -->
+  <div id="ait-boot" role="status" data-auto-hide="true">
+    <h1>$GODOT_PROJECT_NAME</h1>
+    <p id="ait-boot-msg">불러오고 있어요</p>
+    <div class="bar"><i id="ait-boot-bar"></i></div>
+  </div>
+
+  <script>
+  (function () {
+    "use strict";
+    // 렌더 해상도 상한: Godot는 window.devicePixelRatio로 캔버스 픽셀 수를 정한다. 3배 화면에서 그대로 쓰면
+    // 2배 상한보다 2.25배 많은 픽셀을 그려 발열·배터리 부담이 크다. setPixelCap으로 바꾸면 resize를 다시 보낸다.
+    var realDpr = window.devicePixelRatio || 1;
+    var cap = 2;
+    try {
+      Object.defineProperty(window, "devicePixelRatio", {
+        configurable: true,
+        get: function () { return Math.min(realDpr, cap); },
+      });
+    } catch (e) { /* 덮어쓸 수 없는 환경 — 기기 배율 그대로 */ }
+
+    function boot() { return document.getElementById("ait-boot"); }
+
+    window.AppsInTossShell = {
+      // 로딩 화면을 걷는다
+      ready: function () {
+        var b = boot();
+        if (!b) return;
+        b.classList.add("hide");
+        setTimeout(function () { b.remove(); }, 400);
+      },
+      progress: function (current, total) {
+        var bar = document.getElementById("ait-boot-bar");
+        if (bar && total > 0) bar.style.width = Math.max(4, Math.round((current / total) * 100)) + "%";
+      },
+      fail: function (message) {
+        var b = boot();
+        if (!b) return;
+        b.classList.add("err");
+        document.getElementById("ait-boot-msg").textContent = message;
+      },
+      setPixelCap: function (value) {
+        cap = Math.max(1, Number(value) || 2);
+        window.dispatchEvent(new Event("resize"));
+      },
+      realPixelRatio: function () { return realDpr; },
+    };
+  })();
+  </script>
+  <script src="$GODOT_URL"></script>
+  <script>
+    (function () {
+      var shell = window.AppsInTossShell;
+      var missing = Engine.getMissingFeatures({ threads: false });
+      if (missing.length > 0) {
+        shell.fail("이 기기에서는 열 수 없어요. 토스 앱을 최신 버전으로 업데이트한 뒤 다시 열어 주세요.");
+        console.error("missing features", missing);
+        return;
+      }
+      var engine = new Engine($GODOT_CONFIG);
+      engine.startGame({
+        onProgress: function (current, total) { shell.progress(current, total); },
+      }).then(function () {
+        var b = document.getElementById("ait-boot");
+        if (b && b.dataset.autoHide !== "false") shell.ready();
+      }).catch(function (error) {
+        shell.fail("불러오지 못했어요. 잠시 뒤 다시 열어 주세요.");
+        console.error(error);
+      });
+    })();
+  </script>
+</body>
+</html>

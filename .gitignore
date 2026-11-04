@@ -4,6 +4,7 @@ bridge/dist-ssr
 addons/apps_in_toss/tools/bridge/dist
 addons/apps_in_toss/tools/bridge/dist-ssr
 *.local
+*.log
 .DS_Store
 
 # Generated build output and Godot cache

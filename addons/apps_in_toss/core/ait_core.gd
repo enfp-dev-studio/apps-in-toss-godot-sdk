@@ -7,6 +7,10 @@ signal subscription_event(subscription_id: int, event: Variant)
 signal subscription_error(subscription_id: int, error: Dictionary)
 signal nested_callback_requested(subscription_id: int, nested_id: int, name: String, payload: Variant)
 
+# patch-export가 index.html에 넣는 개발·테스트 전용 스크립트(tools/scripts/export-dir.mjs와 같은 이름)
+const MOCK_BRIDGE_SCRIPT := "apps-in-toss-godot-bridge.mock.js"
+const DEBUG_CONSOLE_SCRIPT := "ait-debug-console.js"
+
 var _bridge: JavaScriptObject
 var _callback: JavaScriptObject
 var _next_request_id := 1
@@ -26,6 +30,29 @@ func is_available() -> bool:
 
 func has_api(path: String) -> bool:
     return is_available() and bool(_bridge.has(path))
+
+## 빌드 종류. SDK는 Web 빌드를 모두 release 템플릿으로 내보내므로 Web에서는 OS.is_debug_build()로 가를 수 없어
+## 페이지에 SDK가 넣은 스크립트로 판정합니다.
+##   "debug"   에디터·데스크톱 디버그 실행(OS.is_debug_build())
+##   "dev"     build:dev(mock 브리지 + DevTools)
+##   "test"    build --debug-console(실기기 원격 디버깅 테스트 번들)
+##   "release" 그 밖(출시 빌드. release 검증이 mock 브리지·debug-console을 막습니다)
+func build_kind() -> String:
+    if OS.is_debug_build():
+        return "debug"
+    if not OS.has_feature("web"):
+        return "release"
+    if _page_has_script(MOCK_BRIDGE_SCRIPT):
+        return "dev"
+    if _page_has_script(DEBUG_CONSOLE_SCRIPT):
+        return "test"
+    return "release"
+
+func _page_has_script(file_name: String) -> bool:
+    var document: Variant = JavaScriptBridge.get_interface("document")
+    if document == null:
+        return false
+    return document.querySelector('script[src*="%s"]' % file_name) != null
 
 func get_value(path: String) -> Variant:
     if not is_available():
@@ -98,17 +125,23 @@ func start_event_subscription(subscription_id: int, bridge_method: String, optio
         return
     _bridge.call(bridge_method, subscription_id, JSON.stringify(options), _callback)
 
-func start_path_subscription(subscription_id: int, path: String, options: Dictionary = {}) -> void:
+## args는 구독 객체 앞에 넣을 인자입니다.
+## 예: graniteEvent.addEventListener("backEvent", { onEvent }) → path "graniteEvent.addEventListener", args ["backEvent"]
+func start_path_subscription(subscription_id: int, path: String, options: Dictionary = {}, args: Array = []) -> void:
     if not is_available():
         call_deferred("_emit_unavailable_subscription", subscription_id)
         return
-    if not has_bridge_method("subscribePath"):
+    var method := "subscribePath" if args.is_empty() else "subscribePathArgs"
+    if not has_bridge_method(method):
         call_deferred("_emit_subscription_error", subscription_id, {
             "code": "AIT_API_UNAVAILABLE",
             "message": "Apps in Toss bridge does not support path subscriptions. Reinstall the addon.",
         })
         return
-    _bridge.call("subscribePath", subscription_id, path, JSON.stringify(options), _callback)
+    if args.is_empty():
+        _bridge.call("subscribePath", subscription_id, path, JSON.stringify(options), _callback)
+    else:
+        _bridge.call("subscribePathArgs", subscription_id, path, JSON.stringify(args), JSON.stringify(options), _callback)
 
 func dispose_subscription(subscription_id: int) -> void:
     if is_available():
