@@ -87,7 +87,8 @@ if (platformManifest) {
   if (!platformManifest.exportPreset) {
     warnings.push('플랫폼 매니페스트에 exportPreset이 없습니다(이전 SDK로 만든 빌드). 다시 build하면 기록됩니다.');
   } else if (platformManifest.exportPreset !== releasePreset) {
-    errors.push(`"${platformManifest.exportPreset}" 프리셋으로 내보낸 .ait입니다. 출시 프리셋은 "${releasePreset}"입니다 — 셸의 GODOT_EXPORT_PRESET을 지우고 다시 build하세요.`);
+    // 테스트 빌드는 개발 도구 프리셋을 쓸 수 있다(설치 가이드). 출시 빌드만 막는다.
+    (isTestBuild ? warnings : errors).push(`"${platformManifest.exportPreset}" 프리셋으로 내보낸 .ait입니다. 출시 프리셋은 "${releasePreset}"입니다 — 셸의 GODOT_EXPORT_PRESET을 지우고 다시 build하세요.`);
   }
   if (!platformManifest.build?.time) warnings.push('빌드 도장(build.time)이 없습니다. 다시 build하면 기록됩니다.');
 }

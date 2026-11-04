@@ -52,13 +52,8 @@ if (withDebugConsole) console.log('[ait-godot] !!! 테스트 전용 빌드 (--de
 
 console.log(`[ait-godot] 게임: ${gameId} (${gameDir})`);
 
-// 출시 빌드는 lock의 출시 프리셋으로만 만든다. 셸에 남은 GODOT_EXPORT_PRESET(개발 프리셋 등)이
-// 조용히 출시 .ait를 만들지 않게 멈춘다. 의도한 경우에만 AIT_ALLOW_EXPORT_PRESET=1로 허용한다.
-const lockPreset = JSON.parse(fs.readFileSync(path.join(gameDir, '.ait/platform.lock.json'), 'utf8')).godot?.web?.exportPreset ?? 'Apps in Toss Web';
-const presetOverride = process.env.GODOT_EXPORT_PRESET;
-if (presetOverride && presetOverride !== lockPreset && process.env.AIT_ALLOW_EXPORT_PRESET !== '1') {
-  fail(`GODOT_EXPORT_PRESET="${presetOverride}"가 설정돼 있습니다. 출시 빌드는 "${lockPreset}" 프리셋으로만 만듭니다. 셸에서 unset GODOT_EXPORT_PRESET 하거나, 의도했다면 AIT_ALLOW_EXPORT_PRESET=1을 주세요.`);
-}
+// 출시 빌드는 lock의 출시 프리셋으로만 만든다(check-release-preset.mjs).
+script('check-release-preset.mjs', { AIT_DEBUG_CONSOLE });
 const sdkDir = resolveSdkDir();
 // 내장 모드: bridge는 addonDir/tools/bridge에 있다. 그 외에는 SDK 리포의 bridge.
 const bridgeDir = process.env.AIT_BRIDGE_DIR

@@ -204,6 +204,7 @@ function cmdBuild() {
   const debugConsole = args.includes('--debug-console') || process.env.AIT_DEBUG_CONSOLE === '1';
   const AIT_DEBUG_CONSOLE = debugConsole ? '1' : '';
   if (debugConsole) logDebugConsoleBanner();
+  runStep('출시 프리셋 확인', 'check-release-preset.mjs', { env: { AIT_DEBUG_CONSOLE } });
   runStep('게임 매니페스트 → 웹 설정 생성 (Unity Configuration)', 'write-ait-config.mjs', {
     env: { GODOT_EXPORT_DIR: exportDir },
   });
@@ -212,11 +213,13 @@ function cmdBuild() {
   runStep('Godot Web export (Unity WebGL build)', 'export-godot.mjs', {
     env: { GODOT_EXPORT_DIR: exportDir },
   });
+  runStep('엔진 JS 패치 (검수 eval 반려 대응·소리 훅·앱 설정)', 'engine-patch.mjs', { env: { GODOT_EXPORT_DIR: exportDir } });
   runStep('플랫폼 매니페스트 기록 (ait-build-info 대응)', 'write-platform-manifest.mjs', {
     env: { GODOT_EXPORT_DIR: exportDir, AIT_DEBUG_CONSOLE },
   });
   runStep('브리지 빌드 → 주입 → 무결성 검사', 'pipeline-finalize.mjs', { env: { AIT_DEBUG_CONSOLE } });
   runStep('.ait 패키징 (Unity Build & Package)', 'pipeline-package.mjs');
+  runStep('최종 .ait 검사', 'verify-ait.mjs', { env: { AIT_DEBUG_CONSOLE } });
   if (debugConsole) {
     logDebugConsoleBanner();
     console.log('[ait-godot] 테스트 빌드 완료. 콘솔에 테스트 번들로 올린 뒤 /ait:debug로 QR attach 하세요.');
@@ -234,6 +237,7 @@ function cmdBuildDev() {
   runStep('SDK 애드온 동기화', 'sync-godot-sdk.mjs');
   runStep('mock 브리지 빌드 (Unity Dev Server의 Mock SDK)', 'pipeline-bridge-mock.mjs');
   runStep('Godot Web export', 'export-godot.mjs');
+  runStep('엔진 JS 패치 (출시와 같은 엔진)', 'engine-patch.mjs');
   runStep('mock 브리지 + DevTools 패널 주입', 'pipeline-mock-patch.mjs', { env: { AIT_DEBUG_CONSOLE: '' } });
   console.log('[ait-godot] 다음: ait-godot preview → 브라우저 테스트 (?e2e=true는 파라미터 없는 API 자동 점검)');
 }

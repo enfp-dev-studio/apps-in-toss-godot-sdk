@@ -266,6 +266,20 @@ describe('verify-ait.mjs', () => {
     });
   }
 
+  it('lets a test build use a dev-tools preset (warning only)', async () => {
+    const gameDir = await makeGame(
+      { 'sources/ait-debug-console.js': 'window.x=1;' },
+      { manifest: { ...RELEASE_MANIFEST, debugConsole: true, exportPreset: 'Apps in Toss Web (dev tools)' } },
+    );
+    try {
+      const result = runVerifyAit(gameDir);
+      assert.equal(result.status, 0, result.stderr);
+      assert.match(result.stderr, /출시 프리셋/);
+    } finally {
+      fs.rmSync(gameDir, { recursive: true, force: true });
+    }
+  });
+
   it('allows the debug console only in a test build, with a warning', async () => {
     const gameDir = await makeGame(
       { 'sources/ait-debug-console.js': 'window.x=1;' },
@@ -279,4 +293,27 @@ describe('verify-ait.mjs', () => {
       fs.rmSync(gameDir, { recursive: true, force: true });
     }
   });
+});
+
+// 게임에서 쓰는 내장 CLI(ait-godot.mjs)와 pipeline-build*.mjs가 각자 단계 목록을 가지므로 모두 확인한다.
+// (내장 CLI에 엔진 패치가 빠진 것을 실제 데모 빌드에서 찾아 넣은 검사)
+describe('build step order', () => {
+  const read = (p) => fs.readFileSync(path.join(repoRoot, p), 'utf8');
+  const order = (text, names) => names.map((name) => text.indexOf(name));
+  const cli = read('addons/apps_in_toss/tools/ait-godot.mjs');
+  const cliBuild = cli.slice(cli.indexOf('function cmdBuild()'), cli.indexOf('function cmdBuildDev()'));
+  const cliDev = cli.slice(cli.indexOf('function cmdBuildDev()'), cli.indexOf('function cmdSim()'));
+  for (const [label, text] of [['ait-godot build', cliBuild], ['pipeline-build.mjs', read('addons/apps_in_toss/tools/scripts/pipeline-build.mjs')]]) {
+    it(`${label}: preset check → export → engine patch → platform manifest → package → verify-ait`, () => {
+      const at = order(text, ['check-release-preset.mjs', 'export-godot.mjs', 'engine-patch.mjs', 'write-platform-manifest.mjs', 'pipeline-package.mjs', 'verify-ait.mjs']);
+      assert.ok(at.every((i) => i !== -1), JSON.stringify(at));
+      assert.deepEqual([...at].sort((a, b) => a - b), at, JSON.stringify(at));
+    });
+  }
+  for (const [label, text] of [['ait-godot build:dev', cliDev], ['pipeline-build-dev.mjs', read('addons/apps_in_toss/tools/scripts/pipeline-build-dev.mjs')]]) {
+    it(`${label}: export → engine patch`, () => {
+      const [exported, patched] = order(text, ['export-godot.mjs', 'engine-patch.mjs']);
+      assert.ok(exported !== -1 && patched > exported, `${exported} ${patched}`);
+    });
+  }
 });
