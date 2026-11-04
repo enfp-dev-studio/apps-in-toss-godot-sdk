@@ -15,6 +15,7 @@ import {
   findMcpBridgeAutoload,
   findTestAdIdLines,
   findAudioBusEditLines,
+  checkVersions,
 } from '../addons/apps_in_toss/tools/scripts/doctor-checks.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -44,6 +45,13 @@ function runNode(script, args, env, cwd) {
 }
 
 describe('doctor 검사 함수', () => {
+  it('앱 버전이 적힌 곳끼리 다르면 알린다', () => {
+    assert.deepEqual(checkVersions({ gameVersion: '1.2.0', projectVersion: '1.2.0', packageVersion: undefined }), []);
+    assert.deepEqual(checkVersions({ gameVersion: '1.2.0', projectVersion: '', packageVersion: '1.2.0' }), []);
+    const [warning] = checkVersions({ gameVersion: '1.2.0', projectVersion: '1.3.0', packageVersion: '1.2.0' });
+    assert.match(warning, /project\.godot application\/config\/version=1\.3\.0/);
+  });
+
   it('웹에서 소리를 없앨 수 있는 AudioServer.add_bus/move_bus 호출 줄을 찾는다(주석 제외)', () => {
     const text = 'func _ready():\n\tAudioServer.add_bus(1)\n\t# AudioServer.move_bus(1, 2)\n\tAudioServer.bus_count += 1\n\tAudioServer . move_bus(2, 1)\n';
     assert.deepEqual(findAudioBusEditLines(text), [2, 5]);

@@ -147,15 +147,30 @@ func flush() -> bool:
     return ok
 
 
-## 이 칸의 저장을 지우고 빈 상태로 둡니다(내 데이터 삭제 등)
+## 이 칸의 저장을 지우고 빈 상태로 둡니다(내 데이터 삭제 등). 깨진 저장 백업("<키>:broken", ".broken" 파일)과
+## 사용자 식별키 전의 예전 키(base_key)도 지웁니다. 예전 키를 남기면 다음 load_data()가 그 값을 다시 옮겨 옵니다.
 func wipe() -> void:
     _timer.stop()
     if _has_store():
-        if key != "":
-            await _store_remove(key)
-    elif not OS.has_feature("web") and FileAccess.file_exists(_fallback_file()):
-        DirAccess.remove_absolute(_fallback_file())
+        for store_key in wipe_keys(key, base_key):
+            await _store_remove(store_key)
+        _legacy_key = ""
+    elif not OS.has_feature("web"):
+        for path in [_fallback_file(), _fallback_file() + ".broken"]:
+            if FileAccess.file_exists(path):
+                DirAccess.remove_absolute(path)
     data = {}
+
+
+## wipe()가 지우는 저장소 키: 지금 키·예전 키와 각각의 ":broken"
+static func wipe_keys(current_key: String, legacy_key: String) -> Array[String]:
+    var keys: Array[String] = []
+    for k in [current_key, legacy_key]:
+        if k != "" and not keys.has(k):
+            keys.append(k)
+    for k in keys.duplicate():
+        keys.append("%s:broken" % k)
+    return keys
 
 
 ## 사용자 식별키 hash로 저장 키를 만듭니다

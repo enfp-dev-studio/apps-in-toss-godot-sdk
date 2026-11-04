@@ -14,6 +14,10 @@ class FakeCore extends AITCore:
     var started: Array = [] # [subscription_id, path, options, args]
     var disposed: Array = []
     var results := {}
+    var values := {}
+
+    func get_value(path: String) -> Variant:
+        return values.get(path)
 
     func is_available() -> bool:
         return true
@@ -81,6 +85,7 @@ func _run() -> void:
     await _safe_area()
     await _sound_gate()
     await _ad_guard_and_slot()
+    _entry()
     await _save_slot()
     await _touch_scroll()
     if _fails == 0:
@@ -386,6 +391,33 @@ func _ad_guard_and_slot() -> void:
     core.queue_free()
 
 
+# ── AITEntry (들어온 주소·빌드 정보) ───────────────────────
+
+func _entry() -> void:
+    var a := AITEntry.parse("intoss://cat-room/visit?code=abc&x=1")
+    _check("entry scheme path+query", a["path"] == "/visit" and a["query"] == {"code": "abc", "x": "1"}, str(a))
+    var b := AITEntry.parse("intoss-private://cat-room/visit?_deploymentId=d1&queryParams=%7B%22code%22%3A%22abc%22%2C%22n%22%3A2%7D")
+    _check("entry test scheme queryParams merged", b["path"] == "/visit" and b["query"] == {"_deploymentId": "d1", "code": "abc", "n": "2"}, str(b))
+    var c := AITEntry.parse("/visit?code=a+b%20c")
+    _check("entry location decode", c["path"] == "/visit" and c["query"] == {"code": "a b c"}, str(c))
+    var d := AITEntry.parse("https://x.apps.tossmini.com/?k=v#frag")
+    _check("entry https root, fragment dropped", d["path"] == "/" and d["query"] == {"k": "v"}, str(d))
+    var e := AITEntry.parse("intoss://app?k=v")
+    _check("entry scheme without path", e["path"] == "" and e["query"] == {"k": "v"}, str(e))
+
+    var core := FakeCore.new()
+    core.values = {
+        "Environment.initialURL": "intoss-private://app/visit?queryParams=%7B%22code%22%3A%22z9%22%7D",
+        "Environment.deploymentId": "dep-1",
+        "Environment.tossAppVersion": "5.290.0",
+    }
+    var entry := AITEntry.read(core)
+    _check("entry read merges initialURL", entry["path"] == "/visit" and entry["query"].get("code") == "z9" and entry["deployment_id"] == "dep-1" and entry["toss_app_version"] == "5.290.0", str(entry))
+    var info := AITEntry.build_info(core)
+    _check("build_info has kind and ids", info["kind"] != "" and info["deployment_id"] == "dep-1" and info["time"] == "", str(info))
+    core.free()
+
+
 # ── AITSaveSlot ─────────────────────────────────────────
 
 func _new_slot(storage: FakeStorage, user_hash: String) -> AITSaveSlot:
@@ -421,6 +453,18 @@ func _save_slot() -> void:
     r = await other.load_data()
     _check("slot other user is separate", bool(r["fresh"]))
     other.queue_free()
+
+    # wipe: 지금 키·예전 키(base_key)와 각각의 :broken 백업까지 지운다. 예전 키를 남기면 다시 옮겨 온다
+    _check("slot wipe keys", AITSaveSlot.wipe_keys(scoped, "t.save") == ["%s" % scoped, "t.save", "%s:broken" % scoped, "t.save:broken"])
+    var wipe_st := FakeStorage.new()
+    wipe_st.items = {scoped: '{"coins":9}', scoped + ":broken": "{bad", "t.save": '{"coins":1}', "t.save:broken": "{old", "t.keep": "1"}
+    var wiping := _new_slot(wipe_st, "hash-abc")
+    await wiping.load_data()
+    await wiping.wipe()
+    _check("slot wipe removes saves and broken backups", wipe_st.items.keys() == ["t.keep"], str(wipe_st.items.keys()))
+    r = await wiping.load_data()
+    _check("slot wipe does not migrate legacy back", bool(r["ok"]) and bool(r["fresh"]) and wiping.data.is_empty(), str(r))
+    wiping.queue_free()
 
     var fail_once := FakeStorage.new()
     fail_once.fail_gets = 1

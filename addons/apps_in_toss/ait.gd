@@ -59,6 +59,16 @@ func is_test_run() -> bool:
     return build_kind() != "release"
 
 
+## 들어온 주소: { path, query, initial_url, deployment_id, toss_app_version }. 테스트 스킴의 queryParams도 query에 합칩니다
+func entry() -> Dictionary:
+    return AITEntry.read(core)
+
+
+## 빌드 정보: { kind, time, commit, dirty, label, deployment_id, toss_app_version } — 테스트 화면에 어떤 빌드인지 보여 줄 때
+func build_info() -> Dictionary:
+    return AITEntry.build_info(core)
+
+
 func invoke(path: String, args: Array = []) -> int:
     return _sdk.invoke(path, args)
 

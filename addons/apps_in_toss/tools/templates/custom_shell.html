@@ -38,6 +38,14 @@
     #ait-boot .bar { width: 160px; height: 6px; border-radius: 3px; background: rgba(49, 130, 246, 0.15); overflow: hidden; }
     #ait-boot .bar i { display: block; width: 4%; height: 100%; background: var(--ait-brand); transition: width 0.2s; }
     #ait-boot.err .bar { display: none; }
+    /* 파일 크기를 몰라 진행률을 셀 수 없을 때 오가는 막대 */
+    #ait-boot .bar.busy i { width: 30%; animation: ait-busy 1.2s ease-in-out infinite; }
+    @keyframes ait-busy { from { transform: translateX(-100%); } to { transform: translateX(340%); } }
+    #ait-boot button {
+      display: none; margin-top: 4px; padding: 12px 24px; border: 0; border-radius: 12px;
+      background: var(--ait-brand); color: #fff; font: inherit; font-size: 15px; font-weight: 600;
+    }
+    #ait-boot.retry button { display: block; }
   </style>
   $GODOT_HEAD_INCLUDE
 </head>
@@ -49,6 +57,7 @@
     <h1>$GODOT_PROJECT_NAME</h1>
     <p id="ait-boot-msg">불러오고 있어요</p>
     <div class="bar"><i id="ait-boot-bar"></i></div>
+    <button type="button" id="ait-boot-retry">다시 시도</button>
   </div>
 
   <script>
@@ -75,14 +84,20 @@
         b.classList.add("hide");
         setTimeout(function () { b.remove(); }, 400);
       },
+      // total을 모르면(0) 오가는 막대를 보여 준다. Godot 로더는 파일 크기를 하나라도 모르면 total=0을 넘긴다.
       progress: function (current, total) {
         var bar = document.getElementById("ait-boot-bar");
-        if (bar && total > 0) bar.style.width = Math.max(4, Math.round((current / total) * 100)) + "%";
+        if (!bar) return;
+        var known = total > 0;
+        bar.parentNode.classList.toggle("busy", !known);
+        bar.style.width = known ? Math.max(4, Math.min(100, Math.round((current / total) * 100))) + "%" : "";
       },
-      fail: function (message) {
+      // retry가 false가 아니면 "다시 시도"(페이지 다시 열기) 버튼을 보여 준다.
+      fail: function (message, retry) {
         var b = boot();
         if (!b) return;
         b.classList.add("err");
+        b.classList.toggle("retry", retry !== false);
         document.getElementById("ait-boot-msg").textContent = message;
       },
       setPixelCap: function (value) {
@@ -92,6 +107,7 @@
       realPixelRatio: function () { return realDpr; },
     };
   })();
+    document.getElementById("ait-boot-retry").addEventListener("click", function () { window.location.reload(); });
   </script>
   <script src="$GODOT_URL"></script>
   <script>
@@ -99,13 +115,18 @@
       var shell = window.AppsInTossShell;
       var missing = Engine.getMissingFeatures({ threads: false });
       if (missing.length > 0) {
-        shell.fail("이 기기에서는 열 수 없어요. 토스 앱을 최신 버전으로 업데이트한 뒤 다시 열어 주세요.");
+        shell.fail("이 기기에서는 열 수 없어요. 토스 앱을 최신 버전으로 업데이트한 뒤 다시 열어 주세요.", false);
         console.error("missing features", missing);
         return;
       }
-      var engine = new Engine($GODOT_CONFIG);
+      var config = $GODOT_CONFIG;
+      // 로더가 total을 0으로 주면 export 때 기록된 파일 크기 합(config.fileSizes)으로 센다.
+      var expected = 0;
+      var sizes = config.fileSizes || {};
+      for (var name in sizes) expected += Number(sizes[name]) || 0;
+      var engine = new Engine(config);
       engine.startGame({
-        onProgress: function (current, total) { shell.progress(current, total); },
+        onProgress: function (current, total) { shell.progress(current, total > 0 ? total : expected); },
       }).then(function () {
         var b = document.getElementById("ait-boot");
         if (b && b.dataset.autoHide !== "false") shell.ready();

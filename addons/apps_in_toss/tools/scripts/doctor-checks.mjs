@@ -74,6 +74,19 @@ export function checkVramCompression(projectText, presetText) {
   return 'Web export preset has vram_texture_compression/for_mobile=true but project.godot lacks rendering/textures/vram_compression/import_etc2_astc=true — Godot export fails with an empty "configuration errors" message. Enable Project Settings → Rendering → Textures → VRAM Compression → Import ETC2 ASTC.';
 }
 
+// 앱 버전이 세 곳에서 같은지 본다: .ait/game.manifest.json gameVersion, project.godot application/config/version,
+// 게임 package.json version(.ait에 project-package.json으로 들어간다). 적혀 있는 값끼리만 비교한다.
+export function checkVersions({ gameVersion, projectVersion, packageVersion }) {
+  const found = Object.entries({
+    'game.manifest.json gameVersion': gameVersion,
+    'project.godot application/config/version': projectVersion,
+    'package.json version': packageVersion,
+  }).filter(([, value]) => typeof value === 'string' && value.trim() !== '');
+  const distinct = new Set(found.map(([, value]) => value.trim()));
+  if (distinct.size <= 1) return [];
+  return [`앱 버전이 서로 다릅니다: ${found.map(([where, value]) => `${where}=${value}`).join(', ')}. 출시 전에 맞추세요.`];
+}
+
 // 매니페스트의 appType·navigationBar 조합을 검사해 알릴 점을 돌려준다.
 export function checkAppType(manifest) {
   if (!manifest || typeof manifest !== 'object') return [];

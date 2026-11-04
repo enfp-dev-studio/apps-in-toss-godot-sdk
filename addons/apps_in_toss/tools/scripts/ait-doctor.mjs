@@ -8,6 +8,7 @@ import { resolveSdkDir } from './sdk-dir.mjs';
 import { resolveProfile, logProfileBanner } from './build-profiles.mjs';
 import {
   checkAppType,
+  checkVersions,
   checkShellViewport,
   checkVramCompression,
   findMcpBridgeAutoload,
@@ -137,6 +138,20 @@ for (const warning of checkAppType(resolvedProfileInfo.manifest)) warnings.push(
 
 const projectFile = path.join(projectDir, 'project.godot');
 const projectText = readText(projectFile, 'Godot project');
+{
+  const gamePackagePath = path.join(projectDir, 'package.json');
+  let packageVersion;
+  try {
+    packageVersion = fs.existsSync(gamePackagePath) ? JSON.parse(fs.readFileSync(gamePackagePath, 'utf8')).version : undefined;
+  } catch {
+    packageVersion = undefined;
+  }
+  for (const warning of checkVersions({
+    gameVersion: resolvedProfileInfo.manifest?.gameVersion,
+    projectVersion: projectText ? iniValue(projectText, 'config/version') : undefined,
+    packageVersion,
+  })) warnings.push(warning);
+}
 if (projectText) {
   const feature = firstMatch(projectText, /^config\/features=PackedStringArray\("([^"]+)"/m);
   const renderer = iniValue(projectText, 'renderer/rendering_method');

@@ -187,6 +187,17 @@ export function injectAppConfig(html, config) {
   return html.replace('</head>', () => `${tag}\n</head>`);
 }
 
+// index.html에 이미 들어 있는 앱 설정을 읽는다. 없거나 깨졌으면 null
+export function readAppConfig(html) {
+  const match = html.match(new RegExp(`<script type="application/json" id="${APP_CONFIG_ID}">([\\s\\S]*?)</script>`));
+  if (!match) return null;
+  try {
+    return JSON.parse(match[1]);
+  } catch {
+    return null;
+  }
+}
+
 export function patchExportDir(exportDir, patches = ENGINE_PATCHES) {
   const htmlPath = path.join(exportDir, 'index.html');
   const jsPath = path.join(exportDir, 'index.js');

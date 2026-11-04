@@ -3,6 +3,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { injectAppConfig, readAppConfig } from './engine-patch.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..');
@@ -76,6 +77,13 @@ manifest.build = buildStamp(projectDir);
 const outputPath = path.join(exportDir, 'ait-platform-manifest.json');
 fs.writeFileSync(outputPath, `${JSON.stringify(manifest, null, 2)}\n`);
 console.log(`Wrote Apps in Toss platform manifest: ${outputPath}`);
+
+// 빌드 도장을 index.html의 앱 설정(JSON)에도 넣어 AIT.build_info()가 읽게 한다.
+const indexPath = path.join(exportDir, 'index.html');
+if (fs.existsSync(indexPath)) {
+  const html = fs.readFileSync(indexPath, 'utf8');
+  fs.writeFileSync(indexPath, injectAppConfig(html, { ...(readAppConfig(html) ?? {}), build: manifest.build }));
+}
 function buildStamp(dir) {
   const git = (args) => {
     const result = spawnSync('git', ['-C', dir, ...args], { encoding: 'utf8' });

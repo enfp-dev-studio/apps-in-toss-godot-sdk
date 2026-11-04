@@ -64,6 +64,8 @@ const usage = `ait-godot — Apps in Toss × Godot 게임 파이프라인 (Unity
   ait-godot build --debug-console        테스트 빌드: 실기기 원격 디버깅(/ait:debug) 포함 — 검수 제출 금지
   ait-godot build:dev                    mock 브리지 + DevTools 개발 빌드 — Dev Server 대응
   ait-godot preview                      build/godot-web 로컬 서빙
+  ait-godot sim [<주소>] [--device <이름>]
+                                         iOS 시뮬레이터 Safari로 미리보기 열기(macOS·Xcode). 다른 터미널에서 preview를 먼저 띄우세요
   ait-godot verify-ait [<파일>.ait]      최종 .ait 검사(출시 프리셋·개발 파일·검수 반려 글자) — build가 마지막에 자동 실행
   ait-godot sync                         SDK 설치 상태 확인 (강제 갱신은 addon:install --force)
 
@@ -107,6 +109,7 @@ function main() {
     'build:dev': { project: true, manifest: true, lock: true },
     preview: { project: true, manifest: true, lock: true },
     'verify-ait': { project: true, manifest: true, lock: true },
+    sim: { project: false, manifest: false },
   };
   const req = needs[command];
   if (!req) fail(`알 수 없는 명령 "${command}"\n\n${usage}`);
@@ -128,6 +131,7 @@ function main() {
     case 'build': return cmdBuild();
     case 'build:dev': return cmdBuildDev();
     case 'preview': return cmdPreview();
+    case 'sim': return cmdSim();
     case 'verify-ait': return runStep('최종 .ait 검사', 'verify-ait.mjs', { extraArgs: args.slice(1, 2) });
   }
 }
@@ -232,6 +236,34 @@ function cmdBuildDev() {
   runStep('Godot Web export', 'export-godot.mjs');
   runStep('mock 브리지 + DevTools 패널 주입', 'pipeline-mock-patch.mjs', { env: { AIT_DEBUG_CONSOLE: '' } });
   console.log('[ait-godot] 다음: ait-godot preview → 브라우저 테스트 (?e2e=true는 파라미터 없는 API 자동 점검)');
+}
+
+// iOS 시뮬레이터 Safari로 preview 주소를 연다. 켜진 시뮬레이터가 없으면 --device 이름(없으면 첫 iPhone)을 켠다.
+// 시뮬레이터의 localhost는 이 Mac이므로 preview(기본 http://localhost:5173/)를 그대로 연다.
+function cmdSim() {
+  if (process.platform !== 'darwin') fail('sim은 macOS(Xcode)에서만 동작합니다.');
+  const deviceAt = args.indexOf('--device');
+  const deviceName = deviceAt !== -1 ? args[deviceAt + 1] : null;
+  const url = args.slice(1).find((arg, i) => !arg.startsWith('--') && args[i] !== '--device') ?? 'http://localhost:5173/';
+  const simctl = (simArgs) => spawnSync('xcrun', ['simctl', ...simArgs], { encoding: 'utf8' });
+  const list = (filter) => {
+    const out = simctl(['list', 'devices', filter, '-j']);
+    if (out.error || out.status !== 0) fail(`xcrun simctl을 실행하지 못했습니다. Xcode와 iOS 시뮬레이터를 설치하세요. ${out.stderr ?? ''}`);
+    return Object.values(JSON.parse(out.stdout).devices).flat();
+  };
+  let device = list('booted').find((d) => !deviceName || d.name === deviceName);
+  if (!device) {
+    const available = list('available');
+    device = deviceName ? available.find((d) => d.name === deviceName) : available.find((d) => d.name.startsWith('iPhone'));
+    if (!device) fail(`켤 시뮬레이터를 찾지 못했습니다${deviceName ? `: ${deviceName}` : ''}. xcrun simctl list devices available로 이름을 확인하세요.`);
+    console.log(`[ait-godot sim] ${device.name} 켜는 중…`);
+    const boot = simctl(['boot', device.udid]);
+    if (boot.status !== 0 && !String(boot.stderr).includes('current state: Booted')) fail(`시뮬레이터를 켜지 못했습니다: ${boot.stderr}`);
+  }
+  spawnSync('open', ['-a', 'Simulator'], { stdio: 'ignore' });
+  const opened = simctl(['openurl', device.udid, url]);
+  if (opened.status !== 0) fail(`Safari로 열지 못했습니다: ${opened.stderr}`);
+  console.log(`[ait-godot sim] ${device.name} Safari → ${url} (preview가 떠 있어야 합니다)`);
 }
 
 function cmdPreview() {
