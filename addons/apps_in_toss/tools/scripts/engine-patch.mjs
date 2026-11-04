@@ -174,6 +174,19 @@ export function patchEngineCode(code, patches = ENGINE_PATCHES) {
   return { code, applied };
 }
 
+// build/ait-app-config.json(write-ait-config.mjs)을 index.html에 실행되지 않는 JSON으로 넣는다.
+// 같은 id의 태그가 있으면 바꾼다. 설정 파일이 없으면 아무것도 하지 않는다.
+export const APP_CONFIG_ID = 'ait-app-config';
+
+export function injectAppConfig(html, config) {
+  const json = JSON.stringify(config).replaceAll('<', '\\u003c');
+  const tag = `<script type="application/json" id="${APP_CONFIG_ID}">${json}</script>`;
+  const existing = new RegExp(`<script type="application/json" id="${APP_CONFIG_ID}">[\\s\\S]*?</script>`);
+  if (existing.test(html)) return html.replace(existing, () => tag);
+  if (!html.includes('</head>')) throw new Error('index.html에 </head>가 없어 앱 설정을 넣지 못했습니다.');
+  return html.replace('</head>', () => `${tag}\n</head>`);
+}
+
 export function patchExportDir(exportDir, patches = ENGINE_PATCHES) {
   const htmlPath = path.join(exportDir, 'index.html');
   const jsPath = path.join(exportDir, 'index.js');
@@ -191,6 +204,13 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const exportDir = path.resolve(process.argv[2] ?? process.env.GODOT_EXPORT_DIR ?? path.join(gameDir, 'build/godot-web'));
   try {
     const { jsPath, applied } = patchExportDir(exportDir);
+    const configPath = path.join(gameDir, 'build/ait-app-config.json');
+    const htmlPath = path.join(exportDir, 'index.html');
+    if (fs.existsSync(configPath) && fs.existsSync(htmlPath)) {
+      const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      fs.writeFileSync(htmlPath, injectAppConfig(fs.readFileSync(htmlPath, 'utf8'), config));
+      applied.push('앱 설정(ait-app-config)');
+    }
     const shown = path.relative(gameDir, jsPath) || jsPath;
     console.log(
       applied.length > 0

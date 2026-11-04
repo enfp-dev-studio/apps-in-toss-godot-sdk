@@ -11,7 +11,7 @@ import path from 'node:path';
 import vm from 'node:vm';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
-import { addAudioHooks, disableJsBridgeExec, ENGINE_PATCHES, patchEngineCode, patchExportDir } from '../addons/apps_in_toss/tools/scripts/engine-patch.mjs';
+import { addAudioHooks, disableJsBridgeExec, ENGINE_PATCHES, injectAppConfig, patchEngineCode, patchExportDir } from '../addons/apps_in_toss/tools/scripts/engine-patch.mjs';
 import { referencesScript, scanReleaseText, scriptSources } from '../addons/apps_in_toss/tools/scripts/release-scan.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -95,6 +95,19 @@ describe('engine-patch.mjs', () => {
     } finally {
       fs.rmSync(out, { recursive: true, force: true });
     }
+  });
+});
+
+describe('app config injection', () => {
+  const read = (html) => JSON.parse(html.match(/<script type="application\/json" id="ait-app-config">([\s\S]*?)<\/script>/)[1]);
+  it('adds inert JSON before </head>, replaces it on rebuild, and escapes markup and $ patterns', () => {
+    const page = '<html><head><title>g</title></head><body></body></html>';
+    const once = injectAppConfig(page, { navigationBar: { transparentBackground: true }, note: '</script>$&' });
+    assert.equal(read(once).note, '</script>$&');
+    assert.doesNotMatch(once, /<\/script><\/script>/);
+    const twice = injectAppConfig(once, { navigationBar: { transparentBackground: false } });
+    assert.equal(twice.split('id="ait-app-config"').length - 1, 1);
+    assert.equal(read(twice).navigationBar.transparentBackground, false);
   });
 });
 

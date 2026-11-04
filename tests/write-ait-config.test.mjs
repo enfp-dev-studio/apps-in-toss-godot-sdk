@@ -42,13 +42,17 @@ function cleanup(game) {
   fs.rmSync(game, { recursive: true, force: true });
 }
 
-test('새 필드 없음 → 기본 webView 두 값, 빈 permissions, navigationBar 없음', () => {
+test('새 필드 없음 → 캔버스 앱 webView 기본값, 빈 permissions, navigationBar 없음', () => {
   const { game, result, config } = runWithManifest({});
   try {
     assert.ifError(result.error);
     assert.equal(result.status, 0, result.stderr);
     assert.match(config, /"?mediaPlaybackRequiresUserAction"?\s*:\s*false/);
     assert.match(config, /"?pullToRefreshEnabled"?\s*:\s*false/);
+    assert.match(config, /"?bounces"?\s*:\s*false/);
+    assert.match(config, /"?overScrollMode"?\s*:\s*"never"/);
+    assert.match(config, /"?allowsBackForwardNavigationGestures"?\s*:\s*false/);
+    assert.match(config, /"?allowsInlineMediaPlayback"?\s*:\s*true/);
     assert.match(config, /permissions:\s*\[\]/);
     assert.ok(!config.includes('navigationBar'), 'navigationBar가 없어야 한다');
   } finally {
@@ -240,5 +244,23 @@ test('알 수 없는 appType은 실패한다', () => {
     assert.match(result.stderr, /appType must be "game" or "nongame"/);
   } finally {
     cleanup(game);
+  }
+});
+
+test('실행 설정(build/ait-app-config.json)에 appType과 내비 바 투명 여부를 남긴다', () => {
+  for (const [manifest, expected] of [
+    [{}, { appType: null, navigationBar: { transparentBackground: null } }],
+    [{ appType: 'game' }, { appType: 'game', navigationBar: { transparentBackground: true } }],
+    [{ appType: 'nongame' }, { appType: 'nongame', navigationBar: { transparentBackground: null } }],
+    [{ appType: 'game', navigationBar: { transparentBackground: false } }, { appType: 'game', navigationBar: { transparentBackground: false } }],
+  ]) {
+    const { game, result } = runWithManifest(manifest);
+    try {
+      assert.equal(result.status, 0, result.stderr);
+      const runtime = JSON.parse(fs.readFileSync(path.join(game, 'build/ait-app-config.json'), 'utf8'));
+      assert.deepEqual(runtime, expected, JSON.stringify(manifest));
+    } finally {
+      cleanup(game);
+    }
   }
 });

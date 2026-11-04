@@ -14,12 +14,16 @@ signal show_ended(subscription_id: int)
 
 const SHOW_END_EVENTS := ["dismissed", "failedToShow"]
 
+## 닫힘·실패가 끝내 오지 않을 때 표시를 끝내는 보호(AITShowGuard). idle_seconds·return_seconds로 조정합니다
+var show_guard: AITShowGuard
+
 var _core: AITCore
 var _active: Dictionary = {}
 var _showing: Dictionary = {}
 
 func _init(core: AITCore) -> void:
     _core = core
+    show_guard = AITShowGuard.new(_on_show_guard_expired)
     _core.subscription_event.connect(_on_subscription_event)
     _core.subscription_error.connect(_on_subscription_error)
 
@@ -29,6 +33,7 @@ func load_full_screen_ad(options: Dictionary = {}) -> int:
 func show_full_screen_ad(options: Dictionary = {}) -> int:
     var subscription_id := _start("adsShowFullScreenAd", options)
     _showing[subscription_id] = true
+    show_guard.start(subscription_id)
     show_started.emit(subscription_id)
     return subscription_id
 
@@ -56,6 +61,7 @@ func _start(bridge_method: String, options: Dictionary) -> int:
 func _on_subscription_event(subscription_id: int, event: Variant) -> void:
     if not _active.has(subscription_id):
         return
+    show_guard.touch(subscription_id)
     ad_event.emit(subscription_id, event)
     var type := String(event.get("type", "")) if typeof(event) == TYPE_DICTIONARY else ""
     if type == "loaded":
@@ -69,6 +75,17 @@ func _on_subscription_error(subscription_id: int, error: Dictionary) -> void:
     ad_failed.emit(subscription_id, error)
     _end_show(subscription_id)
 
+## 화면 떠남·돌아옴을 보호에 알립니다(AIT 오토로드가 연결합니다)
+func attach_app_events(app_events: AITAppEvents) -> void:
+    show_guard.attach_app_events(app_events)
+
+func _on_show_guard_expired(subscription_id: int, reason: String) -> void:
+    if not _showing.has(subscription_id):
+        return
+    ad_event.emit(subscription_id, {"type": "showGuardEnded", "reason": reason})
+    _end_show(subscription_id)
+
 func _end_show(subscription_id: int) -> void:
+    show_guard.stop(subscription_id)
     if _showing.erase(subscription_id):
         show_ended.emit(subscription_id)

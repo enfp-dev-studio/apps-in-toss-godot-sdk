@@ -27,6 +27,8 @@ func _ready() -> void:
     game = AITGame.new(core)
     status = AITStatus.new(core)
     app_events = AITAppEvents.new()
+    ads.attach_app_events(app_events)
+    admob.attach_app_events(app_events)
     api = AITGeneratedAPI.new(core)
     back = AITBack.new(core)
     back.name = "Back"

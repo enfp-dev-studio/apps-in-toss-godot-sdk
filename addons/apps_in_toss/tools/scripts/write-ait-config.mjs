@@ -71,7 +71,16 @@ const primaryColor = manifest.brand?.primaryColor ?? '#3182F6';
 const iconLine = manifest.brand?.iconUrl ? `    iconUrl: '${manifest.brand.iconUrl}',\n` : '';
 
 // webView: 기본값 위에 매니페스트 값을 덮어쓴다(매니페스트 우선).
-const webViewDefaults = { mediaPlaybackRequiresUserAction: false, pullToRefreshEnabled: false };
+// 캔버스 하나를 채우는 Godot 앱 기준 기본값: 터치 전 BGM, 당겨서 새로고침·튕김·넘김 제스처 끄기,
+// 인라인 재생 허용(cat-room-godot에서 확인한 값). web-framework 기본값은 bounces:true, allowsInlineMediaPlayback:false다.
+const webViewDefaults = {
+  mediaPlaybackRequiresUserAction: false,
+  pullToRefreshEnabled: false,
+  bounces: false,
+  overScrollMode: 'never',
+  allowsBackForwardNavigationGestures: false,
+  allowsInlineMediaPlayback: true,
+};
 const webViewValidators = {
   allowsInlineMediaPlayback: (v) => typeof v === 'boolean',
   bounces: (v) => typeof v === 'boolean',
@@ -209,6 +218,15 @@ fs.writeFileSync(configPath, config);
 console.log(
   `[AIT config] apps-in-toss.config.ts <- ${path.relative(projectDir, manifestPath)} (appName: ${appName}, appType: ${appType ?? 'unset'})`,
 );
+// 실행 중에 필요한 설정(내비 바 투명 여부 등)을 build/ait-app-config.json에 남긴다.
+// export 뒤 engine-patch.mjs가 index.html에 JSON으로 넣고, AITSafeArea가 위쪽 인셋을 더할지 정할 때 읽는다.
+const runtimeConfig = {
+  appType: appType ?? null,
+  navigationBar: { transparentBackground: typeof navigationBar?.transparentBackground === 'boolean' ? navigationBar.transparentBackground : null },
+};
+fs.mkdirSync(path.join(projectDir, 'build'), { recursive: true });
+fs.writeFileSync(path.join(projectDir, 'build/ait-app-config.json'), `${JSON.stringify(runtimeConfig, null, 2)}\n`);
+
 if (appType === undefined) {
   console.log('[AIT config] appType이 없어 navigationBar 기본값을 넣지 않았습니다. 매니페스트에 "appType": "game" 또는 "nongame"을 적으세요.');
 }

@@ -80,6 +80,7 @@ func _run() -> void:
     await _back()
     await _safe_area()
     await _sound_gate()
+    await _ad_guard_and_slot()
     await _save_slot()
     await _touch_scroll()
     if _fails == 0:
@@ -198,6 +199,16 @@ func _safe_area() -> void:
     root.add_child(sa2)
     var none: Dictionary = await sa2.refresh()
     _check("safe no sdk → zeros", none["top"] == 0.0 and sa2.source == "none", sa2.source)
+    # 위쪽 인셋: 불투명 내비 바 아래에서는 더하지 않는다(빌드 설정의 transparentBackground)
+    _check("safe config transparent", AITSafeArea.transparent_from_config({"navigationBar": {"transparentBackground": true}}) == true)
+    _check("safe config opaque", AITSafeArea.transparent_from_config({"navigationBar": {"transparentBackground": false}}) == false)
+    _check("safe config unknown", AITSafeArea.transparent_from_config({"navigationBar": {"transparentBackground": null}}) == null and AITSafeArea.transparent_from_config(null) == null)
+    sa2.top_mode = "never"
+    _check("safe top_mode never", not sa2.includes_top())
+    sa2.top_mode = "always"
+    _check("safe top_mode always", sa2.includes_top())
+    sa2.top_mode = "auto"
+    _check("safe auto without config keeps top", sa2.includes_top())
     for node in [sa, sa2, core, bare]:
         node.queue_free()
 
@@ -278,6 +289,100 @@ func _sound_gate() -> void:
     gate.disable()
     _check("gate disable clears", not gate.is_silenced() and not AudioServer.is_bus_mute(0) and gate.reasons().is_empty())
     gate.queue_free()
+    core.queue_free()
+
+
+# ── 광고 보여 주기 보호 + AITAdSlot ───────────────────────
+
+func _wait(seconds: float) -> void:
+    await create_timer(seconds, true, false, true).timeout
+
+
+func _loads(core: FakeCore, method: String) -> Array:
+    return core.started.filter(func(entry: Array) -> bool: return entry[1] == method)
+
+
+func _ad_guard_and_slot() -> void:
+    var core := FakeCore.new()
+    root.add_child(core)
+    var events := AITAppEvents.new()
+    var ads := AITAds.new(core)
+    ads.attach_app_events(events)
+    var guard_events: Array = []
+    ads.ad_event.connect(func(_id: int, ev: Variant) -> void: guard_events.append(ev))
+    var ended: Array[int] = []
+    ads.show_ended.connect(func(id: int) -> void: ended.append(id))
+
+    # 이벤트 없이 보이는 상태로 idle_seconds가 지나면 끝낸다
+    ads.show_guard.idle_seconds = 0.3
+    var idle := ads.show_full_screen_ad({"adGroupId": "g"})
+    await _wait(0.8)
+    _check("guard ends idle show", ended == [idle] and not ads.is_showing(idle), str(ended))
+    _check("guard reports reason", guard_events.any(func(ev: Variant) -> bool: return ev.get("type") == "showGuardEnded" and ev.get("reason") == "idle"))
+
+    # 표시 중 떠났다가 돌아온 뒤 return_seconds가 지나면 끝낸다(그 전에 오는 이벤트는 그대로 전달)
+    ads.show_guard.idle_seconds = 0.0
+    ads.show_guard.return_seconds = 0.3
+    var back := ads.show_full_screen_ad({"adGroupId": "g"})
+    events.apply_life(false, "blur")
+    await _wait(0.4)
+    _check("guard waits while away", ads.is_showing(back))
+    events.apply_life(true, "focus")
+    await _wait(0.7)
+    _check("guard ends after return", not ads.is_showing(back) and ended.has(back), str(ended))
+    var normal := ads.show_full_screen_ad({"adGroupId": "g"})
+    core.subscription_event.emit(normal, {"type": "dismissed"})
+    _check("guard stops on dismissed", not ads.show_guard.is_watching(normal))
+
+    # 슬롯: 한 번에 하나만 불러오고, 같은 그룹은 다시 부르지 않는다
+    var admob := AITAdMob.new(core)
+    var first := AITAdSlot.new(admob, "g-first")
+    var second := AITAdSlot.new(admob, "g-second")
+    var twin := AITAdSlot.new(admob, "g-first")
+    for slot in [first, second, twin]:
+        slot.auto_reload = false
+    first.load_ad()
+    second.load_ad()
+    twin.load_ad()
+    var admob_loads := _loads(core, "GoogleAdMob.loadAppsInTossAdMob")
+    _check("slot loads one at a time", admob_loads.size() == 1 and first.state == "loading" and second.state == "queued", str(admob_loads))
+    _check("slot skips duplicate group", twin.state == "idle")
+    core.subscription_event.emit(admob_loads[0][0], {"type": "loaded"})
+    admob_loads = _loads(core, "GoogleAdMob.loadAppsInTossAdMob")
+    _check("slot ready then next loads", first.is_ready() and second.state == "loading" and admob_loads.size() == 2)
+    _check("slot disposes load subscription", core.disposed.has(admob_loads[0][0]))
+
+    # 보상형: impression·userEarnedReward 뒤 닫힘 → rewarded, impression 없이 닫힘 → not_shown
+    var results: Array = []
+    first.finished.connect(func(result: String, _ev: Dictionary) -> void: results.append(result))
+    _check("slot show", first.show_ad() and first.state == "showing")
+    var shows := _loads(core, "GoogleAdMob.showAppsInTossAdMob")
+    core.subscription_event.emit(shows[-1][0], {"type": "impression"})
+    core.subscription_event.emit(shows[-1][0], {"type": "userEarnedReward"})
+    core.subscription_event.emit(shows[-1][0], {"type": "dismissed"})
+    _check("slot rewarded", results == ["rewarded"] and first.state == "idle", str(results))
+    core.subscription_event.emit(admob_loads[1][0], {"type": "loaded"})
+    second.finished.connect(func(result: String, _ev: Dictionary) -> void: results.append(result))
+    second.show_ad()
+    shows = _loads(core, "GoogleAdMob.showAppsInTossAdMob")
+    core.subscription_event.emit(shows[-1][0], {"type": "dismissed"})
+    _check("slot not_shown without impression", results == ["rewarded", "not_shown"], str(results))
+
+    # 제한 시간: 응답이 없으면 끊고 다시 부르고, 모두 실패하면 load_failed
+    var slow := AITAdSlot.new(admob, "g-slow")
+    slow.auto_reload = false
+    slow.load_timeout_sec = 0.2
+    slow.retry_delays = [0.1]
+    var failures: Array = []
+    slow.load_failed.connect(func(error: Dictionary) -> void: failures.append(error.get("code")))
+    var before := _loads(core, "GoogleAdMob.loadAppsInTossAdMob").size()
+    slow.load_ad()
+    await _wait(1.0)
+    var after := _loads(core, "GoogleAdMob.loadAppsInTossAdMob").size()
+    _check("slot retries after timeout", after - before == 2, "%d" % (after - before))
+    _check("slot load_failed after retries", failures == ["AIT_AD_LOAD_TIMEOUT"] and slow.state == "idle", str(failures))
+    for slot in [first, second, twin, slow]:
+        slot.cancel()
     core.queue_free()
 
 

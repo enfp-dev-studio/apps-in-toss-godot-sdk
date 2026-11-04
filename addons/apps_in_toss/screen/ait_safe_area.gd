@@ -8,6 +8,9 @@ class_name AITSafeArea
 ##   다시 계산하고, 값이 바뀌면 changed를 보냅니다.
 ## - 셸의 viewport meta에 viewport-fit=cover가 없으면 iOS에서 CSS 값이 0입니다.
 ## 에디터·데스크톱 실행에서는 0입니다.
+## - 위쪽: 불투명한 토스 내비 바 아래에서는 WebView가 이미 바 아래에서 시작하므로, SafeArea top(상태 바 높이)을
+##   더하면 빈 띠가 생깁니다. top_mode가 "auto"(기본)이면 빌드 설정(index.html의 ait-app-config,
+##   navigationBar.transparentBackground)이 투명일 때만 더합니다. 설정을 모르면 예전처럼 더합니다.
 
 signal changed
 
@@ -25,6 +28,8 @@ var left := 0.0
 var css := {"top": 0.0, "right": 0.0, "bottom": 0.0, "left": 0.0}
 ## 값의 출처: "" (아직 안 읽음) / "sdk" / "css" / "none"
 var source := ""
+## 위쪽 인셋: "auto"(내비 바가 투명할 때만) / "always" / "never"
+var top_mode := "auto"
 
 var _core: AITCore
 var _started := false
@@ -109,7 +114,7 @@ func _read_css_insets() -> Dictionary:
     return normalize({})
 
 
-## CSS env(safe-area-inset-*)를 숨긴 div의 padding으로 잽니다(eval 없이 DOM API만 씀)
+## CSS env(safe-area-inset-*)를 숨긴 div의 padding으로 잽니다(DOM API만 씀)
 func _probe_css() -> Dictionary:
     if not OS.has_feature("web"):
         return {}
@@ -131,7 +136,42 @@ func _probe_css() -> Dictionary:
     return normalize(out)
 
 
+## 위쪽 인셋을 더할지. top_mode와 빌드 설정의 내비 바 투명 여부로 정합니다
+func includes_top() -> bool:
+    match top_mode:
+        "always":
+            return true
+        "never":
+            return false
+    var transparent: Variant = nav_bar_transparent()
+    return true if transparent == null else bool(transparent)
+
+
+## 빌드 설정의 navigationBar.transparentBackground(true/false). 모르면 null
+static func nav_bar_transparent() -> Variant:
+    if not OS.has_feature("web"):
+        return null
+    var document: Variant = JavaScriptBridge.get_interface("document")
+    if document == null:
+        return null
+    var tag: Variant = document.getElementById("ait-app-config")
+    if tag == null:
+        return null
+    return transparent_from_config(JSON.parse_string(String(tag.textContent)))
+
+
+## ait-app-config JSON에서 투명 여부만 꺼냅니다. 없거나 bool이 아니면 null
+static func transparent_from_config(config: Variant) -> Variant:
+    if typeof(config) != TYPE_DICTIONARY or typeof(config.get("navigationBar")) != TYPE_DICTIONARY:
+        return null
+    var value: Variant = config["navigationBar"].get("transparentBackground")
+    return value if typeof(value) == TYPE_BOOL else null
+
+
 func _apply(css_insets: Dictionary) -> void:
+    if not includes_top():
+        css_insets = css_insets.duplicate()
+        css_insets["top"] = 0.0
     css = css_insets
     var ui := scale_insets(css_insets, ui_per_css_px())
     var moved := false
