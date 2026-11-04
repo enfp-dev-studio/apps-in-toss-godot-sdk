@@ -15,9 +15,13 @@ class FakeCore extends AITCore:
     var disposed: Array = []
     var results := {}
     var values := {}
+    var rejected: Array = []
 
     func get_value(path: String) -> Variant:
         return values.get(path)
+
+    func reject_nested_callback(subscription_id: int, nested_id: int, error: Variant) -> void:
+        rejected.append([subscription_id, nested_id, error])
 
     func is_available() -> bool:
         return true
@@ -250,6 +254,14 @@ func _sound_gate() -> void:
     _check("gate show event keeps mute", gate.is_silenced())
     core.subscription_event.emit(ad, {"type": "dismissed"})
     _check("gate unmutes after ad", not gate.is_silenced() and not AudioServer.is_bus_mute(0))
+
+    # 지급 응답을 받을 곳이 없으면 바로 거절하고, 거절에는 오류 코드가 붙는다(web-framework 3.9.0)
+    var lonely := iap.create_one_time_purchase_order("sku-0")
+    core.nested_callback_requested.emit(lonely, 1, "processProductGrant", {"orderId": "o-0"})
+    _check("iap rejects grant without handler", core.rejected.size() == 1 and core.rejected[0][2].get("code") == AITIAP.NO_GRANT_HANDLER_CODE, str(core.rejected))
+    iap.reject_product_grant(lonely, 2, "out of stock")
+    _check("iap reject carries code", core.rejected[1][2] == {"code": AITIAP.GRANT_REJECTED_CODE, "message": "out of stock"}, str(core.rejected[1]))
+    iap.dispose(lonely)
 
     var order := iap.create_one_time_purchase_order("sku-1")
     _check("gate mutes during order", gate.is_silenced() and gate.reasons() == ["iap:%d" % order])

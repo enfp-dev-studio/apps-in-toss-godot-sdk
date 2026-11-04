@@ -18,6 +18,11 @@ var _next_subscription_id := 1
 var _results: Dictionary = {}
 var _waiting_requests: Dictionary = {}
 var _abandoned_requests: Dictionary = {}
+## 같은 경로를 짧은 시간에 너무 많이 부르면 경고합니다. 앱브릿지 호출 과다로 노출이 중지된 사례가 있습니다
+## (커뮤니티 5024: getStorageItem 10초 1000번 초과, 모든 브릿지에 같은 한도). 0이면 끕니다.
+var call_rate_warn := 300
+const CALL_RATE_WINDOW_MS := 10000
+var _call_rate: Dictionary = {} # path -> [window_start_ms, count, warned]
 
 func _ready() -> void:
     if OS.has_feature("web"):
@@ -61,6 +66,7 @@ func get_value(path: String) -> Variant:
     return JSON.parse_string(raw)
 
 func invoke(path: String, args: Array = []) -> int:
+    _note_call(path)
     var request_id := _next_request_id
     _next_request_id += 1
     if not is_available():
@@ -146,6 +152,19 @@ func start_path_subscription(subscription_id: int, path: String, options: Dictio
 func dispose_subscription(subscription_id: int) -> void:
     if is_available():
         _bridge.disposeSubscription(subscription_id)
+
+func _note_call(path: String) -> void:
+    if call_rate_warn <= 0:
+        return
+    var now := Time.get_ticks_msec()
+    var entry: Array = _call_rate.get(path, [now, 0, false])
+    if now - int(entry[0]) >= CALL_RATE_WINDOW_MS:
+        entry = [now, 0, entry[2]]
+    entry[1] = int(entry[1]) + 1
+    if int(entry[1]) > call_rate_warn and not bool(entry[2]):
+        entry[2] = true
+        push_warning("AIT: %s를 10초 안에 %d번 넘게 불렀습니다. 토스는 앱브릿지 호출 과다를 노출 중지로 제재합니다 — 매 프레임 호출을 캐시·변경 시 호출로 바꾸세요." % [path, call_rate_warn])
+    _call_rate[path] = entry
 
 func resolve_nested_callback(subscription_id: int, nested_id: int, result: Variant) -> void:
     if is_available():

@@ -4,6 +4,11 @@ class_name AITIAP
 signal purchase_succeeded(subscription_id: int, event: Dictionary)
 signal purchase_failed(subscription_id: int, error: Dictionary)
 signal product_grant_requested(subscription_id: int, grant_request_id: int, order_id: String)
+
+## reject_product_grant의 기본 오류 코드(토스가 지급 실패 주문에 쓰는 코드와 같게 맞춤)
+const GRANT_REJECTED_CODE := "PRODUCT_NOT_GRANTED_BY_PARTNER"
+## product_grant_requested에 연결된 함수가 없어 SDK가 대신 거절했을 때의 코드
+const NO_GRANT_HANDLER_CODE := "AIT_NO_GRANT_HANDLER"
 ## 주문(create_*_purchase_order)을 시작한 때부터 결과(purchase_succeeded·purchase_failed)·dispose까지.
 ## 결제 화면이 떠 있는 동안이며, AIT.sound(사운드 게이트)가 이 신호로 소리를 멈춥니다.
 signal order_started(subscription_id: int)
@@ -79,8 +84,10 @@ func create_subscription_purchase_order(sku: String, offer_id: String = "") -> i
 func resolve_product_grant(subscription_id: int, grant_request_id: int, success: bool) -> void:
     _core.resolve_nested_callback(subscription_id, grant_request_id, success)
 
-func reject_product_grant(subscription_id: int, grant_request_id: int, message: String) -> void:
-    _core.reject_nested_callback(subscription_id, grant_request_id, {"message": message})
+## 지급하지 못했다고 알립니다. web-framework 3.9.0부터 지급 콜백이 실패하면(이 함수, 응답 전 dispose, 페이지 종료)
+## 토스에 바로 '지급 안 됨'으로 알리고, purchase_failed가 이 오류로 한 번만 옵니다(뒤에 오는 이벤트는 없습니다).
+func reject_product_grant(subscription_id: int, grant_request_id: int, message: String, code: String = GRANT_REJECTED_CODE) -> void:
+    _core.reject_nested_callback(subscription_id, grant_request_id, {"code": code, "message": message})
 
 func dispose(subscription_id: int) -> void:
     _active.erase(subscription_id)
@@ -105,6 +112,11 @@ func _end_order(subscription_id: int) -> void:
 
 func _on_nested_callback(subscription_id: int, nested_id: int, name: String, payload: Variant) -> void:
     if not _active.has(subscription_id) or name != "processProductGrant":
+        return
+    # 지급 응답을 받을 곳이 없으면 토스가 30초 기다린 뒤 환불 화면을 띄운다. 바로 지급 안 됨으로 알린다.
+    if product_grant_requested.get_connections().is_empty():
+        push_error("AIT: product_grant_requested에 연결된 함수가 없어 지급하지 못했다고 알렸습니다. 주문 전에 연결하세요.")
+        reject_product_grant(subscription_id, nested_id, "No product_grant_requested handler is connected.", NO_GRANT_HANDLER_CODE)
         return
     var order_id := ""
     if typeof(payload) == TYPE_DICTIONARY:
