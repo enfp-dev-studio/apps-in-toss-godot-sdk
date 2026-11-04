@@ -3,6 +3,7 @@ import crypto from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DEBUG_CONSOLE_EXPORT_FILE, DEV_ONLY_EXPORT_FILES } from './export-dir.mjs';
+import { formatFindings, isTextFile, referencesScript, scanReleaseText } from './release-scan.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const defaultExportDir = path.resolve(here, '../build/godot-web');
@@ -68,7 +69,8 @@ if (!withMock) {
     (file) => !(withDebugConsole && file === DEBUG_CONSOLE_EXPORT_FILE),
   );
   const devFile = forbidden.find((file) => fs.existsSync(path.join(exportDir, file)));
-  const devRef = forbidden.find((file) => html.includes(file));
+  // 셸 코드의 글자가 아니라 실제로 불러오는 <script src>만 본다.
+  const devRef = forbidden.find((file) => referencesScript(html, file));
   const offender = devFile ?? devRef;
   if (offender) {
     throw new Error(
@@ -105,6 +107,26 @@ if (/id=["']status-(?:splash|progress)["']/i.test(html)) {
   );
 }
 if (/<iframe\b/i.test(html)) throw new Error('iframe is not allowed in Apps in Toss bundles.');
+
+// 검수는 번들 글자에 "eval"이나 Function 생성자가 있으면 반려한다(release-scan.mjs).
+// .ait에는 게임 package.json도 project-package.json으로 들어가므로 함께 본다.
+if (!withMock) {
+  const findings = [];
+  for (const file of listFiles(exportDir)) {
+    if (!isTextFile(file)) continue;
+    findings.push(...scanReleaseText(file, fs.readFileSync(path.join(exportDir, file), 'utf8')));
+  }
+  const gamePackage = path.join(projectDir, 'package.json');
+  if (fs.existsSync(gamePackage)) {
+    findings.push(...scanReleaseText('package.json (.ait의 project-package.json)', fs.readFileSync(gamePackage, 'utf8')));
+  }
+  if (findings.length > 0) {
+    throw new Error(
+      `Release export contains text the Apps in Toss review rejects as code execution ("eval"/Function):\n${formatFindings(findings)}\n` +
+        'engine-patch.mjs가 엔진 JS를 고쳤는지, 게임 스크립트·package.json 스크립트 이름·셸에 그 글자가 없는지 확인하세요.',
+    );
+  }
+}
 
 const bridge = fs.readFileSync(bridgePath, 'utf8');
 if (!bridge.includes('AppsInTossGodot')) throw new Error('Bridge bundle does not expose AppsInTossGodot.');
@@ -143,4 +165,14 @@ function directorySize(dir) {
 
 function countOccurrences(text, needle) {
   return text.split(needle).length - 1;
+}
+
+function listFiles(dir, prefix = '') {
+  const out = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
+    if (entry.isDirectory()) out.push(...listFiles(path.join(dir, entry.name), rel));
+    else if (entry.isFile()) out.push(rel);
+  }
+  return out;
 }

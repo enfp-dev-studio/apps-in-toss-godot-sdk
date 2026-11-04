@@ -64,6 +64,7 @@ const usage = `ait-godot — Apps in Toss × Godot 게임 파이프라인 (Unity
   ait-godot build --debug-console        테스트 빌드: 실기기 원격 디버깅(/ait:debug) 포함 — 검수 제출 금지
   ait-godot build:dev                    mock 브리지 + DevTools 개발 빌드 — Dev Server 대응
   ait-godot preview                      build/godot-web 로컬 서빙
+  ait-godot verify-ait [<파일>.ait]      최종 .ait 검사(출시 프리셋·개발 파일·검수 반려 글자) — build가 마지막에 자동 실행
   ait-godot sync                         SDK 설치 상태 확인 (강제 갱신은 addon:install --force)
 
 배포는 내장 브리지의 토스 CLI로 합니다: ./addons/apps_in_toss/tools/bridge/node_modules/.bin/ait deploy (같은 바이너리로 ait token add 선행)
@@ -105,6 +106,7 @@ function main() {
     build: { project: true, manifest: true, lock: true },
     'build:dev': { project: true, manifest: true, lock: true },
     preview: { project: true, manifest: true, lock: true },
+    'verify-ait': { project: true, manifest: true, lock: true },
   };
   const req = needs[command];
   if (!req) fail(`알 수 없는 명령 "${command}"\n\n${usage}`);
@@ -126,6 +128,7 @@ function main() {
     case 'build': return cmdBuild();
     case 'build:dev': return cmdBuildDev();
     case 'preview': return cmdPreview();
+    case 'verify-ait': return runStep('최종 .ait 검사', 'verify-ait.mjs', { extraArgs: args.slice(1, 2) });
   }
 }
 

@@ -315,7 +315,8 @@ if (unityLock) {
   exact('Unity SDK package version', unityLock.packageVersion, lock.unitySdk?.packageVersion);
 }
 
-// 게임 코드의 외부 코드 실행(eval) 검출 — strict 여부와 상관없이 경고만 남긴다.
+// 게임 코드의 외부 코드 실행(eval) 검출 — 출시 빌드는 engine-patch.mjs가 JavaScriptBridge 실행을 꺼서
+// 그 호출은 nil만 돌려주므로 strict(출시 build)에서는 실패, 그 밖에는 경고다.
 const evalExcludedDirs = new Set(['.godot', 'node_modules', 'build']);
 const evalExcludedAddon = path.join(projectDir, 'addons/apps_in_toss');
 function collectGdFiles(dir, out) {
@@ -345,7 +346,7 @@ if (fs.existsSync(projectDir)) {
       if (line.includes('JavaScriptBridge.eval')) {
         // eval 경고만 게임 프로젝트 기준 경로로 표시한다(다른 메시지의 relative()는 그대로).
         const shown = path.relative(projectDir, file) || '.';
-        warnings.push(`${shown}:${index + 1} uses JavaScriptBridge.eval — 출시 체크리스트는 외부 코드 실행(eval)을 금지합니다. JavaScriptBridge.get_interface()로 바꾸세요.`);
+        mismatch(`${shown}:${index + 1} uses JavaScriptBridge.eval — 검수는 외부 코드 실행(eval)을 반려하고, SDK 빌드의 엔진은 이 호출에 nil만 돌려줍니다. JavaScriptBridge.get_interface()로 바꾸세요.`);
       }
     });
     const adLines = findTestAdIdLines(text);

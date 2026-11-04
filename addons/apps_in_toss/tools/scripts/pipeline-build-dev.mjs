@@ -47,5 +47,6 @@ script('ait-doctor.mjs', { GODOT_SDK_DIR: sdkDir }); // sandbox 채널은 adviso
 script('sync-godot-sdk.mjs', { GODOT_SDK_DIR: sdkDir });
 run('npm', ['run', 'build'], { cwd: bridgeDir, env: { AIT_BRIDGE_MOCK: '1' } });
 script('export-godot.mjs', { GODOT_SDK_DIR: sdkDir });
+script('engine-patch.mjs'); // 출시와 같은 엔진으로 개발한다(JavaScriptBridge 실행 끄기)
 run('node', [path.join(bridgeDir, 'scripts/patch-export.mjs')], { cwd: sdkDir, env: { AIT_BRIDGE_MOCK: '1' } });
 console.log('\n[ait-godot] dev build 완료. 다음: ait-godot preview → 브라우저 테스트');

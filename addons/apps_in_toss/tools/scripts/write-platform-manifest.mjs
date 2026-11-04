@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -65,6 +66,27 @@ if (gameManifest && !isPlaceholder) {
 // 테스트 빌드(build --debug-console)임을 남긴다. doctor와 verify가 이 값을 본다.
 if (process.env.AIT_DEBUG_CONSOLE === '1') manifest.debugConsole = true;
 
+// 어떤 프리셋으로 내보냈는지 남긴다. verify-ait가 lock의 출시 프리셋과 비교한다.
+manifest.exportPreset = process.env.GODOT_EXPORT_PRESET ?? platformLock.godot?.web?.exportPreset ?? 'Apps in Toss Web';
+
+// 빌드 도장 — 토스 최근 목록이 예전 테스트 빌드를 다시 열 수 있어서, 화면에서 어떤 빌드인지 알아볼 수 있게
+// 시간·커밋·라벨을 남긴다(AIT.build_info()). 라벨은 AIT_BUILD_LABEL(예: 테스트 번호)로 준다.
+manifest.build = buildStamp(projectDir);
+
 const outputPath = path.join(exportDir, 'ait-platform-manifest.json');
 fs.writeFileSync(outputPath, `${JSON.stringify(manifest, null, 2)}\n`);
 console.log(`Wrote Apps in Toss platform manifest: ${outputPath}`);
+function buildStamp(dir) {
+  const git = (args) => {
+    const result = spawnSync('git', ['-C', dir, ...args], { encoding: 'utf8' });
+    return result.status === 0 ? String(result.stdout).trim() : null;
+  };
+  const stamp = { time: new Date().toISOString() };
+  const commit = git(['rev-parse', '--short=12', 'HEAD']);
+  if (commit) {
+    stamp.commit = commit;
+    stamp.dirty = (git(['status', '--porcelain', '--untracked-files=no']) ?? '') !== '';
+  }
+  if (process.env.AIT_BUILD_LABEL) stamp.label = String(process.env.AIT_BUILD_LABEL);
+  return stamp;
+}

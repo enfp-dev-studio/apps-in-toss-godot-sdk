@@ -61,11 +61,34 @@ function useBridgeSdk(): Plugin {
   };
 }
 
+// 앱인토스 검수는 번들의 "eval" 글자 자체를 반려한다(외부 코드 실행 검사, 2026-11-04).
+// @webview-bridge/web의 내부 옵션 이름 `evaluate`(같은 번들 안에서만 쓰임)를 `dispatch`로
+// 바꾼다. 속성 위치(.evaluate, evaluate:)만 바꿔 document.evaluate() 같은 DOM 호출은 두고,
+// 출시·debug-console 번들에 글자가 남으면 빌드를 멈춘다. mock 번들은 출시되지 않아 바꾸기만 한다.
+const evalProperty = /(\.|[{,]\s*)evaluate(?=\s*[:,;})=])/g;
+
+function stripEvalText(failOnLeftover: boolean): Plugin {
+  return {
+    name: 'ait-strip-eval-text',
+    generateBundle(_options, bundle) {
+      for (const chunk of Object.values(bundle)) {
+        if (chunk.type !== 'chunk') continue;
+        chunk.code = chunk.code.replace(evalProperty, '$1dispatch');
+        const left = chunk.code.search(/eval/i);
+        if (failOnLeftover && left !== -1) {
+          const around = chunk.code.slice(Math.max(0, left - 60), left + 60);
+          this.error(`${chunk.fileName} still contains "eval" text: …${around}… (update stripEvalText)`);
+        }
+      }
+    },
+  };
+}
+
 export default defineConfig(({ mode }) => {
   if (mode === 'debug-console') {
     return {
       root: bridgeRoot,
-      plugins: [useBridgeSdk()],
+      plugins: [useBridgeSdk(), stripEvalText(true)],
       define: { 'process.env.NODE_ENV': JSON.stringify('production') },
       build: {
         lib: {
@@ -87,6 +110,7 @@ export default defineConfig(({ mode }) => {
       ...(withMock
         ? [aitDevtools.vite({ mock: true, panel: false, forceEnable: true })]
         : []),
+      stripEvalText(!withMock),
     ],
     build: {
       lib: {

@@ -51,6 +51,14 @@ const AIT_DEBUG_CONSOLE = withDebugConsole ? '1' : '';
 if (withDebugConsole) console.log('[ait-godot] !!! 테스트 전용 빌드 (--debug-console) — 검수 제출 금지 !!!');
 
 console.log(`[ait-godot] 게임: ${gameId} (${gameDir})`);
+
+// 출시 빌드는 lock의 출시 프리셋으로만 만든다. 셸에 남은 GODOT_EXPORT_PRESET(개발 프리셋 등)이
+// 조용히 출시 .ait를 만들지 않게 멈춘다. 의도한 경우에만 AIT_ALLOW_EXPORT_PRESET=1로 허용한다.
+const lockPreset = JSON.parse(fs.readFileSync(path.join(gameDir, '.ait/platform.lock.json'), 'utf8')).godot?.web?.exportPreset ?? 'Apps in Toss Web';
+const presetOverride = process.env.GODOT_EXPORT_PRESET;
+if (presetOverride && presetOverride !== lockPreset && process.env.AIT_ALLOW_EXPORT_PRESET !== '1') {
+  fail(`GODOT_EXPORT_PRESET="${presetOverride}"가 설정돼 있습니다. 출시 빌드는 "${lockPreset}" 프리셋으로만 만듭니다. 셸에서 unset GODOT_EXPORT_PRESET 하거나, 의도했다면 AIT_ALLOW_EXPORT_PRESET=1을 주세요.`);
+}
 const sdkDir = resolveSdkDir();
 // 내장 모드: bridge는 addonDir/tools/bridge에 있다. 그 외에는 SDK 리포의 bridge.
 const bridgeDir = process.env.AIT_BRIDGE_DIR
@@ -79,6 +87,8 @@ if (withDebugConsole) run('npm', ['run', 'build:debug-console'], { cwd: bridgeDi
 
 // 6. Godot Web export — export 결과물도 게임 리포 안에 둔다.
 script('export-godot.mjs', { GODOT_SDK_DIR: sdkDir, GODOT_EXPORT_DIR: path.join(gameDir, 'build/godot-web') });
+// 6-1. 엔진 JS 패치 (JavaScriptBridge 실행 끄기 — 검수 eval 반려 대응)
+script('engine-patch.mjs', { GODOT_EXPORT_DIR: path.join(gameDir, 'build/godot-web') });
 
 // 7. 플랫폼 매니페스트 (ait-build-info.json 대응) — export dir 기준으로 기록
 script('write-platform-manifest.mjs', {
@@ -100,6 +110,9 @@ script('verify-godot-export.mjs', {
 
 // 9. .ait 패키징 (ait bin 해석은 pipeline-package.mjs가 담당)
 script('pipeline-package.mjs', { GODOT_SDK_DIR: sdkDir });
+
+// 10. 최종 .ait 검사 — 묶은 결과물 자체를 열어 본다(export 폴더 검사 뒤에 덮어쓰인 경우도 잡는다)
+script('verify-ait.mjs', { GODOT_SDK_DIR: sdkDir, AIT_DEBUG_CONSOLE }, [path.join(gameDir, `${gameId}.ait`)]);
 
 console.log(`\n[ait-godot build] 완료: ${gameId}.ait`);
 if (withDebugConsole) console.log('[ait-godot] !!! 테스트 전용 빌드 (--debug-console) — 검수 제출 금지 !!!');
