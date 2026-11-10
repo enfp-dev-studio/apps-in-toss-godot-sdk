@@ -50,6 +50,25 @@ API와 카탈로그 GDScript를 생성합니다. 의존성 설치 시 실행되�
 Unity SDK와 npm web-framework, DevTools의 버전이 같다고 가정하지 말고 실제 의존성을 비교하세요.
 새 API에 맞춰 양쪽 브리지, GDScript 래퍼·생성 파일, 버전 lock, 테스트와 문서를 갱신합니다.
 
+**이 SDK는 출시된 공식 Unity SDK와 1:1로 맞춥니다.** 버전 사이의 차이만 보면 전에 빠진 API가 계속 빠진 채로 남습니다
+(2026-09-28에 게임에 필요한 것만 골라 넣고 나머지를 미룬 뒤, 3.8.0·3.9.0 업데이트가 차이만 봐서 45개가 11-10까지 빠져 있었습니다).
+업데이트할 때마다 아래처럼 전체를 대조합니다.
+
+- 기준은 출시된 Unity UPM 태그(`release/v<버전>`)입니다. main 브랜치나 API 변경 기록의 개수는 출시 전 표면이라 쓰지 않습니다.
+- 그 태그의 jslib가 부르는 web-framework 경로를 모두 뽑습니다.
+
+  ```bash
+  git clone --depth 1 --branch release/v<버전> https://github.com/toss/apps-in-toss-unity-sdk.git <임시 폴더>
+  grep -h -o -E "window\.AppsInToss\.[A-Za-z0-9_.]+" <임시 폴더>/Runtime/SDK/Plugins/*.jslib | sed 's/window\.AppsInToss\.//' | sort -u
+  ```
+
+- 뽑은 목록으로 [manifest-parity](../tests/manifest-parity.test.mjs)의 Unity 경로 목록을 바꾸고, 테스트가 통과할 때까지 매핑합니다.
+  결과를 한 번 주는 API는 매니페스트(`AIT.api.*`), 콜백을 여러 번 주는 API는 `AIT.events`, 결제·광고처럼 흐름이 있는 API는 전용 모듈에 둡니다.
+  Unity가 엔진 값으로 주는 API(`GetDevicePixelRatio` 등)도 Godot 쪽 함수로 맞춥니다.
+- Unity가 deprecated·v2 별칭인 옛 이름을 부르고 이 SDK에 같은 기능의 새 이름이 있으면, 테스트의 `RENAMED`에 적고 새 이름으로 덮습니다.
+- Unity보다 web-framework에 먼저 나온 공개 API(예: 3.10.0 `NavigationBar` 액세서리 버튼)도 함께 넣습니다.
+- "게임에 필요 없어 보인다"는 이유로 빼거나 미루지 않습니다. 범위를 줄여야 할 사정이 있으면 정하기 전에 사용자에게 묻습니다.
+
 문서도 용도별로 유지합니다. README에는 소개·시작 순서·검사 상태만 두고,
 설치 변경은 설치 가이드에, 호출 예제는 API 가이드에, 검사 범위는 테스트 가이드에 반영하세요.
 상세한 변경 근거는 아래처럼 날짜와 함께 기록합니다.
