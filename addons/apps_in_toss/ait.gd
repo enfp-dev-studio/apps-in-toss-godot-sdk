@@ -9,6 +9,8 @@ var iap: AITIAP
 var ads: AITAds
 var admob: AITAdMob
 var game: AITGame
+## 구독형 API(홈 버튼·액세서리 버튼·위치·친구 공유 리워드·알림 동의 등). Unity SDK 3.9.0 대응
+var events: AITEvents
 var status: AITStatus
 var app_events: AITAppEvents
 ## 시스템 뒤로가기 스택(graniteEvent backEvent). 닫을 것이 있을 때만 구독합니다
@@ -33,6 +35,7 @@ func _ready() -> void:
     ads = _sdk.ads
     admob = _sdk.admob
     game = _sdk.game
+    events = _sdk.events
     status = _sdk.status
     app_events = _sdk.app_events
     back = _sdk.back
@@ -104,3 +107,8 @@ func get_value(path: String) -> Variant:
 
 func create_anonymous_key_auth_code(timeout_ms: int = 0) -> Dictionary:
     return await auth.create_anonymous_key_auth_code(timeout_ms)
+
+
+## 페이지의 window.devicePixelRatio(Unity GetDevicePixelRatio). Web이 아니면 1.0
+func get_device_pixel_ratio() -> float:
+    return _sdk.get_device_pixel_ratio()

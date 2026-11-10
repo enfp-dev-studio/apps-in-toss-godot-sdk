@@ -18,9 +18,11 @@ const debugConsoleEntry = fileURLToPath(new URL('./src/debug-console.ts', import
  *   copies only dist/, and CI builds without AIT_BRIDGE_MOCK.
  * - Debug console (`npm run build:debug-console`, mode `debug-console`): builds
  *   only `dist/ait-debug-console.js`, a separate IIFE with
- *   `@apps-in-toss/debug-console/auto` for on-device attach (`/ait:debug`
+ *   `@apps-in-toss/debug-console` `startDebugConsole` for on-device attach (`/ait:debug`
  *   environment 3). It is injected only by test builds
  *   (`ait-godot build --debug-console`); the bridge bundle never imports it.
+ *   `AIT_DEBUG_RELAY_KEYS` (JSON array of the debugger public keys, read from the
+ *   game manifest by the build) is required and baked in as `__AIT_DEBUG_RELAY_KEYS__`.
  *
  * `forceEnable` is required because `vite build` runs with NODE_ENV=production,
  * where the devtools plugin disables itself by default. `mock: true` keeps the
@@ -84,12 +86,24 @@ function stripEvalText(failOnLeftover: boolean): Plugin {
   };
 }
 
+function relayPublicKeys(): string[] {
+  const raw = process.env.AIT_DEBUG_RELAY_KEYS;
+  const keys: unknown = raw ? JSON.parse(raw) : null;
+  if (!Array.isArray(keys) || keys.length === 0 || !keys.every((k) => typeof k === 'string' && k !== '')) {
+    throw new Error('AIT_DEBUG_RELAY_KEYS must be a JSON array of debugger public keys (game manifest debugConsole.relayPublicKeys).');
+  }
+  return keys as string[];
+}
+
 export default defineConfig(({ mode }) => {
   if (mode === 'debug-console') {
     return {
       root: bridgeRoot,
       plugins: [useBridgeSdk(), stripEvalText(true)],
-      define: { 'process.env.NODE_ENV': JSON.stringify('production') },
+      define: {
+        'process.env.NODE_ENV': JSON.stringify('production'),
+        __AIT_DEBUG_RELAY_KEYS__: JSON.stringify(relayPublicKeys()),
+      },
       build: {
         lib: {
           entry: debugConsoleEntry,

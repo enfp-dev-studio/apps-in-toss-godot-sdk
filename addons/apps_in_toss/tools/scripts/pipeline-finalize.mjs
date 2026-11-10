@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { readRelayPublicKeys } from './debug-relay-keys.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const gameDir = process.env.GODOT_PROJECT_DIR
@@ -59,7 +60,13 @@ if (withDebugConsole) {
   if (!fs.existsSync(path.join(bridgeDir, 'node_modules/@apps-in-toss/debug-console'))) {
     fail(`@apps-in-toss/debug-console이 설치되지 않았습니다. npm --prefix ${bridgeDir} ci 를 먼저 실행하세요.`);
   }
-  run('npm', ['run', 'build:debug-console'], { cwd: bridgeDir });
+  let relayKeys;
+  try {
+    relayKeys = readRelayPublicKeys(gameDir);
+  } catch (error) {
+    fail(error.message);
+  }
+  run('npm', ['run', 'build:debug-console'], { cwd: bridgeDir, env: { AIT_DEBUG_RELAY_KEYS: JSON.stringify(relayKeys) } });
 }
 
 // 주입 + export 무결성 검증 — 게임 리포의 export dir을 명시적으로 넘긴다.

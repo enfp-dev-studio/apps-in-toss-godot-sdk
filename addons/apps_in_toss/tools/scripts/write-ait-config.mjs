@@ -162,8 +162,12 @@ if (manifest.navigationBar !== undefined) {
     if (typeof button !== 'object' || button === null || Array.isArray(button)) {
       throw new Error('Game manifest navigationBar.initialAccessoryButton must be an object.');
     }
-    if (typeof button.id !== 'string' || typeof button.title !== 'string') {
-      throw new Error('Game manifest navigationBar.initialAccessoryButton.id/title must be strings.');
+    // web-framework 3.10.0: id는 생략 가능(deprecated), title 대신 accessibilityLabel(title은 deprecated로 계속 받음)
+    if (button.id !== undefined && typeof button.id !== 'string') {
+      throw new Error('Game manifest navigationBar.initialAccessoryButton.id must be a string.');
+    }
+    if (typeof button.accessibilityLabel !== 'string' && typeof button.title !== 'string') {
+      throw new Error('Game manifest navigationBar.initialAccessoryButton needs accessibilityLabel (or the deprecated title) as a string.');
     }
     const icon = button.icon;
     const hasUri = typeof icon === 'object' && icon !== null && typeof icon.source === 'object' &&

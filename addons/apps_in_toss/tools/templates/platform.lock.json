@@ -17,14 +17,14 @@
     "version": "0.2.0",
     "repository": "https://github.com/enfp-dev-studio/apps-in-toss-godot-sdk",
     "baseCommit": "2af77adb0fafcd291cc9a8edc3b97efd2bd274f6",
-    "apiManifestSha256": "329cce9782e10de8d0cac03c772c0acfd41c832f38aee93180d8e4c89929e214"
+    "apiManifestSha256": "b7321872b7544af1eb58e6fe2068b76067ff7b67a78fc55b154bb25eec99c8ed"
   },
   "bridge": {
     "version": "0.2.0"
   },
   "webFramework": {
     "package": "@apps-in-toss/web-framework",
-    "version": "3.9.0"
+    "version": "3.10.0"
   },
   "toolchain": {
     "node": {

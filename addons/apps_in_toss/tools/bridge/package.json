@@ -11,11 +11,11 @@
     "prepare": "npm run generate"
   },
   "dependencies": {
-    "@apps-in-toss/debug-console": "https://github.com/toss/apps-in-toss-harness/releases/download/debug-console-v0.2.0/apps-in-toss-debug-console-0.2.0.tgz",
-    "@apps-in-toss/web-framework": "3.9.0"
+    "@apps-in-toss/debug-console": "https://github.com/toss/apps-in-toss-harness/releases/download/debug-console-v0.3.0/apps-in-toss-debug-console-0.3.0.tgz",
+    "@apps-in-toss/web-framework": "3.10.0"
   },
   "devDependencies": {
-    "@apps-in-toss/devtools": "3.9.0",
+    "@apps-in-toss/devtools": "3.10.0",
     "typescript": "~6.0.2",
     "vite": "^8.2.2"
   }

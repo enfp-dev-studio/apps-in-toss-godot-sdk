@@ -264,3 +264,23 @@ test('실행 설정(build/ait-app-config.json)에 appType과 내비 바 투명 �
     }
   }
 });
+
+test('initialAccessoryButton은 3.10 accessibilityLabel(id 생략)과 예전 id/title을 모두 받는다', () => {
+  const icon = { name: 'icon-setting-mono' };
+  for (const button of [{ accessibilityLabel: '설정', icon }, { id: 'settings', title: '설정', icon }]) {
+    const { game, result, config } = runWithManifest({ navigationBar: { initialAccessoryButton: button } });
+    try {
+      assert.equal(result.status, 0, result.stderr);
+      assert.match(config, /initialAccessoryButton/);
+    } finally {
+      cleanup(game);
+    }
+  }
+  const { game, result } = runWithManifest({ navigationBar: { initialAccessoryButton: { id: 'x', icon } } });
+  try {
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /accessibilityLabel/);
+  } finally {
+    cleanup(game);
+  }
+});

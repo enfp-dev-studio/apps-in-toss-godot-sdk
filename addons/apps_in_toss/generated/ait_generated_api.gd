@@ -120,3 +120,132 @@ func user_create_anonymous_key_auth_code() -> int:
 
 func share_create_link(options: Variant) -> int:
     return _core.invoke("Share.createLink", [options])
+
+func get_consented_user_data(options: Variant) -> int:
+    return _core.invoke("getConsentedUserData", [options])
+
+func get_declared_age_range(params: Variant) -> int:
+    return _core.invoke("getDeclaredAgeRange", [params])
+
+func apps_in_toss_sign_toss_cert(params: Variant) -> int:
+    return _core.invoke("appsInTossSignTossCert", [params])
+
+func checkout_payment(options: Variant) -> int:
+    return _core.invoke("checkoutPayment", [options])
+
+func request_toss_pay_pays_billing(options: Variant) -> int:
+    return _core.invoke("requestTossPayPaysBilling", [options])
+
+func get_device_id() -> int:
+    return _core.invoke("getDeviceId", [])
+
+func get_group_id() -> int:
+    return _core.invoke("getGroupId", [])
+
+func get_locale() -> int:
+    return _core.invoke("getLocale", [])
+
+func get_scheme_uri() -> int:
+    return _core.invoke("getSchemeUri", [])
+
+func get_server_time() -> int:
+    return _core.invoke("getServerTime", [])
+
+func get_operational_environment() -> int:
+    return _core.invoke("getOperationalEnvironment", [])
+
+func get_toss_app_version() -> int:
+    return _core.invoke("getTossAppVersion", [])
+
+func get_apps_in_toss_globals() -> int:
+    return _core.invoke("getAppsInTossGlobals", [])
+
+func is_min_version_supported(min_versions: Variant) -> int:
+    return _core.invoke("isMinVersionSupported", [min_versions])
+
+func env_get_deployment_id() -> int:
+    return _core.invoke("env.getDeploymentId", [])
+
+func get_current_location(options: Variant) -> int:
+    return _core.invoke("getCurrentLocation", [options])
+
+func request_permission(permission: Variant) -> int:
+    return _core.invoke("requestPermission", [permission])
+
+func grant_promotion_reward(params: Variant) -> int:
+    return _core.invoke("grantPromotionReward", [params])
+
+func grant_promotion_reward_for_game(params: Variant) -> int:
+    return _core.invoke("grantPromotionRewardForGame", [params])
+
+func fetch_contacts(options: Variant) -> int:
+    return _core.invoke("fetchContacts", [options])
+
+func fetch_album_photos(options: Variant = {}) -> int:
+    return _core.invoke("fetchAlbumPhotos", [options])
+
+func fetch_album_items(options: Variant = {}) -> int:
+    return _core.invoke("fetchAlbumItems", [options])
+
+func open_camera(options: Variant = {}) -> int:
+    return _core.invoke("openCamera", [options])
+
+func open_pdf_viewer(params: Variant) -> int:
+    return _core.invoke("openPDFViewer", [params])
+
+func save_base64_data(params: Variant) -> int:
+    return _core.invoke("saveBase64Data", [params])
+
+func set_device_orientation(options: Variant) -> int:
+    return _core.invoke("setDeviceOrientation", [options])
+
+func set_ios_swipe_gesture_enabled(options: Variant) -> int:
+    return _core.invoke("setIosSwipeGestureEnabled", [options])
+
+func set_screen_awake_mode(options: Variant) -> int:
+    return _core.invoke("setScreenAwakeMode", [options])
+
+func set_secure_screen(options: Variant) -> int:
+    return _core.invoke("setSecureScreen", [options])
+
+func event_log(params: Variant) -> int:
+    return _core.invoke("eventLog", [params])
+
+func analytics_click(params: Variant = {}) -> int:
+    return _core.invoke("Analytics.click", [params])
+
+func analytics_impression(params: Variant = {}) -> int:
+    return _core.invoke("Analytics.impression", [params])
+
+func analytics_screen(params: Variant = {}) -> int:
+    return _core.invoke("Analytics.screen", [params])
+
+func toss_ads_initialize(options: Variant = {}) -> int:
+    return _core.invoke("TossAds.initialize", [options])
+
+func toss_ads_attach(ad_group_id: Variant, target: Variant, options: Variant = {}) -> int:
+    return _core.invoke("TossAds.attach", [ad_group_id, target, options])
+
+func toss_ads_attach_banner(ad_group_id: Variant, target: Variant, options: Variant = {}) -> int:
+    return _core.invoke("TossAds.attachBanner", [ad_group_id, target, options])
+
+func toss_ads_destroy(slot_id: Variant) -> int:
+    return _core.invoke("TossAds.destroy", [slot_id])
+
+func toss_ads_destroy_all() -> int:
+    return _core.invoke("TossAds.destroyAll", [])
+
+func partner_add_accessory_button(params: Variant) -> int:
+    return _core.invoke("partner.addAccessoryButton", [params])
+
+func partner_remove_accessory_button() -> int:
+    return _core.invoke("partner.removeAccessoryButton", [])
+
+func request_review() -> int:
+    return _core.invoke("requestReview", [])
+
+func navigation_bar_add_accessory_button(options: Variant) -> int:
+    return _core.invoke("NavigationBar.addAccessoryButton", [options])
+
+func navigation_bar_remove_accessory_button() -> int:
+    return _core.invoke("NavigationBar.removeAccessoryButton", [])

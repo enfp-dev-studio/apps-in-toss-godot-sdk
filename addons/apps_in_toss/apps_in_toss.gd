@@ -7,6 +7,7 @@ var iap: AITIAP
 var ads: AITAds
 var admob: AITAdMob
 var game: AITGame
+var events: AITEvents
 var status: AITStatus
 var app_events: AITAppEvents
 var back: AITBack
@@ -25,6 +26,7 @@ func _ready() -> void:
     ads = AITAds.new(core)
     admob = AITAdMob.new(core)
     game = AITGame.new(core)
+    events = AITEvents.new(core)
     status = AITStatus.new(core)
     app_events = AITAppEvents.new()
     ads.attach_app_events(app_events)
@@ -48,3 +50,10 @@ func invoke(path: String, args: Array = []) -> int:
 
 func invoke_and_wait(path: String, args: Array = [], timeout_ms: int = 0) -> Dictionary:
     return await core.invoke_and_wait(path, args, timeout_ms)
+
+## 페이지의 window.devicePixelRatio(Unity GetDevicePixelRatio). Web이 아니면 1.0
+func get_device_pixel_ratio() -> float:
+    if not OS.has_feature("web"):
+        return 1.0
+    var window: Variant = JavaScriptBridge.get_interface("window")
+    return float(window.devicePixelRatio) if window != null else 1.0

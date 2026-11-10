@@ -9,16 +9,19 @@
 | 분류 | 제공하는 기능 |
 | --- | --- |
 | 인증 | 토스 로그인, 게임 사용자 식별키, 로그인 연동 여부, 익명 식별키 인증 코드 |
-| 결제 | 상품·주문 조회, 일회성·구독 결제, 지급 콜백과 미결 주문 처리 |
-| 광고 | 전면 광고·AdMob의 로드·표시·이벤트 |
+| 결제 | 상품·주문 조회, 일회성·구독 결제, 지급 콜백과 미결 주문 처리, 토스페이 결제·정기결제 인증 |
+| 광고 | 전면 광고·AdMob의 로드·표시·이벤트, 토스 배너 광고(`TossAds`) |
 | 게임 | 게임센터, 정보 오버레이 구독 |
-| 이벤트 | 백/포그라운드 가시성 변화, 시스템 뒤로가기(`AIT.back`) |
+| 이벤트 | 백/포그라운드 가시성 변화, 시스템 뒤로가기(`AIT.back`), 홈 버튼·액세서리 버튼·위치 갱신·친구 공유 리워드·알림 동의 구독(`AIT.events`) |
 | 화면 | Safe Area(`AIT.safe_area`), 한글 줄바꿈·조사(`AITKorean`), 터치 스크롤(`AITTouchScroll`) |
 | 소리 | 백그라운드·광고·결제 중 정지(`AIT.sound`) |
 | 저장 | 사용자별 안전한 저장(`AITSaveSlot`) |
-| 기타 | 저장소·배치 처리, 권한·공유·공유 링크·진입 주소·클립보드·햅틱, 바이럴, 내비게이션 바 |
+| 기타 | 저장소·배치 처리, 권한·공유·공유 링크·진입 주소·클립보드·햅틱, 바이럴, 내비게이션 바와 액세서리 버튼, 기기·환경 정보, 위치, 연락처·앨범·카메라·PDF·파일 저장, 화면 방향·꺼짐 방지·보안 화면·iOS 스와이프, 이벤트 로그·Analytics, 프로모션 보상, 리뷰 요청, 알림 동의 |
 
-현재 카탈로그는 38개 항목이며, Unity SDK 3.9.0 / web-framework 3.9.0을 기준으로 합니다.
+현재 카탈로그는 81개 항목이며, web-framework 3.10.0을 기준으로 합니다. 출시된 Unity SDK 3.9.0이 부르는 web-framework 경로 85개를
+모두 덮습니다(카탈로그, 결제·광고 래퍼, `AIT.events`·`AIT.back`·`AIT.safe_area`. 회귀 테스트가 확인). Unity의 옛 이름
+`getGameCenterGameProfile`·`openGameCenterLeaderboard`·`submitGameCenterLeaderBoardScore`·`getTossShareLink`·`SafeAreaInsets`는
+같은 기능의 새 이름 `Game.*`·`Share.createLink`·`SafeArea`로 제공합니다. Unity `GetDevicePixelRatio`는 `AIT.get_device_pixel_ratio()`입니다.
 카탈로그와 별도로 결제·광고·게임 이벤트의 구독과 해제를 관리하는 래퍼와
 가시성 감지(`AIT.app_events`)를 제공합니다. 화면·소리·저장 모듈은 cat-room-godot을 만들며
 모든 미니앱에 필요하다고 확인한 것을 옮긴 것입니다([정리 문서](lessons-cat-room-godot.md)).
@@ -32,7 +35,7 @@ AdMob load/show 두 항목은 일반 호출로 사용할 수 없으므로 `AIT.a
 브리지가 없는 Godot 에디터나 일반 브라우저에서는 false이며,
 호출은 `AIT_BRIDGE_UNAVAILABLE` 오류로 비동기 반환됩니다.
 
-DevTools 3.9.0 mock은 카탈로그의 모든 API를 제공하지만, 토스 앱 버전에 따라
+DevTools 3.10.0 mock은 카탈로그의 모든 API를 제공하지만, 토스 앱 버전에 따라
 최근 추가된 API는 없을 수 있습니다. 기능별 지원 여부는 `AIT.has_api()`로 확인하세요. [브라우저 테스트 범위](testing.md#브라우저-시뮬레이터의-테스트-범위)
 
 빌드 종류는 `AIT.build_kind()`로 봅니다. SDK는 Web 빌드를 모두 release 템플릿으로 내보내므로
@@ -497,6 +500,49 @@ web-framework 3.9.0부터 지급 콜백이 실패하면 토스에 바로 '지급
 콘솔 QR 테스트의 결제는 실제 결제입니다. 로컬에서는 DevTools 모의 결제로 확인하세요.
 샘플 씬의 미결 주문 복구도 참고하세요.
 
+## 구독형 API(AIT.events)
+
+결과를 한 번이 아니라 여러 번 콜백으로 주는 API는 `AIT.events`가 구독 번호로 관리합니다. 이벤트는 `event_received`,
+실패는 `subscription_failed`로 오고 `name`으로 어느 구독인지 가립니다. 그만 받을 때 `dispose(구독 번호)`를 부르세요.
+
+| 함수 | web-framework | name |
+| --- | --- | --- |
+| `subscribe_home_event()` | `graniteEvent` `homeEvent` | `home_event` |
+| `subscribe_accessory_button()` | `NavigationBar.subscribeAccessoryButton` (3.10.0) | `accessory_button` |
+| `subscribe_navigation_accessory_event()` | `tdsEvent` `navigationAccessoryEvent` (3.10.0에서 deprecated) | `navigation_accessory_event` |
+| `start_update_location(options)` | `startUpdateLocation` | `update_location` |
+| `contacts_viral(options)` | `contactsViral` | `contacts_viral` |
+| `on_visibility_changed_by_transparent_service_web(options)` | `onVisibilityChangedByTransparentServiceWeb` | `visibility_changed_by_transparent_service_web` |
+| `request_notification_agreement(options)` | `requestNotificationAgreement` | `notification_agreement` |
+
+내비게이션 바 액세서리 버튼(web-framework 3.10.0)은 버튼을 붙이고 클릭을 구독합니다.
+
+```gdscript
+extends Node
+
+var _accessory := 0
+
+func _ready() -> void:
+    AIT.events.event_received.connect(_on_event)
+    AIT.api.navigation_bar_add_accessory_button({
+        "accessibilityLabel": "설정",
+        "icon": {"name": "icon-setting-mono"},
+    })
+    _accessory = AIT.events.subscribe_accessory_button()
+
+
+func _on_event(subscription_id: int, name: String, _event: Variant) -> void:
+    if subscription_id == _accessory and name == "accessory_button":
+        print("액세서리 버튼을 눌렀어요")
+```
+
+처음부터 버튼을 띄우려면 매니페스트 `navigationBar.initialAccessoryButton`에 `accessibilityLabel`과 `icon`을 적습니다
+(3.10.0부터 `id`는 생략하고, `title` 대신 `accessibilityLabel`을 씁니다).
+
+토스 배너 광고(`AIT.api.toss_ads_*`)는 Unity SDK 3.9.0처럼 web-framework에 값을 그대로 넘깁니다. `target`은 배너를 넣을
+페이지 요소의 CSS 선택자이고, Godot 화면은 canvas 하나라서 그 요소는 커스텀 셸(`custom_shell.html`)에 따로 두어야 합니다.
+옵션의 콜백(`onAdRendered` 등)은 JSON으로 넘길 수 없어 전달되지 않습니다.
+
 ## 앱브릿지 호출 한도
 
 토스는 앱브릿지를 짧은 시간에 너무 많이 부른 앱의 노출을 중지합니다(커뮤니티 5024: `getStorageItem`을 10초에 1000번 넘게 호출,
@@ -544,6 +590,6 @@ func _load_all_orders() -> Array:
 요청 ID를 반환하는 `get_completed_or_refunded_orders({"key": next_key})`와
 생성 API `AIT.api.iap_get_completed_or_refunded_orders({"key": next_key})`도 같은 옵션을 받습니다.
 `_and_wait`의 첫 번째 인자는 기존과 같은 시간제한(ms)입니다.
-DevTools 3.9.0은 `key`를 무시하고 `hasNext: false`인 한 페이지만 반환하므로
+DevTools 3.10.0도 `key`를 무시하고 `hasNext: false`인 한 페이지만 반환하므로
 실제 페이지 이동은 토스 앱에서 확인해야 합니다.
 `get_pending_orders`는 결제 완료 후 상품이 아직 지급되지 않은 주문을 조회합니다.

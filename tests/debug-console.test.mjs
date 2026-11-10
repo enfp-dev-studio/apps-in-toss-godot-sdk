@@ -316,3 +316,26 @@ describe('doctor debugConsole 경고', () => {
     assert.doesNotMatch(`${result.stdout}\n${result.stderr}`, /debugConsole/);
   });
 });
+
+describe('debug-console 0.3.0 공개키(게임 매니페스트 debugConsole.relayPublicKeys)', () => {
+  const writeManifest = (extra) => {
+    const game = tempDir('ait-relay-keys-');
+    fs.mkdirSync(path.join(game, '.ait'), { recursive: true });
+    fs.writeFileSync(path.join(game, '.ait/game.manifest.json'), JSON.stringify({ gameId: 'g', ...extra }));
+    return game;
+  };
+
+  it('키 배열을 읽는다', async () => {
+    const { readRelayPublicKeys } = await import(path.join(scriptsDir, 'debug-relay-keys.mjs'));
+    const game = writeManifest({ debugConsole: { relayPublicKeys: [' key-a ', 'key-b'] } });
+    assert.deepEqual(readRelayPublicKeys(game), ['key-a', 'key-b']);
+  });
+
+  it('키가 없거나 비어 있으면 relay-key 안내와 함께 실패한다', async () => {
+    const { readRelayPublicKeys } = await import(path.join(scriptsDir, 'debug-relay-keys.mjs'));
+    for (const extra of [{}, { debugConsole: { relayPublicKeys: [] } }, { debugConsole: { relayPublicKeys: [''] } }]) {
+      const game = writeManifest(extra);
+      assert.throws(() => readRelayPublicKeys(game), /debugger relay-key/);
+    }
+  });
+});

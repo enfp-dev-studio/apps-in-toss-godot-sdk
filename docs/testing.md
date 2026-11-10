@@ -40,8 +40,8 @@ git diff --exit-code -- addons/apps_in_toss/generated/  # 생성 파일 변경 �
 (cd bridge && npm run build && AIT_BRIDGE_MOCK=1 npm run build)
 (cd addons/apps_in_toss/tools/bridge && npm run build && AIT_BRIDGE_MOCK=1 npm run build)
 # 테스트 빌드 전용 debug-console 번들 (dist/ait-debug-console.js)
-(cd bridge && npm run build:debug-console)
-(cd addons/apps_in_toss/tools/bridge && npm run build:debug-console)
+(cd bridge && AIT_DEBUG_RELAY_KEYS='["local-test-key"]' npm run build:debug-console)
+(cd addons/apps_in_toss/tools/bridge && AIT_DEBUG_RELAY_KEYS='["local-test-key"]' npm run build:debug-console)
 
 node tests/run-minimal-package.mjs  # 최소 .ait 패키징
 # macOS 앱 경로 예시. PATH에 설치했다면 GODOT_BIN=godot 사용
@@ -55,8 +55,8 @@ GODOT_BIN=/Applications/Godot.app/Contents/MacOS/Godot \
 ## 브라우저 시뮬레이터의 테스트 범위
 
 여기서 시뮬레이터는 `build:dev`와 `preview`로 실행하는 브라우저 mock 및
-DevTools 패널을 뜻합니다. 아래는 설치된 DevTools 3.9.0 구현 기준이며,
-카탈로그의 38개 API 모두 mock 응답이 있습니다.
+DevTools 패널을 뜻합니다. 아래는 설치된 DevTools 3.10.0 구현 기준이며,
+카탈로그의 81개 API와 `AIT.events`의 구독 경로 모두 mock 함수가 있습니다.
 완료·환불 주문 조회의 `key` 페이지 이동은 mock에 구현돼 있지 않아 토스 앱 확인이 필요합니다.
 
 | 항목 | 브라우저에서 확인할 수 있는 범위 | 토스 앱에서 확인할 항목 |
@@ -146,6 +146,15 @@ macOS에서는 `ait-godot preview`를 띄운 채 `ait-godot sim`으로 iOS 시�
    node addons/apps_in_toss/tools/ait-godot.mjs build --debug-console
    ```
 
+   테스트 빌드에는 실기기 디버거 공개키가 필요합니다(debug-console 0.3.0부터 QR 테스트 호스트가 attach 링크의 서명을
+   이 키로 검증). 게임 폴더에서 아래를 실행해 나온 한 줄을 `.ait/game.manifest.json`의
+   `"debugConsole": { "relayPublicKeys": ["<그 값>"] }`에 넣습니다. 공개키는 커밋해도 되고, 팀원은 자기 키를 배열에 더합니다.
+   키가 없으면 빌드가 멈춥니다.
+
+   ```bash
+   npx -y -p https://github.com/toss/apps-in-toss-harness/releases/download/debugger-v0.3.0/apps-in-toss-debugger-0.3.0.tgz debugger relay-key
+   ```
+
    출시 브리지 다음에 `ait-debug-console.js`가 들어가고, `ait-platform-manifest.json`에
    `"debugConsole": true`가 기록됩니다. 빌드 로그 처음과 끝에 "테스트 전용 빌드 — 검수 제출 금지"가 나옵니다.
 2. 만든 `.ait`를 콘솔에 테스트 번들로 올립니다(콘솔 웹이나 console MCP). `ait build` 출력의
@@ -168,6 +177,8 @@ macOS에서는 `ait-godot preview`를 띄운 채 `ait-godot sim`으로 iOS 시�
 
 - 디버거(`ait-devtools`)는 한 세션만 잡을 수 있습니다. 다른 Claude 세션이 디버거를 쥐고 있으면 도구 호출이 거부됩니다.
   그 세션을 끝내거나 디버거를 놓게 한 뒤 붙습니다.
+- debug-console 0.3.0은 디버거 0.3.0과 짝입니다(프로토콜 2). 게임의 `.mcp.json`에서 `ait-devtools`의 debugger도 0.3.0으로 맞춥니다.
+  번들의 공개키와 디버거의 `.ait_relay`가 다르면(키 교체 뒤 다시 빌드하지 않음) 서명 검증에서 막힙니다.
 - QR attach에는 게임 폴더의 relay 비밀값 파일 `.ait_relay`가 필요합니다. `.gitignore`에 넣고(`init`이 넣습니다) 값을 커밋하거나 출력하지 마세요.
   `doctor`는 이 파일이 git에서 무시되지 않으면 경고합니다.
 - 앱은 열리는데 아래 디버그 막대가 없고 relay가 요청을 하나도 받지 못하면(`page-not-opened`), debug-console이
@@ -292,3 +303,18 @@ cat-room-godot 노트 반영과 3.9 정리 뒤, 임시 게임 프로젝트(SDK �
 처음 실행에서 게임이 쓰는 내장 CLI(`ait-godot.mjs`)의 `build`·`build:dev`에 엔진 패치 단계가 빠져 있던 것을 찾아 넣고,
 모든 빌드 경로의 단계 순서를 검사하는 테스트를 더했습니다. 확인하지 못한 것: iOS·안드로이드 실기기의 소리 복구와 신호 순서,
 실제 검수 통과 여부(wasm 안의 엔진 글자), 실제 광고·결제 이벤트, `ait-godot sim`(시뮬레이터를 켜지 않음).
+
+## 2026-11-10 SDK 3.10.0 자동 검사
+
+web-framework·DevTools 3.10.0, debug-console 0.3.0, Unity SDK 3.9.0 전체 매핑 뒤 로컬(macOS, Node 26.12.1, npm 11.20.0)에서 확인했습니다.
+
+| 확인한 항목 | 결과 |
+| --- | --- |
+| `node --test tests/*.test.mjs` | 137개 통과(Unity 3.9.0 경로 85개 덮기, `initialAccessoryButton` 3.10 형식, 공개키 읽기 포함) |
+| 두 브리지 타입 검사, production·mock 빌드, 공개키를 넣은 debug-console 빌드 | 통과. 공개키가 번들에 들어가고, 키 없이 빌드하면 멈춤 |
+| 카탈로그 81개와 구독 경로 13개가 DevTools 3.10.0 mock 함수로 해석되는지 | 94개 모두 확인 |
+| `tests/run-minimal-package.mjs` | 통과 |
+| Godot 4.7.2 `tests/run-godot-addon.mjs` | 게이트·IAP 페이지·구독형 API(새 `events-subscriptions.gd`)·모듈 120개 통과 |
+| API 가이드의 액세서리 버튼 예제 | `AIT` 오토로드가 있는 프로젝트에서 컴파일 통과 |
+
+확인하지 못한 것: 새 API의 실제 토스 앱 응답(토스페이·위치·카메라·배너 광고 등), 액세서리 버튼 표시와 클릭, debug-console 0.3.0의 실기기 QR attach.

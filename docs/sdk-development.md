@@ -381,3 +381,35 @@ cat-room-godot 출시 준비(검수 반려 2회, iOS 실기기 -33~-105)에서 �
   Godot 4.7.2 모듈 검사, 실제 4.7.2 출시·디버그 템플릿에 엔진 패치 적용. 결과는 [테스트 기록](testing.md#2026-11-04-sdk-점검)에 있습니다.
 - 감시: 커뮤니티 5134(wasm·외부 코드 실행 판정), web-framework 3.10.0 정식(DevTools 3.10의 peer 범위가 web-framework 3.10 이상),
   Godot 4.8(#123996)·4.7.3, Unity의 IDBFS 숨김 flush(`user://` 저장을 쓰는 게임만), Windows `ait build` 경로(5003은 글이 내려감).
+
+## 2026-11-10: web-framework 3.10.0 대응과 Unity SDK 3.9.0 전체 매핑
+
+- 기준: 출시된 Unity SDK `release/v3.9.0`(UPM `c2892282`, 공개 메서드 87개)과 npm web-framework·DevTools 3.10.0(2026-11-06).
+  Unity는 아직 3.10.0을 내지 않았습니다(main도 web-framework 3.9.0). Unity main의 API 변경 기록에 적힌 "229개"는
+  출시되지 않은 main 기준이며(메서드 232개 = 기능 146 + `IsSupported` 58 + 권한 보조 28), 비교 기준으로 쓰지 않습니다.
+- 대조 방법: Unity 3.9.0 jslib가 부르는 web-framework 경로 85개(`window.AppsInToss.<경로>`)와 이 SDK의 매니페스트·브리지·모듈을 맞췄습니다.
+  전에는 41개만 함수가 있었고 45개가 없었습니다(대부분 `AIT.invoke`로는 부를 수 있었음). 이번에 모두 넣었고,
+  [manifest-parity](../tests/manifest-parity.test.mjs)가 85개 경로를 모두 덮는지 확인합니다.
+  - 호출형 41개 → 카탈로그(`AIT.api.*`): 토스페이(`checkoutPayment`, `requestTossPayPaysBilling`), 인증서 서명, 동의 데이터·연령대,
+    기기·환경 정보(`getDeviceId`·`getGroupId`·`getLocale`·`getSchemeUri`·`getServerTime`·`getOperationalEnvironment`·`getTossAppVersion`·
+    `getAppsInTossGlobals`·`isMinVersionSupported`·`env.getDeploymentId`), 위치·권한 요청, 프로모션 보상 둘, 연락처·앨범·카메라·PDF·파일 저장,
+    화면 방향·iOS 스와이프·꺼짐 방지·보안 화면, `eventLog`·`Analytics` 셋, 토스 배너 광고 `TossAds` 다섯, `partner` 액세서리 버튼 둘, 리뷰 요청.
+    Unity와 같이 web-framework의 옛 평면 이름 그대로입니다(web-framework 3.10.0에서 상당수가 `Screen.*`·`TossPay.*` 등으로 deprecated).
+  - 구독형 6개 → 새 모듈 `AIT.events`(`AITEvents`): `graniteEvent` `homeEvent`, `tdsEvent` `navigationAccessoryEvent`, `startUpdateLocation`,
+    `contactsViral`, `onVisibilityChangedByTransparentServiceWeb`, `requestNotificationAgreement`. 구독 번호와 이름으로 이벤트·오류를 돌려줍니다.
+  - `GetDevicePixelRatio`(Unity 엔진 값) → `AIT.get_device_pixel_ratio()`(`window.devicePixelRatio`).
+  - Unity의 옛 이름 `getGameCenterGameProfile`·`openGameCenterLeaderboard`·`submitGameCenterLeaderBoardScore`·`getTossShareLink`·`SafeAreaInsets`는
+    web-framework가 deprecated·v2 별칭으로 둔 것이라 이미 있는 새 이름(`Game.*`·`Share.createLink`·`SafeArea`)으로 덮습니다.
+  - `TossAds`는 Unity 3.9.0과 같이 값을 그대로 넘깁니다(`target`은 CSS 선택자, 콜백은 JSON이라 전달되지 않음).
+- web-framework 3.9.0 → 3.10.0 변경과 반영:
+  - 내비게이션 바 액세서리 버튼이 `partner`에서 `NavigationBar.addAccessoryButton`·`removeAccessoryButton`·`subscribeAccessoryButton`으로 옮겨졌고
+    `title` 대신 `accessibilityLabel`을 씁니다 → 카탈로그 둘과 `AIT.events.subscribe_accessory_button()`을 더했습니다.
+    `write-ait-config`는 `initialAccessoryButton`의 `accessibilityLabel`(또는 예전 `title`)을 받고 `id`는 생략할 수 있게 했습니다.
+  - `brand`가 deprecated(생략 가능, CLI가 기존 `primaryColor`는 유지)입니다. 생성 설정은 지금처럼 `brand.primaryColor`를 씁니다.
+  - 버전: web-framework·DevTools·간접 CLI 3.9.0 → 3.10.0. CLI가 바뀌며 빌드 도구 의존성(babel·clack 등)도 함께 올라갔고 출시 번들에는 들어가지 않습니다.
+- debug-console 0.2.0 → 0.3.0: QR 테스트 호스트에서 attach 링크의 서명을 개발자 공개키로 검증합니다.
+  공식 권장대로 `/auto` 대신 `startDebugConsole({ relayPublicKeys })`를 쓰고, 공개키는 게임 매니페스트 `debugConsole.relayPublicKeys`에서 읽어
+  테스트 빌드 번들에 넣습니다([debug-relay-keys.mjs](../addons/apps_in_toss/tools/scripts/debug-relay-keys.mjs)). 키가 없으면 테스트 빌드가 멈춥니다.
+  짝이 되는 디버거는 0.3.0(프로토콜 2)입니다.
+- 검증: [2026-11-10 검사 기록](testing.md#2026-11-10-sdk-3100-자동-검사).
+- 감시: Unity SDK 3.10.0 출시(새 `NavigationBar` 액세서리 API 이름·`IsSupported`·권한 보조 함수가 들어오는지), Godot 4.8 정식(지금 beta3)·4.7.3.
