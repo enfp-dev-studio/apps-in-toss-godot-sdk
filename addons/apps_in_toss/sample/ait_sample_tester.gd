@@ -38,9 +38,15 @@ func _build_ui() -> void:
 	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(root)
 
+	# 연동 확인 화면 위에 덮으므로 불투명 배경을 깐다(기본 테마 글자색이 밝아 어두운 배경)
+	var background := ColorRect.new()
+	background.color = Color("191f28")
+	background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	root.add_child(background)
+
 	var margin := MarginContainer.new()
 	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	for side in ["margin_left", "margin_top", "margin_right"]:
+	for side in ["left", "top", "right"]:
 		margin.add_theme_constant_override("margin_" + side, 16)
 	margin.add_theme_constant_override("margin_bottom", 34)
 	root.add_child(margin)
@@ -80,6 +86,12 @@ func _build_ui() -> void:
 	_detail_label.text = "API를 선택하세요. 일부 API는 토스 앱 환경에서만 응답합니다."
 	bottom.add_child(_detail_label)
 
+	var close := Button.new()
+	close.text = "닫기"
+	close.custom_minimum_size = Vector2(0, 48)
+	close.pressed.connect(queue_free)
+	bottom.add_child(close)
+
 	_fill_api_list()
 
 
@@ -96,6 +108,7 @@ func _on_api_selected(index: int) -> void:
 	_selected_api = AITGeneratedCatalog.APIS[index] if index < AITGeneratedCatalog.APIS.size() else {}
 	var args: Array = _selected_api.get("args", [])
 	_param_input.visible = not args.is_empty()
+	_call_button.visible = true
 	_call_button.disabled = false
 	_call_button.text = "%s 호출" % _selected_api.get("name", "")
 	_detail_label.text = "[b]%s[/b]\npath: %s\nargs: %s" % [
@@ -116,11 +129,11 @@ func _on_invoke_pressed() -> void:
 	_busy = false
 	_call_button.disabled = false
 	if response.get("ok", false):
-		_detail_label.text = "[b]%s[/b]\n[colored=#177e2e]OK[/colored]\n%s" % [
+		_detail_label.text = "[b]%s[/b]\n[color=#177e2e]OK[/color]\n%s" % [
 			_selected_api.get("name", ""), JSON.stringify(response.get("result"), "  ", false)]
 	else:
 		var error: Variant = response.get("error", {})
-		_detail_label.text = "[b]%s[/b]\n[colored=#e42939]실패[/colored]\n%s" % [
+		_detail_label.text = "[b]%s[/b]\n[color=#e42939]실패[/color]\n%s" % [
 			_selected_api.get("name", ""), JSON.stringify(error, "  ", false)]
 
 
