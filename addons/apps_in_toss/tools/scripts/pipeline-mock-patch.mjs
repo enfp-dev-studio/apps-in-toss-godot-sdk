@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readSentryConfig, sentryBuildEnv } from './sentry-config.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const gameDir = path.resolve(process.env.GODOT_PROJECT_DIR ?? process.cwd());
@@ -30,9 +31,15 @@ const sdkDir = resolveSdkDir();
 const bridgeDir = process.env.AIT_BRIDGE_DIR
   ? path.resolve(process.env.AIT_BRIDGE_DIR)
   : path.join(sdkDir, 'bridge');
+// Sentry 연동(매니페스트에 sentry.dsn이 있는 게임만): 개발 빌드는 environment development
+const sentry = readSentryConfig(gameDir);
+if (sentry) {
+  const built = spawnSync('npm', ['run', 'build:sentry'], { cwd: bridgeDir, stdio: 'inherit', env: { ...process.env, ...sentryBuildEnv(sentry, 'development') } });
+  if (built.status !== 0) process.exit(built.status ?? 1);
+}
 const result = spawnSync('node', [path.join(bridgeDir, 'scripts/patch-export.mjs')], {
   cwd: sdkDir,
   stdio: 'inherit',
-  env: { ...process.env, AIT_BRIDGE_MOCK: '1', GODOT_EXPORT_DIR: process.env.GODOT_EXPORT_DIR ?? path.join(gameDir, 'build/godot-web') },
+  env: { ...process.env, AIT_BRIDGE_MOCK: '1', AIT_SENTRY: sentry ? '1' : '', GODOT_EXPORT_DIR: process.env.GODOT_EXPORT_DIR ?? path.join(gameDir, 'build/godot-web') },
 });
 process.exit(result.status ?? 1);

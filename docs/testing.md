@@ -318,3 +318,17 @@ web-framework·DevTools 3.10.0, debug-console 0.3.0, Unity SDK 3.9.0 전체 매�
 | API 가이드의 액세서리 버튼 예제 | `AIT` 오토로드가 있는 프로젝트에서 컴파일 통과 |
 
 확인하지 못한 것: 새 API의 실제 토스 앱 응답(토스페이·위치·카메라·배너 광고 등), 액세서리 버튼 표시와 클릭, debug-console 0.3.0의 실기기 QR attach.
+
+## 2026-11-10 Unity 3.9.0 API 밖 기능 검사
+
+| 확인한 항목 | 결과 |
+| --- | --- |
+| `node --test tests/*.test.mjs` | 160개 통과(배너 브리지, 런타임 로그·Metrics 탭, Sentry 설정·주입·검증, 저장 미러링 되살리기, 배포(가짜 ait), clean·shell:reset, 최소 판 정책, optimize, git:guard, 빌드 실패 진단) |
+| 두 브리지 타입 검사, production·mock·debug-console·Sentry 빌드 | 통과, 모든 번들 "eval" 글자 0개. Sentry 번들 91.6KB(gzip 31.6KB) |
+| Godot 4.7.2 `tests/run-godot-addon.mjs` | 게이트 36개 파일, 배너 19·런타임 로그 11·Sentry 14·저장 미러링 6·설정 창·이슈 제보 13 검사 통과 |
+| 임시 게임 `build:dev`(SDK CLI `init`·`addon:install`) + 브라우저(375px) | 셸 `$GODOT_CONFIG` 두 곳 치환, 배너 두 개(위 띠·Control 영역)가 DevTools mock으로 그려지고 이벤트가 initialized→rendered→impression→viewable→resized로 Godot에 옴, wasm·pck가 엔진 JS와 같은 때 한 번씩만 받아짐(이른 내려받기), `appInfo`·`onReady`·`onComplete`, Storage에 넣은 `user://e2e.cfg`가 다시 열 때 IndexedDB(`/userfs`, 판 21)에 되살아남 |
+| Node 설치 도우미 | nodejs.org에서 24.22.1(darwin-arm64)을 받아 SHA256 확인·풀기 뒤 `node -v` 통과 |
+| `update --check` | 실제 GitHub에서 최신 커밋·판 비교 통과 |
+
+확인하지 못한 것: 실제 토스 앱의 배너 광고·Sentry 전송·소프트 키보드(pan·resize)·`ait deploy`, iOS에서 IndexedDB가 지워진 뒤 되살리기.
+

@@ -10,12 +10,13 @@
 | --- | --- |
 | 인증 | 토스 로그인, 게임 사용자 식별키, 로그인 연동 여부, 익명 식별키 인증 코드 |
 | 결제 | 상품·주문 조회, 일회성·구독 결제, 지급 콜백과 미결 주문 처리, 토스페이 결제·정기결제 인증 |
-| 광고 | 전면 광고·AdMob의 로드·표시·이벤트, 토스 배너 광고(`TossAds`) |
+| 광고 | 전면 광고·AdMob의 로드·표시·이벤트, 토스 배너 광고(`AIT.banner`·`AITBannerAdView`, 원시 `TossAds`) |
 | 게임 | 게임센터, 정보 오버레이 구독 |
 | 이벤트 | 백/포그라운드 가시성 변화, 시스템 뒤로가기(`AIT.back`), 홈 버튼·액세서리 버튼·위치 갱신·친구 공유 리워드·알림 동의 구독(`AIT.events`) |
 | 화면 | Safe Area(`AIT.safe_area`), 한글 줄바꿈·조사(`AITKorean`), 터치 스크롤(`AITTouchScroll`) |
 | 소리 | 백그라운드·광고·결제 중 정지(`AIT.sound`) |
-| 저장 | 사용자별 안전한 저장(`AITSaveSlot`) |
+| 저장 | 사용자별 안전한 저장(`AITSaveSlot`), user:// 파일의 Storage 미러링(`AIT.user_files`) |
+| 진단 | SDK 버전(`AIT.sdk_version()`), 런타임 로그(`AIT.runtime_log`), Godot Metrics 탭, Sentry 연동(`AIT.sentry`) |
 | 기타 | 저장소·배치 처리, 권한·공유·공유 링크·진입 주소·클립보드·햅틱, 바이럴, 내비게이션 바와 액세서리 버튼, 기기·환경 정보, 위치, 연락처·앨범·카메라·PDF·파일 저장, 화면 방향·꺼짐 방지·보안 화면·iOS 스와이프, 이벤트 로그·Analytics, 프로모션 보상, 리뷰 요청, 알림 동의 |
 
 현재 카탈로그는 81개 항목이며, web-framework 3.10.0을 기준으로 합니다. 출시된 Unity SDK 3.9.0이 부르는 web-framework 경로 85개를
@@ -539,9 +540,60 @@ func _on_event(subscription_id: int, name: String, _event: Variant) -> void:
 처음부터 버튼을 띄우려면 매니페스트 `navigationBar.initialAccessoryButton`에 `accessibilityLabel`과 `icon`을 적습니다
 (3.10.0부터 `id`는 생략하고, `title` 대신 `accessibilityLabel`을 씁니다).
 
-토스 배너 광고(`AIT.api.toss_ads_*`)는 Unity SDK 3.9.0처럼 web-framework에 값을 그대로 넘깁니다. `target`은 배너를 넣을
-페이지 요소의 CSS 선택자이고, Godot 화면은 canvas 하나라서 그 요소는 커스텀 셸(`custom_shell.html`)에 따로 두어야 합니다.
-옵션의 콜백(`onAdRendered` 등)은 JSON으로 넘길 수 없어 전달되지 않습니다.
+## 토스 배너 광고
+
+Unity SDK 3.9.0의 배너 도우미와 같습니다. 페이지 요소(DOM) 자리는 SDK가 캔버스 위에 만들고, 광고 부분만 터치를 받습니다.
+실제 광고는 토스 앱·샌드박스에서만 나오고, 브라우저(`build:dev`)에서는 DevTools mock 배너가 보입니다.
+
+- `AIT.banner.show(광고 그룹 ID, AITBannerAd.Position.TOP 또는 BOTTOM, theme, tone, variant)`: 화면 위·아래 띠(Safe Area 반영).
+  다시 부르면 바꾸고, `hide()`로 내립니다. 기본은 아래·`auto`·`blackAndWhite`·`expanded`입니다.
+- `AITBannerAdView` 노드: 앵커·크기로 배치한 Control 영역 위에 배너를 올리고 이동·크기 변경·회전을 따라갑니다.
+  노드마다 따로 슬롯이라 여러 개를 띄울 수 있습니다. `auto_resize_height`면 렌더된 배너 높이로 Control 높이를 맞추고,
+  컨테이너가 크기를 정하는 곳에서는 끄고 `rendered_height_local`을 쓰세요.
+- 이벤트 `ad_event(event)`의 `kind`: `initialized`, `initialization_failed`, `rendered`, `viewable`, `clicked`, `impression`,
+  `failed_to_render`, `no_fill`, `resized`(`width`·`height`는 CSS px, `height_fraction`은 캔버스 높이 대비).
+
+```gdscript
+extends Control
+
+func _ready() -> void:
+    AIT.banner.ad_event.connect(_on_banner)
+    AIT.banner.show("콘솔 배너 광고 그룹 ID", AITBannerAd.Position.BOTTOM)
+
+
+func _on_banner(event: Dictionary) -> void:
+    if event["kind"] == "no_fill" or event["kind"] == "failed_to_render":
+        AIT.banner.hide()
+```
+
+원시 호출 `AIT.api.toss_ads_*`(Unity `TossAds*`와 같음)는 값을 그대로 넘기므로 `target`(CSS 선택자) 요소를 셸에 직접 두어야 하고,
+콜백은 전달되지 않습니다. 보통은 위 도우미를 쓰세요.
+
+## 런타임 로그·Metrics 탭·Sentry
+
+- `AIT.runtime_log`: 장면 전환, 첫 상호작용, 오류(60초에 10개, 같은 문구 한 번), 메모리 경고, 화면 떠남·돌아옴, 0.5초 넘는 프레임,
+  화면 크기·`time_scale` 변화를 `godot_*` 이름의 디버그 로그로 남깁니다(Unity의 `unity_*` 런타임 로그 대응, `enabled = false`로 끔).
+  첫 상호작용 로그는 매니페스트 `"runtimeLog": { "firstInteractive": false }`로 끕니다.
+- 토스 웹 디버그 툴즈를 켜면 vConsole에 **Godot Metrics** 탭이 생겨 위 로그와 게임이 부른 `eventLog`·`Analytics`, FPS·JS 힙을 보여 줍니다.
+  툴즈가 없으면(라이브) 탭을 만들지 않습니다.
+- `AIT.sentry`: 매니페스트에 `"sentry": { "dsn": "…", "environment": "…", "release": "…", "sampleRate": 1 }`을 적은 게임만 빌드가
+  Sentry 브라우저 SDK를 넣고 켜집니다. 태그(SDK·Godot 판, 현재 장면), 앱인토스 정보(기기 ID를 사용자 ID로, OS·언어·토스 앱 판·환경·
+  배포 ID), 장면 전환 기록, Godot 오류를 보내고, JS 오류는 Sentry가 직접 잡습니다. `track_screen`·`track_impression`·`track_click`은
+  Analytics를 부르고 기록을 남기며, `auto_screen_tracking = true`면 장면이 바뀔 때 화면을 기록합니다.
+  environment를 비우면 출시 `production`, 테스트 `test`, 개발 `development`입니다.
+
+## 저장 미러링(user:// 파일)
+
+토스 WebView(iOS ITP 등)에서는 `user://`가 있는 IndexedDB가 지워질 수 있습니다. 매니페스트에 적은 파일만 앱인토스 Storage에 복사해
+두면(Unity PlayerPrefs 미러링 대응), 다음에 열 때 IndexedDB에 없을 경우 엔진이 뜨기 전에 되살립니다. 게임 코드는 바꾸지 않아도 됩니다.
+
+```json
+"userFiles": ["user://settings.cfg"]
+```
+
+실행 중에는 `AIT.user_files`가 바뀐 파일을 2초마다·화면을 떠날 때 Storage에 올리고, 지워진 파일은 Storage에서도 지웁니다.
+값은 base64라 작은 설정 파일에만 쓰세요. 진행 저장을 새로 만든다면 `AITSaveSlot`을 쓰세요. 셸은 SDK 템플릿처럼
+`engine.startGame` 전에 `window.AppsInTossGodot.userFilesReady()`를 기다려야 합니다(`doctor`가 확인).
 
 ## 앱브릿지 호출 한도
 

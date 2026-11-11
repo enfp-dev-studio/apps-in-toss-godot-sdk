@@ -8,6 +8,8 @@ var auth: AITAuth
 var iap: AITIAP
 var ads: AITAds
 var admob: AITAdMob
+## 토스 배너 광고를 화면 위·아래에 띄우는 도우미. 영역에 붙이려면 AITBannerAdView 노드
+var banner: AITBannerAd
 var game: AITGame
 ## 구독형 API(홈 버튼·액세서리 버튼·위치·친구 공유 리워드·알림 동의 등). Unity SDK 3.9.0 대응
 var events: AITEvents
@@ -19,6 +21,12 @@ var back: AITBack
 var safe_area: AITSafeArea
 ## 사운드 게이트(백그라운드·광고·결제 중 정지). enable()을 불러야 동작합니다
 var sound: AITSoundGate
+## 실행 중 일어난 일(장면 전환·첫 상호작용·오류 등) 디버그 로그. enabled = false로 끕니다
+var runtime_log: AITRuntimeLog
+## Sentry 연동(매니페스트 sentry.dsn이 있는 빌드만 켜짐). track_screen·track_impression·track_click
+var sentry: AITSentry
+## 매니페스트 userFiles에 적은 user:// 파일을 Storage에 복사(저장 미러링)
+var user_files: AITUserFiles
 var api: AITGeneratedAPI
 
 var _sdk: AppsInToss
@@ -34,6 +42,7 @@ func _ready() -> void:
     iap = _sdk.iap
     ads = _sdk.ads
     admob = _sdk.admob
+    banner = _sdk.banner
     game = _sdk.game
     events = _sdk.events
     status = _sdk.status
@@ -41,6 +50,9 @@ func _ready() -> void:
     back = _sdk.back
     safe_area = _sdk.safe_area
     sound = _sdk.sound
+    runtime_log = _sdk.runtime_log
+    sentry = _sdk.sentry
+    user_files = _sdk.user_files
     api = _sdk.api
 
 
@@ -107,6 +119,11 @@ func get_value(path: String) -> Variant:
 
 func create_anonymous_key_auth_code(timeout_ms: int = 0) -> Dictionary:
     return await auth.create_anonymous_key_auth_code(timeout_ms)
+
+
+## SDK 버전 "0.2.0"(Unity AITVersion.Version). 웹 프레임워크 판까지는 AITVersion.full_version()
+func sdk_version() -> String:
+    return AITVersion.VERSION
 
 
 ## 페이지의 window.devicePixelRatio(Unity GetDevicePixelRatio). Web이 아니면 1.0

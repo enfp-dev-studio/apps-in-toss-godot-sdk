@@ -6,6 +6,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { readRelayPublicKeys } from './debug-relay-keys.mjs';
+import { readSentryConfig, sentryBuildEnv } from './sentry-config.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const gameDir = process.env.GODOT_PROJECT_DIR
@@ -69,13 +70,22 @@ if (withDebugConsole) {
   run('npm', ['run', 'build:debug-console'], { cwd: bridgeDir, env: { AIT_DEBUG_RELAY_KEYS: JSON.stringify(relayKeys) } });
 }
 
+// Sentry 연동(매니페스트에 sentry.dsn이 있는 게임만): dist/ait-sentry.js
+let sentry;
+try {
+  sentry = readSentryConfig(gameDir);
+} catch (error) {
+  fail(error.message);
+}
+if (sentry) run('npm', ['run', 'build:sentry'], { cwd: bridgeDir, env: sentryBuildEnv(sentry, withDebugConsole ? 'test' : 'production') });
+
 // 주입 + export 무결성 검증 — 게임 리포의 export dir을 명시적으로 넘긴다.
 run('node', [path.join(bridgeDir, 'scripts/patch-export.mjs')], {
   cwd: sdkDir,
-  env: { GODOT_EXPORT_DIR: path.join(gameDir, 'build/godot-web') },
+  env: { GODOT_EXPORT_DIR: path.join(gameDir, 'build/godot-web'), AIT_SENTRY: sentry ? '1' : '' },
 });
 run(process.execPath, [path.join(here, 'verify-godot-export.mjs')], {
-  env: { GODOT_EXPORT_DIR: path.join(gameDir, 'build/godot-web') },
+  env: { GODOT_EXPORT_DIR: path.join(gameDir, 'build/godot-web'), AIT_SENTRY: sentry ? '1' : '' },
 });
 
 console.log(`[ait-godot finalize] 브리지 주입·검증 완료${withDebugConsole ? ' (테스트 빌드: debug-console 포함)' : ''}`);

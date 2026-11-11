@@ -5,6 +5,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { resolveSdkDir } from './sdk-dir.mjs';
+import { checkSdkPolicy } from './sdk-policy.mjs';
+import { isGitRepo, trackedIgnoredFiles } from './git-guard.mjs';
 import { resolveProfile, logProfileBanner } from './build-profiles.mjs';
 import {
   checkAppType,
@@ -209,7 +211,16 @@ if (exportPresetText) {
   if (!shellPath || !fs.existsSync(shellPath)) {
     mismatch(`Godot custom HTML shell file is missing: ${customShell ?? 'unset'}`);
   } else {
-    for (const problem of checkShellViewport(fs.readFileSync(shellPath, 'utf8'))) {
+    const shellText = fs.readFileSync(shellPath, 'utf8');
+    // 매니페스트 userFiles(저장 미러링)는 셸이 engine.startGame 전에 userFilesReady()를 기다려야 되살린 파일을 엔진이 읽는다.
+    const userFiles = resolvedProfileInfo.manifest?.userFiles;
+    if (Array.isArray(userFiles) && userFiles.length > 0 && !shellText.includes('userFilesReady')) {
+      warnings.push(
+        `${customShell}: userFiles를 썼지만 셸이 engine.startGame 전에 window.AppsInTossGodot.userFilesReady()를 기다리지 않습니다. ` +
+          'SDK 템플릿(addons/apps_in_toss/tools/templates/custom_shell.html)처럼 고치세요. 그대로면 지워진 파일을 되살리지 못합니다.',
+      );
+    }
+    for (const problem of checkShellViewport(shellText)) {
       warnings.push(`${customShell}: ${problem}`);
     }
   }
@@ -388,6 +399,14 @@ if (fs.existsSync(path.join(projectDir, '.ait_relay'))) {
   }
 }
 
+// git 보호(Unity AITGitGuard 대응): 커밋돼 있어 .gitignore가 듣지 않는 파일(빌드 결과·비밀 파일)
+if (isGitRepo(projectDir)) {
+  const tracked = trackedIgnoredFiles(projectDir);
+  if (tracked.length > 0) {
+    warnings.push(`git에 커밋돼 있어 무시되지 않는 파일 ${tracked.length}개(${tracked.slice(0, 3).join(', ')}${tracked.length > 3 ? ' …' : ''}). ait-godot git:guard --fix로 git에서만 빼세요.`);
+  }
+}
+
 // 테스트 빌드(build --debug-console) 결과가 export 폴더에 남아 있으면 알린다.
 // 그 .ait에는 실기기 원격 디버깅 표면이 들어 있어 검수에 제출하면 안 된다.
 const exportDir = path.resolve(process.env.GODOT_EXPORT_DIR ?? path.join(projectDir, 'build/godot-web'));
@@ -405,6 +424,17 @@ if (fs.existsSync(exportManifestPath)) {
       `${shown} has "debugConsole": true — 테스트 빌드(--debug-console) 결과입니다. 그 .ait는 검수에 제출하지 마세요. 옵션 없이 build하면 출시용으로 다시 만들어집니다.`,
     );
   }
+}
+
+// SDK 최소 버전 정책(Unity AITDeprecationChecker 대응). 출시 빌드(strict)에서만 main의 sdk-policy.json을 받아 본다.
+// 사용 중지·최소 판 미만이면 멈추고, 받지 못하면 경고만 한다.
+if (strict) {
+  const pluginCfg = path.join(path.dirname(fileURLToPath(import.meta.url)), '../../plugin.cfg');
+  const installed = fs.readFileSync(pluginCfg, 'utf8').match(/version="([^"]+)"/)?.[1];
+  const verdict = await checkSdkPolicy(installed);
+  if (verdict.status === 'blocked') errors.push(verdict.message);
+  else if (verdict.status === 'unknown') warnings.push(verdict.message);
+  else console.log(`[AIT doctor] ${verdict.message}`);
 }
 
 for (const warning of warnings) console.warn(`[AIT doctor] WARN ${warning}`);

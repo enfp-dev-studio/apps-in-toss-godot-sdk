@@ -339,3 +339,48 @@ describe('debug-console 0.3.0 공개키(게임 매니페스트 debugConsole.rela
     }
   });
 });
+
+describe('Sentry 연동(게임 매니페스트 sentry.dsn)', () => {
+  const SENTRY = 'ait-sentry.js';
+  const sentryTag = `<script src="./${SENTRY}"></script>`;
+  const writeGame = (extra) => {
+    const game = tempDir('ait-sentry-game-');
+    fs.mkdirSync(path.join(game, '.ait'), { recursive: true });
+    fs.writeFileSync(path.join(game, '.ait/game.manifest.json'), JSON.stringify({ gameId: 'g', ...extra }));
+    return game;
+  };
+
+  it('설정을 읽고 검사하며, environment를 비우면 빌드 종류로 정한다', async () => {
+    const { readSentryConfig, sentryBuildEnv } = await import(path.join(scriptsDir, 'sentry-config.mjs'));
+    assert.equal(readSentryConfig(writeGame({})), null);
+    const config = readSentryConfig(writeGame({ sentry: { dsn: 'https://k@o1.ingest.sentry.io/2', release: '1.0.0' } }));
+    assert.equal(config.dsn, 'https://k@o1.ingest.sentry.io/2');
+    assert.deepEqual(JSON.parse(sentryBuildEnv(config, 'test').AIT_SENTRY_CONFIG), {
+      dsn: 'https://k@o1.ingest.sentry.io/2', release: '1.0.0', environment: 'test',
+    });
+    assert.equal(JSON.parse(sentryBuildEnv({ ...config, environment: 'qa' }, 'production').AIT_SENTRY_CONFIG).environment, 'qa');
+    for (const sentry of [{ dsn: 'not-a-dsn' }, { dsn: 'https://k@o1.ingest.sentry.io/2', sampleRate: 2 }, 'x']) {
+      assert.throws(() => readSentryConfig(writeGame({ sentry })));
+    }
+  });
+
+  it('AIT_SENTRY=1이면 ait-sentry.js를 브리지 바로 다음(debug-console 앞)에 한 번 넣고, 검증이 통과한다', () => {
+    const bridgeDir = makeBridge();
+    fs.writeFileSync(path.join(bridgeDir, 'dist', SENTRY), '// sentry\n');
+    const { exportDir, lockPath } = makeExport();
+    fs.writeFileSync(path.join(exportDir, 'index.html'), `<!doctype html><html><head></head><body></body></html>\n`);
+    for (let i = 0; i < 2; i += 1) {
+      const result = runPatch(bridgeDir, exportDir, { AIT_SENTRY: '1', AIT_DEBUG_CONSOLE: '1' });
+      assert.equal(result.status, 0, result.stderr);
+    }
+    const html = fs.readFileSync(path.join(exportDir, 'index.html'), 'utf8');
+    assert.equal(count(html, sentryTag), 1);
+    assert.ok(html.indexOf(bridgeTag) < html.indexOf(sentryTag) && html.indexOf(sentryTag) < html.indexOf(consoleTag), html);
+    assert.ok(fs.existsSync(path.join(exportDir, SENTRY)));
+    writeManifest(exportDir, lockPath, { debugConsole: true, sentry: true });
+    assert.equal(runVerify(exportDir, lockPath, { AIT_SENTRY: '1', AIT_DEBUG_CONSOLE: '1' }).status, 0);
+    writeManifest(exportDir, lockPath, { debugConsole: true });
+    assert.notEqual(runVerify(exportDir, lockPath, { AIT_SENTRY: '1', AIT_DEBUG_CONSOLE: '1' }).status, 0, 'manifest must record sentry');
+    assert.notEqual(runVerify(exportDir, lockPath, { AIT_DEBUG_CONSOLE: '1' }).status, 0, 'leftover sentry without dsn fails');
+  });
+});

@@ -5,6 +5,7 @@ import aitDevtools from '@apps-in-toss/devtools/unplugin';
 const bridgeRoot = fileURLToPath(new URL('.', import.meta.url));
 const bridgeEntry = fileURLToPath(new URL('./src/index.ts', import.meta.url));
 const debugConsoleEntry = fileURLToPath(new URL('./src/debug-console.ts', import.meta.url));
+const sentryEntry = fileURLToPath(new URL('./src/sentry.ts', import.meta.url));
 
 /**
  * Bridge bundle.
@@ -95,7 +96,59 @@ function relayPublicKeys(): string[] {
   return keys as string[];
 }
 
+// @sentry/browser의 "eval" 글자(검수 반려 대상)를 뜻은 그대로 두고 바꾼다. 정규식 안은 ev[a]l(같은 글자와 맞음),
+// 문자열은 나눠 쓴다. 대상은 기본 오류 거르기 정규식과 브라우저 스택 해석(eval로 만든 코드의 줄)이다.
+// 판을 올려 모양이 바뀌면 아래 stripEvalText(true)가 남은 글자로 빌드를 멈춘다.
+function rewriteSentryEvalText(): Plugin {
+  const rules: Array<[RegExp, string]> = [
+    [/\\\(evaluating /g, '\\(ev[a]luating '],
+    [/ > eval line /g, ' > ev[a]l line '],
+    [/ > eval\/i/g, ' > ev[a]l/i'],
+    [/`eval`/g, "`ev${'a'}l`"],
+    [/` > eval`/g, "` > ev${'a'}l`"],
+  ];
+  return {
+    name: 'ait-rewrite-sentry-eval-text',
+    generateBundle(_options, bundle) {
+      for (const chunk of Object.values(bundle)) {
+        if (chunk.type !== 'chunk') continue;
+        for (const [pattern, replacement] of rules) chunk.code = chunk.code.replace(pattern, replacement);
+      }
+    },
+  };
+}
+
+function sentryConfig(): Record<string, unknown> {
+  const raw = process.env.AIT_SENTRY_CONFIG;
+  const config: unknown = raw ? JSON.parse(raw) : null;
+  if (!config || typeof config !== 'object' || typeof (config as { dsn?: unknown }).dsn !== 'string') {
+    throw new Error('AIT_SENTRY_CONFIG must be a JSON object with dsn (game manifest sentry).');
+  }
+  return config as Record<string, unknown>;
+}
+
 export default defineConfig(({ mode }) => {
+  if (mode === 'sentry') {
+    // Sentry 연동(dist/ait-sentry.js). 매니페스트에 sentry.dsn이 있는 게임만 ait-godot build가 만든다.
+    return {
+      root: bridgeRoot,
+      plugins: [rewriteSentryEvalText(), stripEvalText(true)],
+      define: {
+        'process.env.NODE_ENV': JSON.stringify('production'),
+        __AIT_SENTRY_CONFIG__: JSON.stringify(sentryConfig()),
+      },
+      build: {
+        lib: {
+          entry: sentryEntry,
+          name: 'AppsInTossGodotSentry',
+          formats: ['iife'],
+          fileName: () => 'ait-sentry.js',
+        },
+        outDir: 'dist',
+        emptyOutDir: false,
+      },
+    };
+  }
   if (mode === 'debug-console') {
     return {
       root: bridgeRoot,

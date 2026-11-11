@@ -6,6 +6,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { readRelayPublicKeys } from './debug-relay-keys.mjs';
+import { readSentryConfig, sentryBuildEnv } from './sentry-config.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const gameDir = path.resolve(process.env.GODOT_PROJECT_DIR ?? process.cwd());
@@ -50,6 +51,12 @@ function resolveSdkDir() {
 const withDebugConsole = process.argv.includes('--debug-console') || process.env.AIT_DEBUG_CONSOLE === '1';
 const AIT_DEBUG_CONSOLE = withDebugConsole ? '1' : '';
 if (withDebugConsole) console.log('[ait-godot] !!! 테스트 전용 빌드 (--debug-console) — 검수 제출 금지 !!!');
+let sentry;
+try {
+  sentry = readSentryConfig(gameDir);
+} catch (error) {
+  fail(error.message);
+}
 let relayKeys = [];
 if (withDebugConsole) {
   try {
@@ -88,6 +95,7 @@ if (!fs.existsSync(path.join(bridgeDir, 'node_modules'))) {
 }
 run('npm', ['run', 'build'], { cwd: bridgeDir });
 if (withDebugConsole) run('npm', ['run', 'build:debug-console'], { cwd: bridgeDir, env: { AIT_DEBUG_RELAY_KEYS: JSON.stringify(relayKeys) } });
+if (sentry) run('npm', ['run', 'build:sentry'], { cwd: bridgeDir, env: sentryBuildEnv(sentry, withDebugConsole ? 'test' : 'production') });
 
 // 6. Godot Web export — export 결과물도 게임 리포 안에 둔다.
 script('export-godot.mjs', { GODOT_SDK_DIR: sdkDir, GODOT_EXPORT_DIR: path.join(gameDir, 'build/godot-web') });
@@ -104,12 +112,13 @@ script('write-platform-manifest.mjs', {
 // 8. 브리지 주입 + export 무결성 검증
 run('node', [path.join(bridgeDir, 'scripts/patch-export.mjs')], {
   cwd: sdkDir,
-  env: { GODOT_EXPORT_DIR: path.join(gameDir, 'build/godot-web'), AIT_DEBUG_CONSOLE },
+  env: { GODOT_EXPORT_DIR: path.join(gameDir, 'build/godot-web'), AIT_DEBUG_CONSOLE, AIT_SENTRY: sentry ? '1' : '' },
 });
 script('verify-godot-export.mjs', {
   GODOT_SDK_DIR: sdkDir,
   GODOT_EXPORT_DIR: path.join(gameDir, 'build/godot-web'),
   AIT_DEBUG_CONSOLE,
+  AIT_SENTRY: sentry ? '1' : '',
 });
 
 // 9. .ait 패키징 (ait bin 해석은 pipeline-package.mjs가 담당)

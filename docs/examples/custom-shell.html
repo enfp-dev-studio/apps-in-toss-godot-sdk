@@ -5,6 +5,30 @@
   <!-- 제스처 확대 막기(비게임 출시 체크리스트, 지도 제외)와 Safe Area env() 값(viewport-fit=cover, 없으면 iOS에서 0) -->
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <title>$GODOT_PROJECT_NAME</title>
+  <script>
+    // 이른 내려받기(Unity 템플릿의 EarlyFetch 대응): 엔진 JS를 받고 해석하는 동안 기다리지 않게 wasm·pck 받기를
+    // 페이지 맨 앞에서 시작하고, Godot 로더가 같은 주소를 처음 부를 때 그 응답을 넘긴다(다시 부르면 평소처럼 받는다).
+    (function () {
+      var sizes = ($GODOT_CONFIG).fileSizes || {};
+      var early = {};
+      Object.keys(sizes).forEach(function (name) {
+        if (!/\.(wasm|pck)$/.test(name)) return;
+        var url = new URL(name, window.location.href).href;
+        early[url] = window.fetch(url);
+        early[url].catch(function () {});
+      });
+      var originalFetch = window.fetch;
+      window.fetch = function (input, init) {
+        var url = typeof input === "string" ? new URL(input, window.location.href).href : input && input.url;
+        var pending = early[url];
+        if (pending && !(init && init.method && init.method !== "GET")) {
+          delete early[url];
+          return pending;
+        }
+        return originalFetch.apply(this, arguments);
+      };
+    })();
+  </script>
   <style>
     :root {
       --ait-bg: #f2f4f6;
@@ -46,6 +70,9 @@
       background: var(--ait-brand); color: #fff; font: inherit; font-size: 15px; font-weight: 600;
     }
     #ait-boot.retry button { display: block; }
+    #ait-boot ul { margin: 0; padding: 0 32px 0 48px; font-size: 13px; line-height: 1.5; color: var(--ait-text-subtle); }
+    #ait-boot details { max-width: 320px; font-size: 12px; color: var(--ait-text-subtle); }
+    #ait-boot details pre { white-space: pre-wrap; word-break: break-all; margin: 6px 0 0; }
   </style>
   $GODOT_HEAD_INCLUDE
 </head>
@@ -57,6 +84,8 @@
     <h1>$GODOT_PROJECT_NAME</h1>
     <p id="ait-boot-msg">불러오고 있어요</p>
     <div class="bar"><i id="ait-boot-bar"></i></div>
+    <ul id="ait-boot-hints" hidden></ul>
+    <details id="ait-boot-debug" hidden><summary>진단 정보</summary><pre></pre></details>
     <button type="button" id="ait-boot-retry">다시 시도</button>
   </div>
 
@@ -76,16 +105,38 @@
 
     function boot() { return document.getElementById("ait-boot"); }
 
+    // 앱 정보(빌드가 넣은 ait-app-config의 appInfo: displayName·primaryColor·iconUrl). Unity AITLoading.appInfo 대응
+    var appInfo = {};
+    try {
+      var tag = document.getElementById("ait-app-config");
+      appInfo = (tag && JSON.parse(tag.textContent).appInfo) || {};
+    } catch (e) { appInfo = {}; }
+    var listeners = { ready: [], progress: [], complete: [], error: [] };
+    function emit(kind, value) {
+      listeners[kind].forEach(function (cb) { try { cb(value); } catch (e) { console.error(e); } });
+    }
+    var done = false;
+
     window.AppsInTossShell = {
+      appInfo: appInfo,
+      // 직접 그린 로딩 화면에서 쓰는 콜백(Unity AITLoading 대응). onReady는 등록하면 바로 appInfo로 불린다
+      onReady: function (cb) { if (typeof cb === "function") { listeners.ready.push(cb); cb(appInfo); } },
+      onProgress: function (cb) { if (typeof cb === "function") listeners.progress.push(cb); },
+      onComplete: function (cb) { if (typeof cb === "function") { if (done) cb(); else listeners.complete.push(cb); } },
+      onError: function (cb) { if (typeof cb === "function") listeners.error.push(cb); },
       // 로딩 화면을 걷는다
       ready: function () {
+        if (!done) { done = true; emit("complete"); }
         var b = boot();
         if (!b) return;
         b.classList.add("hide");
         setTimeout(function () { b.remove(); }, 400);
       },
+      // 로딩 화면을 바로 숨긴다(직접 그린 로딩 화면을 쓸 때)
+      hide: function () { var b = boot(); if (b) b.style.display = "none"; },
       // total을 모르면(0) 오가는 막대를 보여 준다. Godot 로더는 파일 크기를 하나라도 모르면 total=0을 넘긴다.
       progress: function (current, total) {
+        emit("progress", { current: current, total: total });
         var bar = document.getElementById("ait-boot-bar");
         if (!bar) return;
         var known = total > 0;
@@ -93,12 +144,26 @@
         bar.style.width = known ? Math.max(4, Math.min(100, Math.round((current / total) * 100))) + "%" : "";
       },
       // retry가 false가 아니면 "다시 시도"(페이지 다시 열기) 버튼을 보여 준다.
-      fail: function (message, retry) {
+      // details: { hints: ["확인할 것", …], debugInfo: { … } } — 힌트 목록과 접힌 진단 정보로 보여 준다(Unity showLoadError 대응)
+      fail: function (message, retry, details) {
+        emit("error", { message: message, hints: (details && details.hints) || [], debugInfo: (details && details.debugInfo) || null });
         var b = boot();
         if (!b) return;
         b.classList.add("err");
         b.classList.toggle("retry", retry !== false);
         document.getElementById("ait-boot-msg").textContent = message;
+        var hints = document.getElementById("ait-boot-hints");
+        hints.replaceChildren();
+        ((details && details.hints) || []).forEach(function (h) {
+          var li = document.createElement("li");
+          li.textContent = h;
+          hints.appendChild(li);
+        });
+        hints.hidden = hints.children.length === 0;
+        var debug = document.getElementById("ait-boot-debug");
+        var info = details && details.debugInfo;
+        debug.hidden = !info;
+        if (info) debug.querySelector("pre").textContent = JSON.stringify(info, null, 2);
       },
       setPixelCap: function (value) {
         cap = Math.max(1, Number(value) || 2);
@@ -109,13 +174,82 @@
   })();
     document.getElementById("ait-boot-retry").addEventListener("click", function () { window.location.reload(); });
   </script>
-  <script src="$GODOT_URL"></script>
+  <script>
+  // 소프트 키보드(Unity 템플릿의 키보드 모드 대응. 매니페스트 keyboardMode: "pan"(기본)·"resize"·"none").
+  // iOS WKWebView는 입력창(Godot 가상 키보드의 숨은 input)을 드러내려고 문서를 스크롤해 고정 캔버스를 밀고, 키보드가
+  // 캔버스 아래쪽을 가린다. 키보드가 떠 있는 동안만 캔버스를 바로잡고, 내려가면 인라인 스타일을 지운다.
+  //   pan: 캔버스를 보이는 영역 맨 위로 되돌리고, 마지막으로 누른 자리가 키보드에 가리면 그만큼만 올린다(크기 그대로).
+  //   resize: 캔버스를 보이는 영역 크기로 줄인다(Godot이 화면을 다시 배치한다).
+  //   none: 위치만 되돌린다. 아래쪽 입력은 키보드에 가려질 수 있다.
+  // Android WebView는 키보드만큼 창 자체를 줄이므로 pan에서는 키보드 없는 높이로 캔버스를 고정한다.
+  (function () {
+    var vv = window.visualViewport;
+    var canvas = document.getElementById("canvas");
+    if (!vv || !canvas) return;
+    var mode = "pan";
+    try {
+      var configTag = document.getElementById("ait-app-config");
+      var configured = configTag && JSON.parse(configTag.textContent).keyboardMode;
+      if (configured === "resize" || configured === "none") mode = configured;
+    } catch (e) { mode = "pan"; }
+    var MIN_KEYBOARD = 100;
+    var MARGIN = 16;
+    var fullHeight = window.innerHeight;
+    var fullWidth = window.innerWidth;
+    var tapY = null;
+    var scheduled = false;
+    function textFocused() {
+      var el = document.activeElement;
+      return !!el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable);
+    }
+    function apply() {
+      scheduled = false;
+      if (window.innerWidth !== fullWidth) {
+        fullWidth = window.innerWidth;
+        fullHeight = window.innerHeight;
+      } else if (!textFocused()) {
+        fullHeight = Math.max(fullHeight, window.innerHeight);
+      }
+      if (!textFocused() || fullHeight - vv.height <= MIN_KEYBOARD) {
+        canvas.style.top = "";
+        canvas.style.height = "";
+        canvas.style.transform = "";
+        return;
+      }
+      canvas.style.top = vv.offsetTop + "px";
+      if (mode === "resize") {
+        canvas.style.height = vv.height + "px";
+        canvas.style.transform = "";
+      } else if (mode === "pan") {
+        canvas.style.height = fullHeight + "px";
+        var hidden = tapY === null ? 0 : tapY - (vv.height - MARGIN);
+        canvas.style.transform = hidden > 0 ? "translateY(" + -hidden + "px)" : "";
+      }
+    }
+    function schedule() {
+      if (scheduled) return;
+      scheduled = true;
+      window.requestAnimationFrame(apply);
+    }
+    document.addEventListener("pointerdown", function (e) { tapY = e.clientY; }, true);
+    vv.addEventListener("resize", schedule);
+    vv.addEventListener("scroll", schedule);
+    window.addEventListener("resize", apply); // Android: 창이 줄어든 같은 프레임에 고정해 캔버스가 줄지 않게
+    document.addEventListener("focusin", schedule);
+    document.addEventListener("focusout", function () { setTimeout(apply, 0); });
+  })();
+  </script>
+  <script src="$GODOT_URL" onerror="window.AppsInTossShell.fail('불러오지 못했어요. 잠시 뒤 다시 열어 주세요.', true, { hints: ['엔진 파일($GODOT_URL)을 받지 못했어요.', '네트워크 연결을 확인해 주세요.'], debugInfo: { url: '$GODOT_URL' } });"></script>
   <script>
     (function () {
       var shell = window.AppsInTossShell;
+      if (typeof Engine === "undefined") return; // 엔진 JS를 받지 못함(위 onerror가 알림)
       var missing = Engine.getMissingFeatures({ threads: false });
       if (missing.length > 0) {
-        shell.fail("이 기기에서는 열 수 없어요. 토스 앱을 최신 버전으로 업데이트한 뒤 다시 열어 주세요.", false);
+        shell.fail("이 기기에서는 열 수 없어요. 토스 앱을 최신 버전으로 업데이트한 뒤 다시 열어 주세요.", false, {
+          hints: ["WebGL·WebAssembly를 쓸 수 없는 환경이에요."],
+          debugInfo: { missing: missing, userAgent: navigator.userAgent },
+        });
         console.error("missing features", missing);
         return;
       }
@@ -125,13 +259,19 @@
       var sizes = config.fileSizes || {};
       for (var name in sizes) expected += Number(sizes[name]) || 0;
       var engine = new Engine(config);
-      engine.startGame({
-        onProgress: function (current, total) { shell.progress(current, total > 0 ? total : expected); },
+      // 매니페스트 userFiles의 user:// 파일을 엔진이 IndexedDB를 읽기 전에 Storage에서 되살린다(브리지, 실패해도 계속)
+      window.AppsInTossGodot.userFilesReady().then(function () {
+        return engine.startGame({
+          onProgress: function (current, total) { shell.progress(current, total > 0 ? total : expected); },
+        });
       }).then(function () {
         var b = document.getElementById("ait-boot");
         if (b && b.dataset.autoHide !== "false") shell.ready();
       }).catch(function (error) {
-        shell.fail("불러오지 못했어요. 잠시 뒤 다시 열어 주세요.");
+        shell.fail("불러오지 못했어요. 잠시 뒤 다시 열어 주세요.", true, {
+          hints: ["네트워크 연결을 확인하고 다시 시도해 주세요."],
+          debugInfo: { error: String(error && error.message || error), userAgent: navigator.userAgent },
+        });
         console.error(error);
       });
     })();

@@ -45,6 +45,20 @@ module.exports = {
   Environment: {
     initialURL: 'intoss://cat-room-godot/visit?code=abc',
   },
+  debugLog: function (payload) {
+    track({ path: 'debugLog', payload });
+  },
+  TossAds: {
+    initialize: function (options) {
+      track({ path: 'TossAds.initialize', owner: this });
+      module.exports.__lastAdsInit = options;
+    },
+    attachBanner: function (adGroupId, target, options) {
+      track({ path: 'TossAds.attachBanner', adGroupId, owner: this });
+      module.exports.__lastBanner = { adGroupId, target, options };
+      return { destroy: () => { track({ disposed: 'TossAds.attachBanner', adGroupId }); } };
+    },
+  },
   graniteEvent: {
     addEventListener: function (event, args) {
       track({ path: 'graniteEvent.addEventListener', event, args, owner: this });
@@ -59,6 +73,26 @@ let bridge;
 let fake;
 let windowObj;
 let ctx;
+
+// 배너 컨테이너용 최소 DOM. 브리지는 전역 document를 쓰고, web-runtime은 window.document만 보므로 서로 섞이지 않는다.
+function fakeElement() {
+  return {
+    id: '', style: {}, parent: null, wrapper: null, height: 0,
+    remove() {
+      if (!this.parent) return;
+      this.parent.children = this.parent.children.filter((c) => c !== this);
+      this.parent = null;
+    },
+    querySelector(selector) { return selector.includes('attach-banner-wrapper') ? this.wrapper : null; },
+    getBoundingClientRect() { return { left: 0, top: 0, width: 360, height: this.height }; },
+  };
+}
+const canvasEl = { getBoundingClientRect: () => ({ left: 10, top: 20, width: 400, height: 800 }) };
+const documentObj = {
+  body: { children: [], appendChild(el) { el.parent = this; this.children.push(el); } },
+  createElement: () => fakeElement(),
+  querySelector: (selector) => (selector === '#canvas' ? canvasEl : null),
+};
 
 async function flush(rounds = 5) {
   for (let i = 0; i < rounds; i += 1) {
@@ -96,14 +130,19 @@ before(() => {
   const runtimeJs = ts.transpileModule(fs.readFileSync(path.join(repoRoot, 'bridge/src/web-runtime.ts'), 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
   }).outputText;
+  const metricsJs = ts.transpileModule(fs.readFileSync(path.join(repoRoot, 'bridge/src/metrics.ts'), 'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+  }).outputText;
   // 이벤트를 테스트에서 직접 보낼 수 있게 등록된 리스너를 모은다.
   windowObj = {
     listeners: {},
     addEventListener(type, fn) { (this.listeners[type] ??= []).push(fn); },
+    removeEventListener(type, fn) { this.listeners[type] = (this.listeners[type] ?? []).filter((f) => f !== fn); },
     dispatch(type, event = {}) { for (const fn of this.listeners[type] ?? []) fn(event); },
   };
   const sandbox = {
     window: windowObj,
+    document: documentObj,
     queueMicrotask,
     setTimeout,
     console,
@@ -116,6 +155,22 @@ before(() => {
           sandbox.__runtime = mod.exports;
         }
         return sandbox.__runtime;
+      }
+      if (id === './user-files.ts') {
+        const mod = { exports: {} };
+        const userFilesJs = ts.transpileModule(fs.readFileSync(path.join(repoRoot, 'bridge/src/user-files.ts'), 'utf8'), {
+          compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+        }).outputText;
+        vm.runInContext(`(function (exports, module) {${userFilesJs}\n})`, sandbox)(mod.exports, mod);
+        return mod.exports;
+      }
+      if (id === './metrics.ts') {
+        if (!sandbox.__metrics) {
+          const mod = { exports: {} };
+          vm.runInContext(`(function (exports, module) {${metricsJs}\n})`, sandbox)(mod.exports, mod);
+          sandbox.__metrics = mod.exports;
+        }
+        return sandbox.__metrics;
       }
       if (id === fakePath) {
         if (!sandbox.__fake) sandbox.__fake = require(id);
@@ -338,5 +393,162 @@ describe('bridge web runtime (lifecycle + audio)', () => {
     assert.ok(calls.some(([kind, name]) => kind === 'silent' && name === 'renewed'));
     assert.deepEqual(events.filter((e) => e.kind === 'audio').map((e) => e.state), ['renewed']);
     bridge.audioRecovery(false);
+  });
+});
+
+describe('banner slots (Unity AITBannerAd 대응)', () => {
+  const wait = () => new Promise((resolve) => setTimeout(resolve, 5));
+
+  it('initialize failure reports initializationFailed and retries on the next show', async () => {
+    const { cb, payloads } = collectCallback();
+    bridge.bannerShow(31, 'ad-a', 1, 'auto', 'blackAndWhite', 'expanded', cb);
+    await wait();
+    fake.__lastAdsInit.callbacks.onInitializationFailed(new Error('down'));
+    await flush();
+    assert.equal(payloads.at(-1).event.kind, 'initializationFailed');
+    assert.equal(payloads.at(-1).event.errorMessage, 'down');
+    bridge.disposeSubscription(31);
+    const before = fake.__calls.filter((c) => c.path === 'TossAds.initialize').length;
+    bridge.bannerShow(32, 'ad-a', 1, 'auto', 'blackAndWhite', 'expanded', collectCallback().cb);
+    await wait();
+    assert.equal(fake.__calls.filter((c) => c.path === 'TossAds.initialize').length, before + 1, 'idle again → initialize again');
+    fake.__lastAdsInit.callbacks.onInitializationFailed(new Error('down again'));
+    bridge.disposeSubscription(32);
+  });
+
+  it('bottom slot: one initialize for two slots, attach with options, callbacks become events, dispose cleans up', async () => {
+    const a = collectCallback();
+    const b = collectCallback();
+    const before = fake.__calls.filter((c) => c.path === 'TossAds.initialize').length;
+    bridge.bannerShow(41, 'ad-b', 1, 'dark', 'grey', 'card', a.cb);
+    bridge.bannerShow(42, 'ad-c', 0, 'auto', 'blackAndWhite', 'expanded', b.cb);
+    await wait();
+    assert.equal(fake.__calls.filter((c) => c.path === 'TossAds.initialize').length, before + 1, 'initialize is serialized');
+    const containers = documentObj.body.children.filter((c) => c.id.startsWith('ait-banner-container-'));
+    const bottom = containers.find((c) => c.id === 'ait-banner-container-41');
+    const top = containers.find((c) => c.id === 'ait-banner-container-42');
+    assert.equal(bottom.style.position, 'fixed');
+    assert.equal(bottom.style.bottom, 'env(safe-area-inset-bottom, 0px)');
+    assert.equal(top.style.top, 'env(safe-area-inset-top, 0px)');
+
+    fake.__lastAdsInit.callbacks.onInitialized();
+    await flush();
+    assert.deepEqual(a.payloads.map((p) => p.event.kind), ['initialized']);
+    assert.deepEqual(b.payloads.map((p) => p.event.kind), ['initialized']);
+    const attach = fake.__calls.filter((c) => c.path === 'TossAds.attachBanner');
+    assert.deepEqual(attach.map((c) => c.adGroupId), ['ad-b', 'ad-c']);
+    assert.equal(attach[0].owner, fake.TossAds);
+
+    const call = fake.__lastBanner; // ad-c
+    assert.equal(call.target, top);
+    assert.deepEqual(plain({ ...call.options, callbacks: Object.keys(call.options.callbacks) }), {
+      theme: 'auto', tone: 'blackAndWhite', variant: 'expanded',
+      callbacks: ['onAdRendered', 'onAdViewable', 'onAdClicked', 'onAdImpression', 'onAdFailedToRender', 'onNoFill'],
+    });
+    top.wrapper = { style: {} };
+    call.options.callbacks.onAdRendered({ slotId: 's1', adGroupId: 'ad-c', adMetadata: { creativeId: 'cr', requestId: 'rq' } });
+    call.options.callbacks.onNoFill({ slotId: 's1', adGroupId: 'ad-c', adMetadata: {} });
+    call.options.callbacks.onAdFailedToRender({ slotId: 's1', adGroupId: 'ad-c', adMetadata: {}, error: { code: 3, message: 'bad' } });
+    await flush();
+    assert.equal(top.wrapper.style.pointerEvents, 'auto', 'only the ad takes touches');
+    assert.equal(top.style.pointerEvents, 'none');
+    assert.deepEqual(b.payloads.slice(1).map((p) => p.event), [
+      { kind: 'rendered', adGroupId: 'ad-c', slotId: 's1', creativeId: 'cr', requestId: 'rq', errorCode: 0, errorMessage: '' },
+      { kind: 'noFill', adGroupId: 'ad-c', slotId: 's1', creativeId: '', requestId: '', errorCode: 0, errorMessage: '' },
+      { kind: 'failedToRender', adGroupId: 'ad-c', slotId: 's1', creativeId: '', requestId: '', errorCode: 3, errorMessage: 'bad' },
+    ]);
+    assert.ok(b.payloads.every((p) => p.kind === 'subscription_event' && p.subscriptionId === 42));
+
+    // 이미 초기화됐으면 다음 슬롯은 initialize 없이 바로 붙는다.
+    const c = collectCallback();
+    bridge.bannerShow(43, 'ad-d', 2, 'auto', 'blackAndWhite', 'expanded', c.cb);
+    bridge.bannerSetRect(43, 0.25, 0.5, 0.5, 0.1);
+    const rectBox = documentObj.body.children.find((el) => el.id === 'ait-banner-container-43');
+    assert.deepEqual(plain({ left: rectBox.style.left, top: rectBox.style.top, width: rectBox.style.width }), {
+      left: '110px', top: '420px', width: '200px',
+    }, 'normalized rect maps onto the canvas box');
+    await wait();
+    assert.deepEqual(c.payloads.map((p) => p.event.kind), ['initialized']);
+    assert.equal(fake.__calls.filter((x) => x.path === 'TossAds.initialize').length, before + 1);
+
+    // 높이 보고: 화면 크기 변경 뒤 다시 보고를 요청하면 캔버스 대비 비율과 함께 resized가 온다.
+    rectBox.height = 96;
+    bridge.bannerRefreshSizes();
+    await wait();
+    await flush();
+    const resized = c.payloads.at(-1).event;
+    assert.equal(resized.kind, 'resized');
+    assert.equal(resized.height, 96);
+    assert.equal(resized.heightFraction, 96 / 800);
+
+    for (const id of [41, 42, 43]) bridge.disposeSubscription(id);
+    assert.equal(documentObj.body.children.filter((el) => el.id.startsWith('ait-banner-container-')).length, 0);
+    assert.deepEqual(
+      fake.__calls.filter((x) => x.disposed === 'TossAds.attachBanner').map((x) => x.adGroupId).sort(),
+      ['ad-b', 'ad-c', 'ad-d'],
+    );
+  });
+
+  it('banner methods are listed as bridge methods', () => {
+    for (const name of ['bannerShow', 'bannerSetRect', 'bannerRefreshSizes']) assert.equal(bridge.hasBridgeMethod(name), true);
+  });
+});
+
+describe('runtime log and Godot Metrics tab', () => {
+  it('runtimeLog forwards { log_name, log_type, params } to debugLog and ignores bad JSON', () => {
+    bridge.runtimeLog(JSON.stringify({ log_name: 'godot_first_interactive', log_type: 'godot_runtime', params: { scene_name: 'Main' } }));
+    bridge.runtimeLog('not json');
+    const calls = fake.__calls.filter((c) => c.path === 'debugLog');
+    assert.equal(calls.length, 1);
+    assert.deepEqual(plain(calls[0].payload), {
+      log_name: 'godot_first_interactive', log_type: 'godot_runtime', params: { scene_name: 'Main' },
+    });
+    assert.equal(bridge.hasBridgeMethod('runtimeLog'), true);
+  });
+
+  it('adds a vConsole tab only when the debug tools instance exists, and lists records', async () => {
+    const metricsJs = ts.transpileModule(fs.readFileSync(path.join(repoRoot, 'bridge/src/metrics.ts'), 'utf8'), {
+      compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+    }).outputText;
+    const mod = { exports: {} };
+    new Function('exports', 'module', metricsJs)(mod.exports, mod);
+    const el = () => {
+      const node = {
+        children: [], attrs: {}, textContent: '', listeners: {},
+        setAttribute(k, v) { this.attrs[k] = v; },
+        addEventListener(type, fn) { this.listeners[type] = fn; },
+        appendChild(child) { this.children.push(child); return child; },
+        append(...nodes) { this.children.push(...nodes); },
+        replaceChildren() { this.children = []; },
+      };
+      return node;
+    };
+    const doc = { createElement: el };
+    const plugins = [];
+    class FakePlugin {
+      constructor(id, name) { this.id = id; this.name = name; this.handlers = {}; }
+      on(event, fn) { this.handlers[event] = fn; }
+    }
+    const noTools = { document: doc, setTimeout: () => 0, performance: { now: () => 0 } };
+    const quiet = mod.exports.installMetrics(noTools);
+    quiet.record('runtime', 'godot_error', { message: 'x' });
+    assert.equal(plugins.length, 0, 'no tab without the debug tools');
+
+    const instance = { constructor: { VConsolePlugin: FakePlugin }, addPlugin(p) { plugins.push(p); } };
+    const win = { document: doc, __VCONSOLE_INSTANCE: instance, setTimeout: () => 0, performance: { now: () => 0 }, requestAnimationFrame: () => 1, cancelAnimationFrame() {} };
+    const metrics = mod.exports.installMetrics(win);
+    assert.equal(plugins.length, 1);
+    assert.equal(plugins[0].id, 'godot_metrics');
+    assert.equal(plugins[0].name, 'Godot Metrics');
+    let root;
+    plugins[0].handlers.renderTab((node) => { root = node; });
+    metrics.record('runtime', 'godot_scene_transition', { scene_name: 'Room' });
+    metrics.record('event', 'eventLog', { log_name: 'buy' });
+    const body = root.children[1];
+    const rows = body.children.slice(2).map((row) => row.children.map((c) => c.textContent).join(''));
+    assert.equal(rows.length, 2);
+    assert.match(rows[0], /eventLog \{"log_name":"buy"\}/);
+    assert.match(rows[1], /godot_scene_transition \{"scene_name":"Room"\}/);
+    assert.match(body.children[1].textContent, /godot_scene_transition 1/);
   });
 });

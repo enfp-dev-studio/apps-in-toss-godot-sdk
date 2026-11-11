@@ -224,8 +224,37 @@ console.log(
 );
 // 실행 중에 필요한 설정(내비 바 투명 여부 등)을 build/ait-app-config.json에 남긴다.
 // export 뒤 engine-patch.mjs가 index.html에 JSON으로 넣고, AITSafeArea가 위쪽 인셋을 더할지 정할 때 읽는다.
+// runtimeLog.firstInteractive: 첫 상호작용 로그(godot_first_interactive)를 보낼지(기본 켬, Unity AIT_FIRST_INTERACTIVE_LOG 대응)
+const runtimeLog = manifest.runtimeLog;
+if (runtimeLog !== undefined) {
+  if (typeof runtimeLog !== 'object' || runtimeLog === null || Array.isArray(runtimeLog)) {
+    throw new Error('Game manifest runtimeLog must be an object.');
+  }
+  if (runtimeLog.firstInteractive !== undefined && typeof runtimeLog.firstInteractive !== 'boolean') {
+    throw new Error('Game manifest runtimeLog.firstInteractive must be a boolean.');
+  }
+}
+// userFiles: Storage에 복사해 둘 user:// 파일(Unity PlayerPrefs 미러링 대응). 브리지가 시작 전에 되살린다.
+const userFiles = manifest.userFiles ?? [];
+if (!Array.isArray(userFiles) || !userFiles.every((p) => typeof p === 'string' && /^user:\/\/[^]+$/.test(p) && !p.split('/').includes('..'))) {
+  throw new Error('Game manifest userFiles must be an array of "user://…" paths.');
+}
+// keyboardMode: 소프트 키보드가 뜰 때 셸이 캔버스를 다루는 방식(Unity AITKeyboardMode 대응). pan(기본)·resize·none
+const keyboardMode = manifest.keyboardMode ?? 'pan';
+if (!['pan', 'resize', 'none'].includes(keyboardMode)) {
+  throw new Error('Game manifest keyboardMode must be "pan", "resize" or "none".');
+}
 const runtimeConfig = {
   appType: appType ?? null,
+  userFiles,
+  keyboardMode,
+  // 셸 로딩 화면의 앱 정보(AppsInTossShell.appInfo, Unity AITLoading.appInfo 대응)
+  appInfo: {
+    displayName: manifest.displayName ?? appName,
+    primaryColor,
+    iconUrl: manifest.brand?.iconUrl ?? null,
+  },
+  runtimeLog: { firstInteractive: runtimeLog?.firstInteractive !== false },
   navigationBar: { transparentBackground: typeof navigationBar?.transparentBackground === 'boolean' ? navigationBar.transparentBackground : null },
 };
 fs.mkdirSync(path.join(projectDir, 'build'), { recursive: true });

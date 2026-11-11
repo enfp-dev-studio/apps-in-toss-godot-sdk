@@ -8,6 +8,8 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { diagnose, formatDiagnosis, writeDiagnosis } from './scripts/build-diagnostics.mjs';
+import { addGitignoreLines, missingGitignoreLines } from './scripts/git-guard.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const toolsDir = path.resolve(here); // .../addons/apps_in_toss/tools
@@ -39,15 +41,25 @@ function pipelineEnv(extra = {}) {
   };
 }
 
+// 단계 출력은 그대로 보여 주고, 오류 출력(stderr)은 모아 두었다가 단계가 끝나면 내보낸다.
+// 실패하면 빌드 실패 진단(build-diagnostics.mjs)으로 할 일과 오류 끝부분을 보여 주고 build/last-build-error.json에 남긴다.
 function runStep(label, scriptName, { env = {}, extraArgs = [] } = {}) {
   console.log(`\n[ait-godot] ▶ ${label}`);
   const result = spawnSync(process.execPath, [path.join(scriptsDir, scriptName), ...extraArgs], {
     cwd: gameDir,
-    stdio: 'inherit',
+    stdio: ['inherit', 'inherit', 'pipe'],
+    encoding: 'utf8',
+    maxBuffer: 64 * 1024 * 1024,
     env: pipelineEnv(env),
   });
+  if (result.stderr) process.stderr.write(result.stderr);
   if (result.error) fail(String(result.error));
-  if (result.status !== 0) fail(`${label} 실패 (exit ${result.status ?? '?'})`);
+  if (result.status !== 0) {
+    const diagnosis = diagnose(label, result.status, result.stderr);
+    if (fs.existsSync(path.join(gameDir, 'project.godot'))) writeDiagnosis(gameDir, diagnosis);
+    console.error(formatDiagnosis(diagnosis));
+    process.exit(1);
+  }
 }
 
 const usage = `ait-godot — Apps in Toss × Godot 게임 파이프라인 (Unity SDK 워크플로 대응)
@@ -63,11 +75,19 @@ const usage = `ait-godot — Apps in Toss × Godot 게임 파이프라인 (Unity
   ait-godot build                        release 파이프라인 → <gameId>.ait — Build & Package 대응
   ait-godot build --debug-console        테스트 빌드: 실기기 원격 디버깅(/ait:debug) 포함 — 검수 제출 금지
   ait-godot build:dev                    mock 브리지 + DevTools 개발 빌드 — Dev Server 대응
-  ait-godot preview                      build/godot-web 로컬 서빙
+  ait-godot deploy [--rc] [--profile <이름>] [--skip-build]
+                                         출시 빌드 후 콘솔 테스트(QR) 환경에 올리고 QR 표시 — Deploy for Online Test·
+                                         Release Candidate 대응. 토큰은 처음 한 번 bridge의 ait token add
+  ait-godot preview                      build/godot-web 로컬 서빙(매니페스트 preview.host·preview.port, 기본 0.0.0.0:5173)
+  ait-godot clean                        SDK 빌드 결과(build/godot-web, .ait 등) 지우기 — Clean 대응
+  ait-godot git:guard [--fix]            .gitignore 빠진 줄·커밋된 빌드 결과/비밀 파일 찾기(--fix로 고침) — GitGuard 대응
+  ait-godot optimize [--fix]             256KB 넘는 무손실 텍스처·압축 끈 WAV 찾기(--fix로 .import 고침) — 빌드 전 최적화 검사 대응
+  ait-godot shell:reset                  custom_shell.html을 SDK 템플릿으로(기존은 .bak) — Reset Loading Screen 대응
   ait-godot sim [<주소>] [--device <이름>]
                                          iOS 시뮬레이터 Safari로 미리보기 열기(macOS·Xcode). 다른 터미널에서 preview를 먼저 띄우세요
   ait-godot verify-ait [<파일>.ait]      최종 .ait 검사(출시 프리셋·개발 파일·검수 반려 글자) — build가 마지막에 자동 실행
   ait-godot sync                         SDK 설치 상태 확인 (강제 갱신은 addon:install --force)
+  ait-godot update [--check]             SDK 새 판 확인(--check)·올리기 — Check for Updates 대응
 
 배포는 내장 브리지의 토스 CLI로 합니다: ./addons/apps_in_toss/tools/bridge/node_modules/.bin/ait deploy (같은 바이너리로 ait token add 선행)
 
@@ -80,17 +100,9 @@ const usage = `ait-godot — Apps in Toss × Godot 게임 파이프라인 (Unity
 // init이 게임 .gitignore에 더하는 줄(없는 줄만). 빌드 결과, Godot 캐시,
 // 실기기 디버거 relay 비밀값, Godot MCP 실행 파일. *.ait는 .ait/ 폴더 이름에도 맞으므로
 // 매니페스트·lock이 든 .ait/는 !.ait/로 다시 넣는다.
-const GITIGNORE_LINES = ['.godot/', 'build/', '*.ait', '!.ait/', '.ait_relay', '.mcp/'];
-
+// .gitignore 줄 목록은 git 보호(scripts/git-guard.mjs, GITIGNORE_LINES)와 같다
 function ensureGitignore(dir) {
-  const file = path.join(dir, '.gitignore');
-  const text = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
-  const have = new Set(text.split(/\r?\n/).map((line) => line.trim()));
-  const missing = GITIGNORE_LINES.filter((line) => !have.has(line));
-  if (missing.length === 0) return [];
-  const prefix = text === '' || text.endsWith('\n') ? '' : '\n';
-  fs.writeFileSync(file, `${text}${prefix}# Apps in Toss Godot SDK (ait-godot init)\n${missing.join('\n')}\n`);
-  return missing;
+  return addGitignoreLines(dir, missingGitignoreLines(dir), '# Apps in Toss Godot SDK (ait-godot init)');
 }
 
 main();
@@ -110,6 +122,12 @@ function main() {
     preview: { project: true, manifest: true, lock: true },
     'verify-ait': { project: true, manifest: true, lock: true },
     sim: { project: false, manifest: false },
+    deploy: { project: true, manifest: true, lock: true },
+    clean: { project: true, manifest: false },
+    optimize: { project: true, manifest: false },
+    'shell:reset': { project: true, manifest: false },
+    update: { project: true, manifest: false },
+    'git:guard': { project: true, manifest: false },
   };
   const req = needs[command];
   if (!req) fail(`알 수 없는 명령 "${command}"\n\n${usage}`);
@@ -130,6 +148,12 @@ function main() {
     case 'doctor': return cmdDoctor();
     case 'build': return cmdBuild();
     case 'build:dev': return cmdBuildDev();
+    case 'deploy': return cmdDeploy();
+    case 'clean': return runStep('빌드 결과 정리', 'pipeline-clean.mjs');
+    case 'git:guard': return runStep('git 보호 검사', 'pipeline-git-guard.mjs', { extraArgs: args.slice(1) });
+    case 'optimize': return runStep('빌드 전 최적화 검사', 'pipeline-optimize.mjs', { extraArgs: args.slice(1) });
+    case 'shell:reset': return runStep('셸을 SDK 템플릿으로', 'pipeline-shell-reset.mjs');
+    case 'update': return runStep(args.includes('--check') ? 'SDK 업데이트 확인' : 'SDK 업데이트', 'pipeline-update.mjs', { extraArgs: args.slice(1) });
     case 'preview': return cmdPreview();
     case 'sim': return cmdSim();
     case 'verify-ait': return runStep('최종 .ait 검사', 'verify-ait.mjs', { extraArgs: args.slice(1, 2) });
@@ -225,7 +249,15 @@ function cmdBuild() {
     console.log('[ait-godot] 테스트 빌드 완료. 콘솔에 테스트 번들로 올린 뒤 /ait:debug로 QR attach 하세요.');
     return;
   }
-  console.log('\n[ait-godot] ✅ 완료. 배포: ./addons/apps_in_toss/tools/bridge/node_modules/.bin/ait deploy (콘솔 토큰 필요, token add 선행)');
+  console.log('\n[ait-godot] ✅ 완료. 콘솔 테스트 환경에 올리려면: ait-godot deploy (처음 한 번 ait token add)');
+}
+
+// 콘솔 테스트(QR) 환경에 올린다(Unity Deploy for Online Test / Deploy Release Candidate). 먼저 출시 빌드를 한다
+function cmdDeploy() {
+  if (!args.includes('--skip-build')) cmdBuild();
+  runStep(args.includes('--rc') ? '릴리스 후보 배포' : '온라인 테스트 배포', 'pipeline-deploy.mjs', {
+    extraArgs: args.slice(1).filter((a) => a !== '--skip-build'),
+  });
 }
 
 function cmdBuildDev() {

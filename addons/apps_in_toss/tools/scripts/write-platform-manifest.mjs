@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { injectAppConfig, readAppConfig } from './engine-patch.mjs';
+import { readSentryConfig } from './sentry-config.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..');
@@ -66,6 +67,8 @@ if (gameManifest && !isPlaceholder) {
 
 // 테스트 빌드(build --debug-console)임을 남긴다. doctor와 verify가 이 값을 본다.
 if (process.env.AIT_DEBUG_CONSOLE === '1') manifest.debugConsole = true;
+// Sentry 연동이 들어간 빌드임을 남긴다(매니페스트 sentry.dsn). verify-godot-export가 ait-sentry.js와 맞춰 본다.
+if (readSentryConfig(projectDir)) manifest.sentry = true;
 
 // 어떤 프리셋으로 내보냈는지 남긴다. verify-ait가 lock의 출시 프리셋과 비교한다.
 manifest.exportPreset = process.env.GODOT_EXPORT_PRESET ?? platformLock.godot?.web?.exportPreset ?? 'Apps in Toss Web';

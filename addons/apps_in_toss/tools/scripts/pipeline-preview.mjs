@@ -48,9 +48,18 @@ function resolveViteEntry() {
 }
 
 const viteEntry = resolveViteEntry();
-console.log(`[ait-godot preview] http://localhost:5173/ (vite: ${viteEntry})`);
 // process.execPath = 지금 이 스크립트를 실행 중인 node 자신. PATH 불필요.
-const result = spawnSync(process.execPath, [viteEntry, exportDir, '--host', '0.0.0.0'], {
+// 매니페스트 preview: { host, port }(Unity Configuration의 서버 호스트·포트 대응). 포트가 차 있으면 vite가 다음 포트를 쓴다.
+const manifestPath = path.join(gameDir, '.ait/game.manifest.json');
+const preview = fs.existsSync(manifestPath) ? JSON.parse(fs.readFileSync(manifestPath, 'utf8')).preview ?? {} : {};
+const host = preview.host ?? '0.0.0.0';
+const port = preview.port ?? 5173;
+if (typeof host !== 'string' || !Number.isInteger(port) || port < 1 || port > 65535) {
+  console.error('[ait-godot preview] 매니페스트 preview는 { "host": 문자열, "port": 1~65535 }여야 합니다.');
+  process.exit(1);
+}
+console.log(`[ait-godot preview] http://localhost:${port}/ (vite: ${viteEntry})`);
+const result = spawnSync(process.execPath, [viteEntry, exportDir, '--host', host, '--port', String(port)], {
   cwd: gameDir,
   stdio: 'inherit',
 });

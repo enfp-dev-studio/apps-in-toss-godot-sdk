@@ -4,6 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DEBUG_CONSOLE_EXPORT_FILE, DEV_ONLY_EXPORT_FILES } from './export-dir.mjs';
 import { formatFindings, isTextFile, referencesScript, scanReleaseText } from './release-scan.mjs';
+import { SENTRY_EXPORT_FILE } from './sentry-config.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const defaultExportDir = path.resolve(here, '../build/godot-web');
@@ -100,6 +101,18 @@ if (withDebugConsole) {
   throw new Error(
     'AIT platform manifest records "debugConsole": true, but this is a release build. Rebuild without --debug-console.',
   );
+}
+// Sentry 연동: AIT_SENTRY=1(게임 매니페스트 sentry.dsn)이면 ait-sentry.js가 브리지 다음에 한 번, 플랫폼 매니페스트에
+// "sentry": true. 아니면 그 파일이 없어야 한다(지난 빌드의 찌꺼기로 DSN이 남지 않게).
+const withSentry = process.env.AIT_SENTRY === '1';
+const sentryTag = `<script src="./${SENTRY_EXPORT_FILE}"></script>`;
+if (withSentry) {
+  if (!fs.existsSync(path.join(exportDir, SENTRY_EXPORT_FILE))) throw new Error(`Sentry bundle not found: ${SENTRY_EXPORT_FILE}.`);
+  if (countOccurrences(html, sentryTag) !== 1) throw new Error('Sentry script must appear exactly once in index.html.');
+  if (html.indexOf(sentryTag) < html.indexOf(bridgeTag)) throw new Error('Sentry script must come after the Apps in Toss Godot bridge script.');
+  if (manifest && manifest.sentry !== true) throw new Error('AIT platform manifest must record "sentry": true (game manifest sentry.dsn).');
+} else if (fs.existsSync(path.join(exportDir, SENTRY_EXPORT_FILE)) || referencesScript(html, SENTRY_EXPORT_FILE)) {
+  throw new Error(`${SENTRY_EXPORT_FILE} is in the export but the game manifest has no sentry.dsn. Rebuild.`);
 }
 if (/id=["']status-(?:splash|progress)["']/i.test(html)) {
   throw new Error(

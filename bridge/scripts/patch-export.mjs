@@ -69,4 +69,21 @@ if (withDebugConsole) {
   console.log('Debug console injected (test build only, do not submit for review).');
 }
 
+// Sentry 연동(게임 매니페스트에 sentry.dsn이 있을 때 빌드가 AIT_SENTRY=1로 부른다). 브리지 바로 다음에 넣어
+// debug-console보다 먼저 오류를 잡는다. 출시 빌드에도 들어간다.
+if (process.env.AIT_SENTRY === '1') {
+  const sentryName = 'ait-sentry.js';
+  const sentrySrc = path.join(bridgeDir, 'dist', sentryName);
+  if (!fs.existsSync(sentrySrc)) {
+    throw new Error(`Sentry bundle not found: ${sentrySrc}. Run npm run build:sentry first.`);
+  }
+  fs.copyFileSync(sentrySrc, path.join(exportDir, sentryName));
+  const sentryTag = `<script src="./${sentryName}"></script>`;
+  if (!html.includes(sentryTag)) {
+    html = html.replace(tag, `${tag}\n  ${sentryTag}`);
+    fs.writeFileSync(indexPath, html);
+  }
+  console.log('Sentry injected (game manifest sentry.dsn).');
+}
+
 console.log(`Patched ${indexPath}`);

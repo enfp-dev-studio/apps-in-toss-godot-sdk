@@ -67,6 +67,7 @@ Unity SDK와 npm web-framework, DevTools의 버전이 같다고 가정하지 말
   Unity가 엔진 값으로 주는 API(`GetDevicePixelRatio` 등)도 Godot 쪽 함수로 맞춥니다.
 - Unity가 deprecated·v2 별칭인 옛 이름을 부르고 이 SDK에 같은 기능의 새 이름이 있으면, 테스트의 `RENAMED`에 적고 새 이름으로 덮습니다.
 - Unity보다 web-framework에 먼저 나온 공개 API(예: 3.10.0 `NavigationBar` 액세서리 버튼)도 함께 넣습니다.
+- API 밖의 Unity 기능(런타임 도우미, WebGL 템플릿, 에디터 메뉴·창)도 같은 태그로 대조합니다. 엔진 차이로 필요 없는 것만 빼고, 뺀 것은 이유와 함께 기록합니다.
 - "게임에 필요 없어 보인다"는 이유로 빼거나 미루지 않습니다. 범위를 줄여야 할 사정이 있으면 정하기 전에 사용자에게 묻습니다.
 
 문서도 용도별로 유지합니다. README에는 소개·시작 순서·검사 상태만 두고,
@@ -432,3 +433,38 @@ cat-room-godot 출시 준비(검수 반려 2회, iOS 실기기 -33~-105)에서 �
   짝이 되는 디버거는 0.3.0(프로토콜 2)입니다.
 - 검증: [2026-11-10 검사 기록](testing.md#2026-11-10-sdk-3100-자동-검사).
 - 감시: Unity SDK 3.10.0 출시(새 `NavigationBar` 액세서리 API 이름·`IsSupported`·권한 보조 함수가 들어오는지), Godot 4.8 정식(지금 beta3)·4.7.3.
+
+### 2026-11-10 (이어서): Unity SDK 3.9.0의 API 밖 기능 맞춤
+
+API 85개 경로에 이어, Unity 패키지의 런타임 도우미·WebGL 템플릿·에디터 도구를 대조해 엔진 차이로 필요 없는 것만 빼고 붙였습니다.
+Unity SDK 저장소에는 라이선스가 없어(Toss 모든 권리 보유) 코드는 옮기지 않고 동작만 맞춰 새로 썼습니다.
+
+| Unity 3.9.0 | 이 SDK |
+| --- | --- |
+| `AITBannerAd`·`AITBannerAdView`·BannerAd.jslib | `AIT.banner`·`AITBannerAdView`, 브리지 `bannerShow`·`bannerSetRect`·`bannerRefreshSizes`(초기화 직렬화, 위·아래·영역, 높이 보고) |
+| `AITVersion` | `AITVersion`(`AIT.sdk_version()`), 시작 로그 |
+| 런타임 이벤트 로거(`unity_*`, `debugLog`) | `AIT.runtime_log`(`godot_*`, log_type `godot_runtime`). GC 로그는 GDScript에 가비지 컬렉터가 없어 뺌 |
+| Unity Metrics 탭(vConsole) | Godot Metrics 탭(`bridge/src/metrics.ts`) |
+| Sentry 통합·Analytics 연동 | `AIT.sentry` + `dist/ait-sentry.js`(@sentry/browser 11.10.0, 매니페스트 `sentry.dsn`이 있을 때만). 번들의 "eval" 글자 6곳은 뜻을 바꾸지 않고 다시 써 검수 검사를 통과 |
+| PlayerPrefs 미러링(ait-playerprefs.js) | `userFiles` + `AIT.user_files` + 브리지 `userFilesReady()`(IDBFS `/userfs` 판 21에 되살림) |
+| 템플릿 소프트 키보드(pan·resize·none) | 셸 템플릿 같은 세 모드(`keyboardMode`). Unity 입력 바 처리는 Unity 전용이라 뺌 |
+| EarlyFetch | 셸 템플릿 이른 내려받기(wasm·pck) |
+| `AITLoading`·`showLoadError` | `AppsInTossShell.appInfo`·콜백·`hide`·실패 힌트와 진단 정보 |
+| Deploy for Online Test·Release Candidate·QR | `ait-godot deploy [--rc]`, 패널 버튼과 QR(qrcode 1.5.4). 토큰은 CLI 저장소(`ait token add`) |
+| `ait-patch-cli.mjs`(runtimeVersion) | 뺌: CLI 3.10.0의 `ait deploy`에는 runtimeVersion 검사가 없음(서버 쪽은 실제 배포 전에는 확인하지 못함) |
+| AutoUpdater·DeprecationChecker | `update [--check]`, `sdk-policy.json` + strict `doctor`. 정책을 받지 못하면 Unity처럼 코드 기준으로 대신하지 않고 경고만 |
+| Clean·Open Build Output·Reset Loading Screen·Force Update Template·Reset All SDK State | `clean`, `shell:reset`, 패널 버튼 |
+| 서버 호스트·포트·재시작 | 매니페스트 `preview`, 패널 재시작 |
+| NodeJSDownloader | 패널 Node 설치(24.22.1, SHA256 고정). 다른 미러로 대신 받기는 뺌 |
+| BuildOptimizationScanner | `optimize [--fix]`(Godot `.import` 기준) |
+| GitGuard | `git:guard [--fix]`, `doctor` 경고 |
+| BuildDiagnostics·ExportErrorCatalog | 단계 실패 진단(`build-diagnostics.mjs`, `build/last-build-error.json`) |
+| Configuration 창 | 패널 설정 창(`AITConfigDialog`, 모르는 키·appType 기본값 유지) |
+| 이슈 제보(토스 Sentry User Feedback) | GitHub 이슈 작성 화면을 진단 정보로 채워 엶(토스의 Sentry 프로젝트로는 보내지 않음) |
+| 에디터 오류 추적(토스 Sentry, opt-out) | 뺌: 토스의 Sentry 프로젝트로 보내는 것이라 이 SDK가 쓸 수 없음 |
+
+엔진 차이로 뺀 것: PlayerSettings·빌드 세션 복구, WebGL 빌더 설정(IL2CPP, 코드 제거, WASM 스트리밍, 파일명 해싱), Unity 메타데이터·
+에디터 대기·컴파일 감시, pnpm 실행·저장소·잠금 파일 검사, BuildConfig 병합·Unity 빌드 복사, 템플릿 관리, 내부 유틸, IL2CPP 줄번호,
+Sentry Unity 패키지 설치, web-framework 2.x 전용 설정(`bridgeColorMode`, `webViewType`).
+검증: [테스트 기록](testing.md#2026-11-10-unity-390-api-밖-기능-검사).
+

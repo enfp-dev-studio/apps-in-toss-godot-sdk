@@ -75,7 +75,7 @@ function main() {
     copyTree(addonSrc, path.join(fixture, 'addons/apps_in_toss'));
 
     fs.mkdirSync(path.join(fixture, 'tests'), { recursive: true });
-    for (const name of ['admob-lifecycle.gd', 'iap-pagination.gd', 'lessons-modules.gd', 'events-subscriptions.gd']) {
+    for (const name of ['admob-lifecycle.gd', 'iap-pagination.gd', 'lessons-modules.gd', 'events-subscriptions.gd', 'banner-ad.gd', 'runtime-log.gd', 'sentry.gd', 'user-files.gd', 'editor-tools.gd']) {
       fs.copyFileSync(path.join(repoRoot, 'tests/gdscript', name), path.join(fixture, 'tests', name));
     }
 
@@ -135,6 +135,51 @@ function main() {
       throw new Error(`구독형 API 검사 성공 마커 없음:\n${eventsOut}`);
     }
     console.log('[godot-ci] 구독형 API 통과 (경로·인자·이벤트 이름·해제)');
+    // AIT.banner·AITBannerAdView: Unity SDK 3.9.0 배너 도우미
+    const bannerOut = run(godotBin, ['--headless', '--path', fixture, '--script', 'res://tests/banner-ad.gd'], {
+      cwd: repoRoot, timeoutMs: 180_000, label: 'banner ad',
+    });
+    const bannerMatch = bannerOut.match(/banner ad check passed \((\d+) checks\)/);
+    if (!bannerMatch) {
+      throw new Error(`배너 검사 성공 마커 없음:\n${bannerOut}`);
+    }
+    console.log(`[godot-ci] 배너 광고 통과 (${bannerMatch[1]} checks)`);
+    // AITRuntimeLog·AITVersion: Unity 런타임 이벤트 로거·SDK 버전
+    const runtimeLogOut = run(godotBin, ['--headless', '--path', fixture, '--script', 'res://tests/runtime-log.gd'], {
+      cwd: repoRoot, timeoutMs: 180_000, label: 'runtime log',
+    });
+    const runtimeLogMatch = runtimeLogOut.match(/runtime log check passed \((\d+) checks\)/);
+    if (!runtimeLogMatch) {
+      throw new Error(`런타임 로그 검사 성공 마커 없음:\n${runtimeLogOut}`);
+    }
+    console.log(`[godot-ci] 런타임 로그 통과 (${runtimeLogMatch[1]} checks)`);
+    // AIT.sentry: Unity Sentry 통합·Analytics 연동
+    const sentryOut = run(godotBin, ['--headless', '--path', fixture, '--script', 'res://tests/sentry.gd'], {
+      cwd: repoRoot, timeoutMs: 180_000, label: 'sentry',
+    });
+    const sentryMatch = sentryOut.match(/sentry check passed \((\d+) checks\)/);
+    if (!sentryMatch) {
+      throw new Error(`Sentry 검사 성공 마커 없음:\n${sentryOut}`);
+    }
+    console.log(`[godot-ci] Sentry 통과 (${sentryMatch[1]} checks)`);
+    // AIT.user_files: 저장 미러링(Unity PlayerPrefs 미러링)
+    const userFilesOut = run(godotBin, ['--headless', '--path', fixture, '--script', 'res://tests/user-files.gd'], {
+      cwd: repoRoot, timeoutMs: 180_000, label: 'user files',
+    });
+    const userFilesMatch = userFilesOut.match(/user files check passed \((\d+) checks\)/);
+    if (!userFilesMatch) {
+      throw new Error(`저장 미러링 검사 성공 마커 없음:\n${userFilesOut}`);
+    }
+    console.log(`[godot-ci] 저장 미러링 통과 (${userFilesMatch[1]} checks)`);
+    // 설정 창·이슈 제보(에디터 도구)
+    const editorToolsOut = run(godotBin, ['--headless', '--path', fixture, '--script', 'res://tests/editor-tools.gd'], {
+      cwd: repoRoot, timeoutMs: 180_000, label: 'editor tools',
+    });
+    const editorToolsMatch = editorToolsOut.match(/editor tools check passed \((\d+) checks\)/);
+    if (!editorToolsMatch) {
+      throw new Error(`에디터 도구 검사 성공 마커 없음:\n${editorToolsOut}`);
+    }
+    console.log(`[godot-ci] 설정 창·이슈 제보 통과 (${editorToolsMatch[1]} checks)`);
     // cat-room-godot에서 옮긴 모듈(뒤로가기·Safe Area·사운드 게이트·저장·한글·터치 스크롤)
     const lessonsOut = run(godotBin, ['--headless', '--path', fixture, '--script', 'res://tests/lessons-modules.gd'], {
       cwd: repoRoot,

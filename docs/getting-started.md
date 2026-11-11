@@ -188,9 +188,47 @@ release 결과에 남으면 검사가 실패합니다. export 폴더가 압축 �
 node addons/apps_in_toss/tools/ait-godot.mjs build --debug-console  # 테스트 전용, 검수 제출 금지
 ```
 
-플러그인을 켜면 Godot 에디터의 **AIT 탭**에서도 Doctor, Dev Server,
-Build & Package를 실행할 수 있습니다. Configuration 열기, Publish 안내,
-서버 정지 버튼도 제공합니다.
+콘솔 테스트(QR) 환경에 바로 올리려면 처음 한 번 배포 키를 넣고(`ait token add`, 토큰은 `~/.ait/credentials`에 저장되고 SDK는
+읽거나 출력하지 않습니다) `deploy`를 실행합니다. 출시 빌드 뒤 올리고 링크·QR을 보여 줍니다(`build/deploy-qr.png`).
+`--rc`는 릴리스 후보(메모 머리말과 검수 요청 안내만 다름)이고, 실제 출시는 콘솔의 검수 요청으로만 합니다.
+
+```bash
+./addons/apps_in_toss/tools/bridge/node_modules/.bin/ait token add
+node addons/apps_in_toss/tools/ait-godot.mjs deploy          # 온라인 테스트
+node addons/apps_in_toss/tools/ait-godot.mjs deploy --rc     # 릴리스 후보
+```
+
+그 밖의 명령(Unity AIT 메뉴 대응):
+
+| 명령 | 하는 일 |
+| --- | --- |
+| `update --check` / `update` | SDK 새 판 확인 / 최신 SDK로 애드온·lock 교체 후 `doctor --strict` |
+| `clean` | SDK 빌드 결과(`build/godot-web`, `.ait`, 배포 결과)만 지움 |
+| `optimize [--fix]` | 256KB 넘는 무손실 텍스처·압축 끈 WAV 찾기. `--fix`면 `.import`를 손실·VRAM 압축·QOA로(그림·소리 품질이 바뀌니 목록 먼저 확인) |
+| `git:guard [--fix]` | `.gitignore` 빠진 줄과 커밋돼 있는 빌드 결과·비밀 파일 찾기. `--fix`면 줄을 더하고 `git rm --cached` |
+| `shell:reset` | `custom_shell.html`을 SDK 템플릿으로(기존은 `.bak`) |
+
+출시 `build`(strict)는 SDK 저장소의 `sdk-policy.json`을 받아 설치된 SDK가 최소 판보다 낮거나 사용 중지된 판이면 멈춥니다.
+받지 못하면(오프라인) 경고만 합니다. 단계가 실패하면 할 일과 오류 끝부분을 보여 주고 `build/last-build-error.json`에 남깁니다.
+
+플러그인을 켜면 Godot 에디터의 **AIT 탭**에서 같은 일을 버튼으로 합니다: 설정 창(매니페스트를 칸으로 고침), Doctor,
+Dev Server·서버 정지·재시작, Build & Package, Deploy for Online Test·Release Candidate(QR 표시), 업데이트 확인, 빌드 결과 열기,
+정리, 셸 초기화, SDK 상태 초기화, Node 설치(Node.js 24.22.1을 받아 SHA256 확인), 빌드 전 최적화 검사, git 보호 검사, 이슈 제보하기
+(SDK 저장소의 GitHub 이슈 화면을 판·진단 정보로 채워 엶).
+
+매니페스트의 선택 항목(빌드가 읽음):
+
+| 키 | 뜻 |
+| --- | --- |
+| `keyboardMode` | 소프트 키보드가 뜰 때 셸이 캔버스를 다루는 방식. `pan`(기본, 누른 자리가 가리면 그만큼 올림)·`resize`(보이는 영역으로 줄임)·`none` |
+| `preview` | `{ "host": "0.0.0.0", "port": 5173 }` 개발 서버 주소 |
+| `runtimeLog` | `{ "firstInteractive": false }`면 첫 상호작용 로그를 보내지 않음 |
+| `userFiles` | Storage에 복사해 둘 `user://` 파일 목록([저장 미러링](api-guide.md#저장-미러링user-파일)) |
+| `sentry` | `{ "dsn", "environment", "release", "sampleRate" }` Sentry 연동([진단](api-guide.md#런타임-로그metrics-탭sentry)) |
+| `debugConsole` | `{ "relayPublicKeys": [] }` 테스트 빌드의 실기기 디버거 공개키([실기기 원격 디버깅](testing.md#실기기-원격-디버깅)) |
+
+셸 템플릿은 엔진 JS를 받는 동안 wasm·pck 받기를 먼저 시작하고(이른 내려받기), 로딩 화면에 `AppsInTossShell.appInfo`·`onReady`·
+`onProgress`·`onComplete`·`onError`·`hide`와 실패 화면의 힌트·진단 정보를 둡니다(Unity `AITLoading` 대응).
 
 ## SDK 업데이트
 

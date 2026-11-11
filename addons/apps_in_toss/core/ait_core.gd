@@ -149,6 +149,35 @@ func start_path_subscription(subscription_id: int, path: String, options: Dictio
     else:
         _bridge.call("subscribePathArgs", subscription_id, path, JSON.stringify(args), JSON.stringify(options), _callback)
 
+## 런타임 디버그 로그(AITRuntimeLog). 브리지가 debugLog가 있으면 넘기고 Godot Metrics 탭에 보여 줍니다.
+func runtime_log(log_name: String, log_type: String, params: Dictionary) -> void:
+    if is_available() and has_bridge_method("runtimeLog"):
+        _bridge.call("runtimeLog", JSON.stringify({"log_name": log_name, "log_type": log_type, "params": params}))
+
+## 배너 광고 슬롯(AITBannerAd). mode 0 위, 1 아래, 2 영역(set_banner_rect). 이벤트는 subscription_event로 오고,
+## 내릴 때는 dispose_subscription을 부릅니다.
+func start_banner(subscription_id: int, ad_group_id: String, mode: int, theme: String, tone: String, variant: String) -> void:
+    if not is_available():
+        call_deferred("_emit_unavailable_subscription", subscription_id)
+        return
+    if not has_bridge_method("bannerShow"):
+        call_deferred("_emit_subscription_error", subscription_id, {
+            "code": "AIT_API_UNAVAILABLE",
+            "message": "Apps in Toss bridge does not support banner ads. Reinstall the addon.",
+        })
+        return
+    _bridge.call("bannerShow", subscription_id, ad_group_id, mode, theme, tone, variant, _callback)
+
+## 영역 배너의 위치(캔버스 기준 0~1, 왼쪽 위 원점)
+func set_banner_rect(subscription_id: int, rect: Rect2) -> void:
+    if is_available():
+        _bridge.call("bannerSetRect", subscription_id, rect.position.x, rect.position.y, rect.size.x, rect.size.y)
+
+## 화면 크기가 바뀐 뒤 모든 배너가 높이를 다시 보고하게 합니다
+func refresh_banner_sizes() -> void:
+    if is_available() and has_bridge_method("bannerRefreshSizes"):
+        _bridge.call("bannerRefreshSizes")
+
 func dispose_subscription(subscription_id: int) -> void:
     if is_available():
         _bridge.disposeSubscription(subscription_id)

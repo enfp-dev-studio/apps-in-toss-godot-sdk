@@ -35,6 +35,9 @@ describe('bridge source/embedded parity + version pins', () => {
       ['bridge/package-lock.json', 'addons/apps_in_toss/tools/bridge/package-lock.json'],
       ['bridge/src/index.ts', 'addons/apps_in_toss/tools/bridge/src/index.ts'],
       ['bridge/src/web-runtime.ts', 'addons/apps_in_toss/tools/bridge/src/web-runtime.ts'],
+      ['bridge/src/metrics.ts', 'addons/apps_in_toss/tools/bridge/src/metrics.ts'],
+      ['bridge/src/sentry.ts', 'addons/apps_in_toss/tools/bridge/src/sentry.ts'],
+      ['bridge/src/user-files.ts', 'addons/apps_in_toss/tools/bridge/src/user-files.ts'],
       ['bridge/src/debug-console.ts', 'addons/apps_in_toss/tools/bridge/src/debug-console.ts'],
       ['bridge/vite.config.ts', 'addons/apps_in_toss/tools/bridge/vite.config.ts'],
       ['bridge/tsconfig.json', 'addons/apps_in_toss/tools/bridge/tsconfig.json'],
@@ -79,6 +82,9 @@ describe('bridge source/embedded parity + version pins', () => {
     assert.equal(lock.unitySdk.packageVersion, '3.9.0');
     assert.equal(lock.unitySdk.commit, 'c2892282018b44e1666b364a7a97711a130761d6');
     assert.equal(read('addons/apps_in_toss/plugin.cfg').match(/version="([^"]+)"/)[1], '0.2.0');
+    const versionGd = read('addons/apps_in_toss/status/ait_version.gd');
+    assert.equal(versionGd.match(/const VERSION := "([^"]+)"/)[1], read('addons/apps_in_toss/plugin.cfg').match(/version="([^"]+)"/)[1], 'AITVersion.VERSION = plugin.cfg');
+    assert.equal(versionGd.match(/const WEB_FRAMEWORK := "([^"]+)"/)[1], readJson('bridge/package.json').dependencies['@apps-in-toss/web-framework'], 'AITVersion.WEB_FRAMEWORK = bridge');
   });
 
   // Unity SDK 3.9.0(c2892282)의 jslib가 부르는 web-framework 경로 85개를 이 SDK가 모두 덮는지 본다.

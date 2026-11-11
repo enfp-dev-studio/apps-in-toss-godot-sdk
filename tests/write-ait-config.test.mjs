@@ -258,7 +258,9 @@ test('실행 설정(build/ait-app-config.json)에 appType과 내비 바 투명 �
     try {
       assert.equal(result.status, 0, result.stderr);
       const runtime = JSON.parse(fs.readFileSync(path.join(game, 'build/ait-app-config.json'), 'utf8'));
-      assert.deepEqual(runtime, expected, JSON.stringify(manifest));
+      const { appInfo, ...rest } = runtime;
+      assert.equal(typeof appInfo.displayName, 'string');
+      assert.deepEqual(rest, { ...expected, userFiles: [], keyboardMode: 'pan', runtimeLog: { firstInteractive: true } }, JSON.stringify(manifest));
     } finally {
       cleanup(game);
     }
@@ -282,5 +284,61 @@ test('initialAccessoryButton은 3.10 accessibilityLabel(id 생략)과 예전 id/
     assert.match(result.stderr, /accessibilityLabel/);
   } finally {
     cleanup(game);
+  }
+});
+
+test('runtimeLog.firstInteractive는 실행 설정(build/ait-app-config.json)에 들어가고 기본은 켬', () => {
+  for (const [extra, expected] of [[{}, true], [{ runtimeLog: { firstInteractive: false } }, false]]) {
+    const { game, result } = runWithManifest(extra);
+    try {
+      assert.equal(result.status, 0, result.stderr);
+      const runtime = JSON.parse(fs.readFileSync(path.join(game, 'build/ait-app-config.json'), 'utf8'));
+      assert.equal(runtime.runtimeLog.firstInteractive, expected);
+    } finally {
+      cleanup(game);
+    }
+  }
+  const { game, result } = runWithManifest({ runtimeLog: { firstInteractive: 'no' } });
+  try {
+    assert.notEqual(result.status, 0);
+  } finally {
+    cleanup(game);
+  }
+});
+
+test('userFiles는 user:// 경로만 받아 실행 설정에 넣는다', () => {
+  const { game, result } = runWithManifest({ userFiles: ['user://settings.cfg'] });
+  try {
+    assert.equal(result.status, 0, result.stderr);
+    const runtime = JSON.parse(fs.readFileSync(path.join(game, 'build/ait-app-config.json'), 'utf8'));
+    assert.deepEqual(runtime.userFiles, ['user://settings.cfg']);
+  } finally {
+    cleanup(game);
+  }
+  for (const userFiles of [['res://a'], ['user://../x'], 'user://a']) {
+    const bad = runWithManifest({ userFiles });
+    try {
+      assert.notEqual(bad.result.status, 0, JSON.stringify(userFiles));
+    } finally {
+      cleanup(bad.game);
+    }
+  }
+});
+
+test('keyboardMode와 appInfo가 실행 설정에 들어간다', () => {
+  const { game, result } = runWithManifest({ keyboardMode: 'resize', displayName: '고양이 공부방', brand: { primaryColor: '#C2410C' } });
+  try {
+    assert.equal(result.status, 0, result.stderr);
+    const runtime = JSON.parse(fs.readFileSync(path.join(game, 'build/ait-app-config.json'), 'utf8'));
+    assert.equal(runtime.keyboardMode, 'resize');
+    assert.deepEqual(runtime.appInfo, { displayName: '고양이 공부방', primaryColor: '#C2410C', iconUrl: null });
+  } finally {
+    cleanup(game);
+  }
+  const bad = runWithManifest({ keyboardMode: 'adjust' });
+  try {
+    assert.notEqual(bad.result.status, 0);
+  } finally {
+    cleanup(bad.game);
   }
 });
