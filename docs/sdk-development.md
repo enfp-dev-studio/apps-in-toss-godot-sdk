@@ -66,7 +66,9 @@ Unity SDK와 npm web-framework, DevTools의 버전이 같다고 가정하지 말
   결과를 한 번 주는 API는 매니페스트(`AIT.api.*`), 콜백을 여러 번 주는 API는 `AIT.events`, 결제·광고처럼 흐름이 있는 API는 전용 모듈에 둡니다.
   Unity가 엔진 값으로 주는 API(`GetDevicePixelRatio` 등)도 Godot 쪽 함수로 맞춥니다.
 - Unity가 deprecated·v2 별칭인 옛 이름을 부르고 이 SDK에 같은 기능의 새 이름이 있으면, 테스트의 `RENAMED`에 적고 새 이름으로 덮습니다.
-- Unity보다 web-framework에 먼저 나온 공개 API(예: 3.10.0 `NavigationBar` 액세서리 버튼)도 함께 넣습니다.
+- web-framework·DevTools 버전과 API는 그 Unity 태그가 쓰는 것(`WebGLTemplates/AITTemplate/BuildConfig~/package.json`)을 따릅니다.
+  Unity보다 web-framework에 먼저 나온 API는 Unity가 넣을 때 함께 넣습니다(2026-11-12 결정: 앱인토스 팀이 만드는 Unity SDK의 처리 결과를 따른다).
+  그 전에 앞서 넣은 web-framework 3.10.0과 `NavigationBar` 액세서리 버튼은 내리지 않고 둡니다.
 - API 밖의 Unity 기능(런타임 도우미, WebGL 템플릿, 에디터 메뉴·창)도 같은 태그로 대조합니다. 엔진 차이로 필요 없는 것만 빼고, 뺀 것은 이유와 함께 기록합니다.
 - "게임에 필요 없어 보인다"는 이유로 빼거나 미루지 않습니다. 범위를 줄여야 할 사정이 있으면 정하기 전에 사용자에게 묻습니다.
 
