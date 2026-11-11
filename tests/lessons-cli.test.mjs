@@ -321,7 +321,7 @@ describe('init', () => {
       fs.readFileSync(shellTemplate, 'utf8'),
     );
     const ignore = fs.readFileSync(path.join(gameDir, '.gitignore'), 'utf8');
-    for (const line of ['.godot/', 'build/', '*.ait', '!.ait/', '.ait_relay', '.mcp/']) {
+    for (const line of ['.godot/', 'build/', '*.ait', '!.ait/', '.ait_relay', '.mcp/', 'node_modules/', 'addons/apps_in_toss/tools/bridge/dist/']) {
       assert.ok(ignore.split('\n').includes(line), `${line} in .gitignore`);
     }
   });

@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 // init이 더하는 줄과 같다. .ait_relay.meta는 디버거 0.3.0이 키 만든 날짜를 적는 파일이다.
-export const GITIGNORE_LINES = ['.godot/', 'build/', '*.ait', '!.ait/', '.ait_relay', '.ait_relay.meta', '.mcp/'];
+export const GITIGNORE_LINES = ['.godot/', 'build/', '*.ait', '!.ait/', '.ait_relay', '.ait_relay.meta', '.mcp/', 'node_modules/', 'addons/apps_in_toss/tools/bridge/dist/'];
 const SECRET = /(^|\/)\.ait_relay(\.meta)?$/;
 
 export function missingGitignoreLines(gameDir) {
