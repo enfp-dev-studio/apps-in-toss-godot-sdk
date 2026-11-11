@@ -225,7 +225,6 @@ Dev Server·서버 정지·재시작, Build & Package, Deploy for Online Test·R
 | `runtimeLog` | `{ "firstInteractive": false }`면 첫 상호작용 로그를 보내지 않음 |
 | `userFiles` | Storage에 복사해 둘 `user://` 파일 목록([저장 미러링](api-guide.md#저장-미러링user-파일)) |
 | `sentry` | `{ "dsn", "environment", "release", "sampleRate" }` Sentry 연동([진단](api-guide.md#런타임-로그metrics-탭sentry)) |
-| `debugConsole` | `{ "relayPublicKeys": [] }` 테스트 빌드의 실기기 디버거 공개키([실기기 원격 디버깅](testing.md#실기기-원격-디버깅)) |
 
 셸 템플릿은 엔진 JS를 받는 동안 wasm·pck 받기를 먼저 시작하고(이른 내려받기), 로딩 화면에 `AppsInTossShell.appInfo`·`onReady`·
 `onProgress`·`onComplete`·`onError`·`hide`와 실패 화면의 힌트·진단 정보를 둡니다(Unity `AITLoading` 대응).

@@ -218,7 +218,7 @@ function logDebugConsoleBanner() {
   const line = '!'.repeat(64);
   console.log(`\n${line}`);
   console.log('!!  테스트 전용 빌드 (--debug-console) — 검수 제출 금지');
-  console.log('!!  실기기 원격 디버깅(@apps-in-toss/debug-console)이 들어갑니다.');
+  console.log('!!  실기기 원격 디버깅(@apps-in-toss/debugger-client)이 들어갑니다.');
   console.log('!!  출시·검수용 .ait는 옵션 없이 build를 다시 실행해 만드세요.');
   console.log(`${line}\n`);
 }

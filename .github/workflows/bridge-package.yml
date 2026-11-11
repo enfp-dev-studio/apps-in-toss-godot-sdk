@@ -57,9 +57,9 @@ jobs:
       - name: Debug console build (source + embedded)
         # 테스트 빌드 전용 별도 번들. 출시 브리지 번들에는 들어가지 않는다.
         # 출시 번들 → debug-console 순서로 빌드해 두 파일이 함께 남는지, 출시 번들에 섞이지 않는지 본다.
-        # debug-console 0.3.0은 실기기 디버거 공개키가 있어야 빌드된다(게임 매니페스트 debugConsole.relayPublicKeys).
+        # debugger-client 0.4.0은 실기기 디버거 공개키 { publicKey, notAfter }가 있어야 빌드된다(게임 빌드는 debugger relay-key --json).
         env:
-          AIT_DEBUG_RELAY_KEYS: '["ci-relay-public-key"]'
+          AIT_DEBUG_RELAY_KEYS: '[{"publicKey":"ci-relay-public-key","notAfter":4102444800}]'
         run: |
           for dir in bridge addons/apps_in_toss/tools/bridge; do
             npm --prefix "$GITHUB_WORKSPACE/$dir" run build

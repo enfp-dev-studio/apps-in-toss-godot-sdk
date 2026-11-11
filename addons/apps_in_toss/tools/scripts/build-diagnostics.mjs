@@ -9,7 +9,7 @@ const CATALOG = [
   [/spawn(?:Sync)? godot ENOENT|Godot executable could not be checked/i, 'Godot 실행 파일을 찾지 못했습니다. GODOT_BIN에 Godot 경로를 주세요.'],
   [/Node\.js major version/i, 'Node.js 24 또는 26으로 실행하세요(에디터 패널의 Node 설치 버튼도 있습니다).'],
   [/still contains "eval" text|eval 글자|"eval"/i, '번들에 검수가 반려하는 eval 글자가 남았습니다. SDK를 최신으로 올리거나 게임 코드의 JavaScriptBridge.eval을 빼세요.'],
-  [/relayPublicKeys|debugger relay-key/i, '테스트 빌드에는 실기기 디버거 공개키가 필요합니다. 게임 폴더에서 debugger relay-key를 실행해 매니페스트 debugConsole.relayPublicKeys에 넣으세요.'],
+  [/relayPublicKeys|debugger relay-key|relay-key/i, '테스트 빌드는 debugger 0.4.0의 relay-key로 공개키를 받습니다. 게임 폴더에서 npx -y -p <debugger 0.4.0 tgz> debugger relay-key가 되는지 확인하세요(키가 만료됐으면 --rotate).'],
   [/sentry\.dsn|AIT_SENTRY_CONFIG/i, '매니페스트 sentry 설정(dsn·environment·release·sampleRate)을 확인하세요.'],
   [/npm (?:ci|install).*(?:ENOTFOUND|ETIMEDOUT|ECONNRESET)|getaddrinfo/i, '네트워크 문제로 의존성을 받지 못했습니다. 연결을 확인하고 다시 실행하세요.'],
   [/platform\.lock|lock and project/i, '.ait/platform.lock.json과 프로젝트 설정이 다릅니다. doctor 출력의 ERROR 줄을 고치세요.'],

@@ -468,3 +468,13 @@ Unity SDK 저장소에는 라이선스가 없어(Toss 모든 권리 보유) 코�
 Sentry Unity 패키지 설치, web-framework 2.x 전용 설정(`bridgeColorMode`, `webViewType`).
 검증: [테스트 기록](testing.md#2026-11-10-unity-390-api-밖-기능-검사).
 
+## 2026-11-11: debugger-client 0.4.0
+
+- 원인: upstream(`toss/apps-in-toss-harness`)이 `@apps-in-toss/debug-console`을 `@apps-in-toss/debugger-client`로 이름을 바꾸며(MCP 키 `ait-devtools` →
+  `ait-debugger`, 프로토콜 2 → 3) 옛 릴리스 파일(debug-console·debugger 0.2·0.3)을 지웠습니다. 0.3.0 tarball을 고정한 `main`의 CI가 `npm ci` 404로 실패했습니다.
+- 반영: 두 브리지 의존성을 debugger-client 0.4.0으로, `src/debug-console.ts`의 import와 vite의 SDK 바꿔치기 대상을 새 이름으로 바꿨습니다.
+- 공개키: 0.4.0은 `{ publicKey, notAfter }`만 받고 키가 기본 24시간 뒤 만료되며, 개인키는 디버거의 메모리 key agent에 있습니다. 그래서 어제(11-10) 넣은
+  "매니페스트 `debugConsole.relayPublicKeys`에 커밋" 방식을 빼고, 테스트 빌드가 `debugger relay-key --json`(debugger 0.4.0)으로 그때그때 받습니다
+  ([debug-relay-keys.mjs](../addons/apps_in_toss/tools/scripts/debug-relay-keys.mjs)). 설정 창의 그 칸도 뺐습니다.
+- 출력 파일 이름 `ait-debug-console.js`·검사 표식(`__ait_debug_status`, `/ait-attach`)은 새 패키지에도 그대로라 바꾸지 않았습니다.
+

@@ -12,7 +12,7 @@
     "prepare": "npm run generate"
   },
   "dependencies": {
-    "@apps-in-toss/debug-console": "https://github.com/toss/apps-in-toss-harness/releases/download/debug-console-v0.3.0/apps-in-toss-debug-console-0.3.0.tgz",
+    "@apps-in-toss/debugger-client": "https://github.com/toss/apps-in-toss-harness/releases/download/debugger-client-v0.4.0/apps-in-toss-debugger-client-0.4.0.tgz",
     "@apps-in-toss/web-framework": "3.10.0",
     "@sentry/browser": "11.10.0",
     "qrcode": "1.5.4"

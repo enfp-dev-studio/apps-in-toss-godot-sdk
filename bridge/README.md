@@ -13,7 +13,7 @@ AIT_BRIDGE_MOCK=1 npm run build   # mock 개발 번들 (브라우저 DevTools �
 npm run build:debug-console       # 테스트 빌드 전용 → dist/ait-debug-console.js
 ```
 
-`build:debug-console`은 `@apps-in-toss/debug-console/auto`를 출시 브리지와 별개의
+`build:debug-console`은 `@apps-in-toss/debugger-client`의 `startDebugConsole`을 출시 브리지와 별개의
 IIFE로 만듭니다. `ait-godot build --debug-console`만 이 파일을 export에 넣으며,
 debug-console이 부르는 SDK는 브리지가 올린 `window.AppsInToss`로 바꿔 web-framework를
 한 번 더 번들하지 않습니다.

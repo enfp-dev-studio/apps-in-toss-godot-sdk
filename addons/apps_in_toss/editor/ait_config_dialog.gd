@@ -100,10 +100,6 @@ func _build() -> void:
     _text(form, "sentry.environment", "environment(비우면 빌드 종류)", sentry.get("environment", ""))
     _text(form, "sentry.release", "release", sentry.get("release", ""))
 
-    var debug_console: Dictionary = _manifest.get("debugConsole", {})
-    _section(form, "실기기 디버거(테스트 빌드)")
-    _text(form, "debugConsole.relayPublicKeys", "relay 공개키(쉼표로 구분)", ", ".join(PackedStringArray(debug_console.get("relayPublicKeys", []))))
-
     var open_file := Button.new()
     open_file.text = "JSON 파일로 열기"
     open_file.pressed.connect(func() -> void: OS.shell_open(manifest_path))
@@ -160,11 +156,6 @@ func save() -> void:
         m["sentry"] = sentry
     else:
         m.erase("sentry")
-    var keys := _list(_value("debugConsole.relayPublicKeys"))
-    if keys.is_empty():
-        m.erase("debugConsole")
-    else:
-        m["debugConsole"] = {"relayPublicKeys": keys}
 
     var file := FileAccess.open(manifest_path, FileAccess.WRITE)
     file.store_string(JSON.stringify(m, "  ", false) + "\n")

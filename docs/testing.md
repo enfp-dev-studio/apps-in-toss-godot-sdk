@@ -18,7 +18,7 @@
 | [검수 eval 대응](../tests/release-eval.test.mjs) | 엔진 JS 패치(실제 4.7.2 템플릿 포함, 로컬에 있을 때), "eval"·Function 글자 검사, export 폴더·최종 `.ait` 검사(출시 프리셋·개발 파일·`project-package.json`), 앱 설정 JSON 넣기 |
 | [브리지 실행 보조](../tests/bridge-transport.test.mjs) | 화면 신호 모으기(첫 신호만), bfcache `pagehide`에서 구독 유지, 첫 터치 소리 풀기, iOS 복귀 복구(가짜 AudioContext) |
 | [CLI 규칙](../tests/lessons-cli.test.mjs) | `doctor`의 셸 확대 막기·`McpBridge`·`.ait_relay`·테스트 광고 ID·`appType`·`tools/.gdignore` 검사, export 100MB 한도, `addon:install`의 `.uid` 보존, `init`의 셸 템플릿·`.gitignore` |
-| [debug-console](../tests/debug-console.test.mjs) | 테스트 빌드에서만 debug-console을 브리지 다음에 주입, release에 남으면 검증 실패, 매니페스트 `debugConsole` 기록과 `doctor` 경고 |
+| [debug-console](../tests/debug-console.test.mjs) | 테스트 빌드에서만 debugger-client 번들을 브리지 다음에 주입, relay-key 공개키 읽기, release에 남으면 검증 실패, 매니페스트 `debugConsole` 기록과 `doctor` 경고 |
 | 별도 확인 | 전체 Godot Web export, 브라우저 게임 플레이, 토스 앱·실기기 동작 |
 
 PR 생성·업데이트와 `main` push 때 실행하며, GitHub Actions 탭에서 수동 실행도 가능합니다.
@@ -127,15 +127,16 @@ macOS에서는 `ait-godot preview`를 띄운 채 `ait-godot sim`으로 iOS 시�
 
 ## 실기기 원격 디버깅
 
-토스 앱에서 연 테스트 번들에 앱인토스 디버거(`ait-devtools` MCP, `/ait:debug` 환경 3)를
-붙이면 화면 캡처, JS 평가, 콘솔·네트워크 로그, SDK 호출, `*.ait.test.ts` 실행을
-원격으로 할 수 있습니다. 폰 쪽 코드는 `@apps-in-toss/debug-console` 0.2.0이며
-테스트 빌드에만 넣습니다.
+토스 앱에서 연 테스트 번들에 앱인토스 디버거(`ait-debugger` MCP, `/ait:debug` 환경 3)를
+붙이면 화면 캡처, 스크립트 실행, 콘솔·네트워크 로그, SDK 호출, `*.ait.test.ts` 실행을
+원격으로 할 수 있습니다. 폰 쪽 코드는 `@apps-in-toss/debugger-client` 0.4.0이며
+테스트 빌드에만 넣습니다. 2026-11-11 upstream이 `@apps-in-toss/debug-console`을 이 이름으로 바꾸고
+옛 릴리스 파일을 지웠습니다(MCP 키 `ait-devtools` → `ait-debugger`, 프로토콜 3).
 
 미리 필요한 것:
 
-- 게임 폴더 `.mcp.json`에 `ait-devtools`(`@apps-in-toss/debugger`) 등록. `/ait:setup-debugger`가 해 줍니다.
-- 내장 브리지 의존성: `npm --prefix addons/apps_in_toss/tools/bridge ci`. debug-console이
+- 게임 폴더 `.mcp.json`에 `ait-debugger`(`@apps-in-toss/debugger` 0.4.0) 등록. 최신 `ait` 플러그인의 `/ait:setup-debugger`가 해 줍니다.
+- 내장 브리지 의존성: `npm --prefix addons/apps_in_toss/tools/bridge ci`. debugger-client가
   설치되지 않았으면 테스트 빌드가 이 명령을 안내하며 멈춥니다.
 
 순서:
@@ -146,14 +147,11 @@ macOS에서는 `ait-godot preview`를 띄운 채 `ait-godot sim`으로 iOS 시�
    node addons/apps_in_toss/tools/ait-godot.mjs build --debug-console
    ```
 
-   테스트 빌드에는 실기기 디버거 공개키가 필요합니다(debug-console 0.3.0부터 QR 테스트 호스트가 attach 링크의 서명을
-   이 키로 검증). 게임 폴더에서 아래를 실행해 나온 한 줄을 `.ait/game.manifest.json`의
-   `"debugConsole": { "relayPublicKeys": ["<그 값>"] }`에 넣습니다. 공개키는 커밋해도 되고, 팀원은 자기 키를 배열에 더합니다.
-   키가 없으면 빌드가 멈춥니다.
-
-   ```bash
-   npx -y -p https://github.com/toss/apps-in-toss-harness/releases/download/debugger-v0.3.0/apps-in-toss-debugger-0.3.0.tgz debugger relay-key
-   ```
+   QR 테스트 호스트는 attach 링크의 서명을 실기기 디버거 공개키로 검증합니다. 테스트 빌드가 게임 폴더에서
+   `debugger relay-key --json --project <게임 폴더>`(debugger 0.4.0)를 불러 `{ publicKey, notAfter }`를 받아 번들에 넣습니다.
+   디버거는 그 폴더에서 가장 가까운 `package.json` 폴더를 프로젝트로 봅니다. 키는 기본 24시간(최대 72시간) 뒤나 key agent가 끝나면(재부팅 등)
+   만료되므로 커밋하지 않고, 만료된 뒤에는 테스트 번들을 다시 만듭니다. 개인키는 디버거의 메모리 key agent에만
+   있습니다. 0.3.0까지 쓰던 `.ait_relay`가 있으면 디버거가 agent로 옮기고 파일을 지웁니다. 키를 받지 못하면 빌드가 멈춥니다.
 
    출시 브리지 다음에 `ait-debug-console.js`가 들어가고, `ait-platform-manifest.json`에
    `"debugConsole": true`가 기록됩니다. 빌드 로그 처음과 끝에 "테스트 전용 빌드 — 검수 제출 금지"가 나옵니다.
@@ -177,10 +175,9 @@ macOS에서는 `ait-godot preview`를 띄운 채 `ait-godot sim`으로 iOS 시�
 
 - 디버거(`ait-devtools`)는 한 세션만 잡을 수 있습니다. 다른 Claude 세션이 디버거를 쥐고 있으면 도구 호출이 거부됩니다.
   그 세션을 끝내거나 디버거를 놓게 한 뒤 붙습니다.
-- debug-console 0.3.0은 디버거 0.3.0과 짝입니다(프로토콜 2). 게임의 `.mcp.json`에서 `ait-devtools`의 debugger도 0.3.0으로 맞춥니다.
-  번들의 공개키와 디버거의 `.ait_relay`가 다르면(키 교체 뒤 다시 빌드하지 않음) 서명 검증에서 막힙니다.
-- QR attach에는 게임 폴더의 relay 비밀값 파일 `.ait_relay`가 필요합니다. `.gitignore`에 넣고(`init`이 넣습니다) 값을 커밋하거나 출력하지 마세요.
-  `doctor`는 이 파일이 git에서 무시되지 않으면 경고합니다.
+- debugger-client 0.4.0은 디버거 0.4.0과 짝입니다(프로토콜 3). 0.3.0 이하와 섞으면 "업데이트 필요"가 나옵니다.
+  번들의 공개키가 만료됐거나 키를 바꾼(`relay-key --rotate`) 뒤 다시 빌드하지 않았으면 서명 검증에서 막힙니다.
+- 0.3.0까지의 `.ait_relay`가 남아 있다면 커밋하지 마세요(`doctor`가 git에서 무시되지 않으면 경고). 새 디버거가 처음 돌 때 옮기고 지웁니다.
 - 앱은 열리는데 아래 디버그 막대가 없고 relay가 요청을 하나도 받지 못하면(`page-not-opened`), debug-console이
   URL에서 `debug=1`·`relay=`를 받지 못한 것입니다. 폰에서 ⋯ → 웹 디버그 툴즈 → System 탭에서 페이지 URL에
   `debug=1`이 있는지 봅니다. 문서상 테스트 스킴의 사용자 쿼리는 `queryParams=`(URL 인코딩한 JSON)로 넘기므로
@@ -332,3 +329,17 @@ web-framework·DevTools 3.10.0, debug-console 0.3.0, Unity SDK 3.9.0 전체 매�
 
 확인하지 못한 것: 실제 토스 앱의 배너 광고·Sentry 전송·소프트 키보드(pan·resize)·`ait deploy`, iOS에서 IndexedDB가 지워진 뒤 되살리기.
 
+## 2026-11-11 debugger-client 0.4.0 이전
+
+upstream이 debug-console·debugger 0.2·0.3 릴리스 파일을 지워 `main`(82bc0dd)의 Actions #14 `Regressions`·`Bridge and package`가
+`npm ci`에서 404로 실패했습니다(로컬은 npm 캐시 때문에 통과). [바꾼 내용](sdk-development.md#2026-11-11-debugger-client-040).
+
+| 확인한 항목 | 결과 |
+| --- | --- |
+| 두 브리지 `npm ci`(빈 npm 캐시) | 통과 |
+| 두 브리지 타입 검사, production·mock·Sentry 빌드, CI의 debug-console 단계(공개키 `{ publicKey, notAfter }`) | 통과. 공개키가 debug-console 번들에 들어가고 출시 번들에 디버그 코드 없음, "eval" 글자 0개 |
+| `node --test tests/*.test.mjs` | 160개 통과(`relay-key --json` 출력 읽기·만료 키 거르기 포함) |
+| `tests/run-minimal-package.mjs`, `generated/` 변경 없음 | 통과 |
+| Godot 4.7.2 `tests/run-godot-addon.mjs` | 전부 통과(설정 창 12개 검사) |
+
+확인하지 못한 것: debugger-client 0.4.0의 실기기 QR attach.

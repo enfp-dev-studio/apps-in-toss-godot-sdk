@@ -19,11 +19,12 @@ const sentryEntry = fileURLToPath(new URL('./src/sentry.ts', import.meta.url));
  *   copies only dist/, and CI builds without AIT_BRIDGE_MOCK.
  * - Debug console (`npm run build:debug-console`, mode `debug-console`): builds
  *   only `dist/ait-debug-console.js`, a separate IIFE with
- *   `@apps-in-toss/debug-console` `startDebugConsole` for on-device attach (`/ait:debug`
+ *   `@apps-in-toss/debugger-client` `startDebugConsole` for on-device attach (`/ait:debug`
  *   environment 3). It is injected only by test builds
  *   (`ait-godot build --debug-console`); the bridge bundle never imports it.
- *   `AIT_DEBUG_RELAY_KEYS` (JSON array of the debugger public keys, read from the
- *   game manifest by the build) is required and baked in as `__AIT_DEBUG_RELAY_KEYS__`.
+ *   `AIT_DEBUG_RELAY_KEYS` (JSON array of `{ publicKey, notAfter }` from
+ *   `debugger relay-key --json`, read by the build) is required and baked in as
+ *   `__AIT_DEBUG_RELAY_KEYS__`.
  *
  * `forceEnable` is required because `vite build` runs with NODE_ENV=production,
  * where the devtools plugin disables itself by default. `mock: true` keeps the
@@ -46,7 +47,7 @@ function useBridgeSdk(): Plugin {
     name: 'ait-debug-console-bridge-sdk',
     enforce: 'pre',
     transform(code, id) {
-      if (!id.includes('@apps-in-toss/debug-console')) return null;
+      if (!id.includes('@apps-in-toss/debugger-client')) return null;
       const next = code.replace(sdkDynamicImport, () => {
         replaced += 1;
         return bridgeSdk;
@@ -87,13 +88,17 @@ function stripEvalText(failOnLeftover: boolean): Plugin {
   };
 }
 
-function relayPublicKeys(): string[] {
+type RelayKey = { publicKey: string; notAfter: number };
+
+function relayPublicKeys(): RelayKey[] {
   const raw = process.env.AIT_DEBUG_RELAY_KEYS;
   const keys: unknown = raw ? JSON.parse(raw) : null;
-  if (!Array.isArray(keys) || keys.length === 0 || !keys.every((k) => typeof k === 'string' && k !== '')) {
-    throw new Error('AIT_DEBUG_RELAY_KEYS must be a JSON array of debugger public keys (game manifest debugConsole.relayPublicKeys).');
+  const valid = (k: unknown): k is RelayKey =>
+    !!k && typeof (k as RelayKey).publicKey === 'string' && (k as RelayKey).publicKey !== '' && Number.isFinite((k as RelayKey).notAfter);
+  if (!Array.isArray(keys) || keys.length === 0 || !keys.every(valid)) {
+    throw new Error('AIT_DEBUG_RELAY_KEYS must be a JSON array of { publicKey, notAfter } (debugger relay-key --json).');
   }
-  return keys as string[];
+  return keys;
 }
 
 // @sentry/browser의 "eval" 글자(검수 반려 대상)를 뜻은 그대로 두고 바꾼다. 정규식 안은 ev[a]l(같은 글자와 맞음),

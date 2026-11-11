@@ -317,26 +317,18 @@ describe('doctor debugConsole 경고', () => {
   });
 });
 
-describe('debug-console 0.3.0 공개키(게임 매니페스트 debugConsole.relayPublicKeys)', () => {
-  const writeManifest = (extra) => {
-    const game = tempDir('ait-relay-keys-');
-    fs.mkdirSync(path.join(game, '.ait'), { recursive: true });
-    fs.writeFileSync(path.join(game, '.ait/game.manifest.json'), JSON.stringify({ gameId: 'g', ...extra }));
-    return game;
-  };
-
-  it('키 배열을 읽는다', async () => {
-    const { readRelayPublicKeys } = await import(path.join(scriptsDir, 'debug-relay-keys.mjs'));
-    const game = writeManifest({ debugConsole: { relayPublicKeys: [' key-a ', 'key-b'] } });
-    assert.deepEqual(readRelayPublicKeys(game), ['key-a', 'key-b']);
+describe('debugger 0.4.0 공개키(debugger relay-key --json)', () => {
+  it('{ publicKey, notAfter } 배열에서 만료되지 않은 키만 쓴다', async () => {
+    const { parseRelayKeys } = await import(path.join(scriptsDir, 'debug-relay-keys.mjs'));
+    const out = JSON.stringify([{ publicKey: 'a', notAfter: 2000 }, { publicKey: 'b', notAfter: 500, extra: 1 }]);
+    assert.deepEqual(parseRelayKeys(out, 1000), [{ publicKey: 'a', notAfter: 2000 }]);
   });
 
-  it('키가 없거나 비어 있으면 relay-key 안내와 함께 실패한다', async () => {
-    const { readRelayPublicKeys } = await import(path.join(scriptsDir, 'debug-relay-keys.mjs'));
-    for (const extra of [{}, { debugConsole: { relayPublicKeys: [] } }, { debugConsole: { relayPublicKeys: [''] } }]) {
-      const game = writeManifest(extra);
-      assert.throws(() => readRelayPublicKeys(game), /debugger relay-key/);
-    }
+  it('모양이 틀리거나 모두 만료됐으면 relay-key 안내와 함께 실패한다', async () => {
+    const { parseRelayKeys } = await import(path.join(scriptsDir, 'debug-relay-keys.mjs'));
+    assert.throws(() => parseRelayKeys('not json'), /relay-key/);
+    assert.throws(() => parseRelayKeys(JSON.stringify(['old-string-key'])), /publicKey, notAfter/);
+    assert.throws(() => parseRelayKeys(JSON.stringify([{ publicKey: 'a', notAfter: 10 }]), 1000), /만료/);
   });
 });
 

@@ -46,7 +46,6 @@ func _run() -> void:
     _expect(saved["keyboardMode"] == "resize", "keyboard mode")
     _expect(saved["userFiles"] == ["user://a.cfg", "user://b.json"], "user files")
     _expect(saved["sentry"] == {"dsn": "https://k@o1.ingest.sentry.io/2"}, "sentry")
-    _expect(not saved.has("debugConsole"), "empty relay keys removed")
 
     var body := AITIssueReport.body(ProjectSettings.globalize_path(dir), "버튼이 안 눌려요")
     _expect(body.begins_with("버튼이 안 눌려요") and body.contains(AITVersion.VERSION) and body.contains("Godot:"), "issue body")

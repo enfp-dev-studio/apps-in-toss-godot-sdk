@@ -58,8 +58,8 @@ run('npm', ['run', 'build'], { cwd: bridgeDir });
 // 출시 브리지 번들과 섞이지 않고, patch-export가 export에만 넣는다.
 const withDebugConsole = process.env.AIT_DEBUG_CONSOLE === '1';
 if (withDebugConsole) {
-  if (!fs.existsSync(path.join(bridgeDir, 'node_modules/@apps-in-toss/debug-console'))) {
-    fail(`@apps-in-toss/debug-console이 설치되지 않았습니다. npm --prefix ${bridgeDir} ci 를 먼저 실행하세요.`);
+  if (!fs.existsSync(path.join(bridgeDir, 'node_modules/@apps-in-toss/debugger-client'))) {
+    fail(`@apps-in-toss/debugger-client가 설치되지 않았습니다. npm --prefix ${bridgeDir} ci 를 먼저 실행하세요.`);
   }
   let relayKeys;
   try {
