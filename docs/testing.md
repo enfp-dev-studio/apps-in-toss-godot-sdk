@@ -343,3 +343,31 @@ upstream이 debug-console·debugger 0.2·0.3 릴리스 파일을 지워 `main`(8
 | Godot 4.7.2 `tests/run-godot-addon.mjs` | 전부 통과(설정 창 12개 검사) |
 
 확인하지 못한 것: debugger-client 0.4.0의 실기기 QR attach.
+
+## 2026-11-13 Unity SDK 3.10.0 정식 대응
+
+[공식 정식 태그](https://github.com/toss/apps-in-toss-unity-sdk/releases/tag/release/v3.10.0)의 UPM 커밋
+`b46a21bf6395a4c502e23ccde97b8cd47f5afbf6`를 기준으로 자동 검사했습니다. web-framework·DevTools·CLI는
+원격 main에 이미 고정된 3.10.0을 사용했습니다. Node 24는 공식 darwin-arm64 24.22.3을 `/tmp`에 격리하고
+공식 `SHASUMS256.txt`와 SHA256 `ff6e17d4874b76d272212b908cc020d6e815fba5a6c7eaaa06add725840307fd`를 대조했습니다.
+사용자의 Node·Godot 설치와 게임 프로젝트는 교체하지 않았습니다.
+
+| 자동 검사 | 실제 결과 |
+| --- | --- |
+| Node 24.22.3 / 26.12.1 `node --test tests/*.test.mjs` | 각각 173개 통과, 실패·건너뛰기 0 |
+| 공식 API 매핑·호환성 | 231개 전체 경로·58개 지원 여부·28개 권한 보조 경로 확인, 기존 85개 호환성 유지 |
+| 양쪽 `npm ci`·타입 검사·production/mock 빌드 | 통과(npm 11.20.0). 기존 package/lockfile 변경 없음 |
+| 양쪽 debug-console 빌드 | 통과. CI 공개키 포함, 출시 브리지에 `__ait_debug_status`·`/ait-attach` 없음 |
+| 양쪽 생성기 재실행 | 생성 GDScript 2개 바이트 일치. 카탈로그 207개(동기 속성 8개 포함) |
+| Godot 4.7.2 `tests/run-godot-addon.mjs` | import·구문 게이트 36개 파일, IAP·구독·새 SDK 3.10 API fixture(236개 검사), 배너·로그·Sentry·저장·에디터·기존 모듈 검사 통과 |
+| 실제 공식 CLI의 최소 HTML `.ait` 패키징 | 통과(1,870 bytes). 실제 reader로 appName·HTML 포함·isGame·runtimeVersion·sdkVersion 검사 |
+| 게임/비게임 메타데이터 회귀 | `game`·`nongame`·미설정 3가지 실제 빌드 및 읽기 통과. 원본 CLI SHA256 불변, 실패 시 임시 모듈 정리 확인 |
+
+자동 검사에는 브리지 TS를 실행한 VM의 콜백·오류·지연 전달·해제 검사와, Godot RecordingCore를 통한 실제 생성 GDScript의
+속성·인자·요청 번호·지원 여부/권한 함수 경로 검사가 포함됩니다. 토스 앱이 반환하는 실제 데이터의 검증은 아닙니다.
+
+이번 실행에서 전체 Godot Web export·브라우저 플레이·실제 Godot Web 출력의 `.ait` 패키징은 실행하지 않았습니다.
+Godot 정식 버전은 4.7.2로 변동이 없으며, 위 최소 HTML 패키징을 전체 게임 검증으로 표시하지 않습니다.
+새 API의 토스 실기기 인증·결제·광고·권한 UI·위치/알림/초대 이벤트, Windows 패키징 실행, 실제 배포 및 서버의
+`runtimeVersion:0.84.0` 수락 여부도 미검증입니다. 패키징 보강은 CLI 3.10.0·ait-format 1.0.0에서만 허용하며
+읽기 전용 CLI 설치 디렉터리에서는 임시 실행 모듈을 쓸 수 없어 실패합니다.

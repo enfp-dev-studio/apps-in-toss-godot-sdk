@@ -19,10 +19,11 @@
 | 진단 | SDK 버전(`AIT.sdk_version()`), 런타임 로그(`AIT.runtime_log`), Godot Metrics 탭, Sentry 연동(`AIT.sentry`) |
 | 기타 | 저장소·배치 처리, 권한·공유·공유 링크·진입 주소·클립보드·햅틱, 바이럴, 내비게이션 바와 액세서리 버튼, 기기·환경 정보, 위치, 연락처·앨범·카메라·PDF·파일 저장, 화면 방향·꺼짐 방지·보안 화면·iOS 스와이프, 이벤트 로그·Analytics, 프로모션 보상, 리뷰 요청, 알림 동의 |
 
-현재 카탈로그는 81개 항목이며, web-framework 3.10.0을 기준으로 합니다. 출시된 Unity SDK 3.9.0이 부르는 web-framework 경로 85개를
-모두 덮습니다(카탈로그, 결제·광고 래퍼, `AIT.events`·`AIT.back`·`AIT.safe_area`. 회귀 테스트가 확인). Unity의 옛 이름
-`getGameCenterGameProfile`·`openGameCenterLeaderboard`·`submitGameCenterLeaderBoardScore`·`getTossShareLink`·`SafeAreaInsets`는
-같은 기능의 새 이름 `Game.*`·`Share.createLink`·`SafeArea`로 제공합니다. Unity `GetDevicePixelRatio`는 `AIT.get_device_pixel_ratio()`입니다.
+현재 카탈로그는 207개 항목이며, web-framework·Unity SDK 3.10.0을 기준으로 합니다. 공식 Unity jslib가 사용하는
+231개 경로를 카탈로그·결제/광고 래퍼·이벤트 모듈로 덮는지 회귀 검사합니다. 기존 평면 이름과 래퍼도 유지합니다.
+Unity의 옛 이름 `getGameCenterGameProfile`·`openGameCenterLeaderboard`·`submitGameCenterLeaderBoardScore`·
+`getTossShareLink`·`SafeAreaInsets`는 같은 기능의 새 이름 `Game.*`·`Share.createLink`·`SafeArea`로 제공합니다.
+Unity `GetDevicePixelRatio`는 `AIT.get_device_pixel_ratio()`입니다.
 카탈로그와 별도로 결제·광고·게임 이벤트의 구독과 해제를 관리하는 래퍼와
 가시성 감지(`AIT.app_events`)를 제공합니다. 화면·소리·저장 모듈은 cat-room-godot을 만들며
 모든 미니앱에 필요하다고 확인한 것을 옮긴 것입니다([정리 문서](lessons-cat-room-godot.md)).
@@ -36,8 +37,9 @@ AdMob load/show 두 항목은 일반 호출로 사용할 수 없으므로 `AIT.a
 브리지가 없는 Godot 에디터나 일반 브라우저에서는 false이며,
 호출은 `AIT_BRIDGE_UNAVAILABLE` 오류로 비동기 반환됩니다.
 
-DevTools 3.10.0 mock은 카탈로그의 모든 API를 제공하지만, 토스 앱 버전에 따라
-최근 추가된 API는 없을 수 있습니다. 기능별 지원 여부는 `AIT.has_api()`로 확인하세요. [브라우저 테스트 범위](testing.md#브라우저-시뮬레이터의-테스트-범위)
+DevTools mock 응답은 실제 토스 앱 검증과 구분하세요. 토스 앱 버전에 따라 API가 없거나 지원되지 않을 수 있습니다.
+`AIT.has_api()`는 호출 경로의 존재만 확인합니다. `.isSupported()`가 있는 기능은 그 함수의 반환값도 확인해야 합니다.
+[브라우저 테스트 범위](testing.md#브라우저-시뮬레이터의-테스트-범위)
 
 빌드 종류는 `AIT.build_kind()`로 봅니다. SDK는 Web 빌드를 모두 release 템플릿으로 내보내므로
 Web에서는 `OS.is_debug_build()`가 늘 false입니다. 그래서 SDK가 페이지에 넣은 스크립트로 가릅니다.
@@ -52,6 +54,36 @@ Web에서는 `OS.is_debug_build()`가 늘 false입니다. 그래서 SDK가 페�
 `AIT.is_test_run()`은 `release`가 아닐 때 true입니다. 시작 재화처럼 테스트 편의에만 쓰세요.
 주소 쿼리(`?dev=1` 등)로 여는 조작 훅이나 저장 초기화는 `dev`·`debug`에서만 여세요.
 출시 빌드에서 쿼리를 읽으면 남이 만든 링크 하나로 진행이 지워질 수 있습니다.
+
+## Unity SDK 3.10.0의 새 이름
+
+`AIT.api`에는 `toss_auth_login()`, `toss_pay_authorize(options)`, `device_get_photos(options)`처럼
+네임스페이스를 포함한 이름이 추가됐습니다. 인자를 JSON으로 전달하고 요청 번호를 받는 기존 규칙을 따릅니다.
+`*_is_supported()`, `*_get_permission()`, `*_open_permission_dialog()`도 **요청 번호**를 반환합니다.
+지원 여부는 `request_completed`의 결과나 `invoke_and_wait()`로 확인하세요.
+
+속성 8개(`Device.locale/os`, `Environment.deviceId/groupId/environment/tossAppVersion/deploymentId/initialURL`)는
+동기 값입니다. `AIT.api.device_locale()` 또는 `AIT.get_value("Device.locale")`로 읽으며, 브리지가 없으면 `null`입니다.
+
+```gdscript
+extends Node
+
+func _ready() -> void:
+    print(AIT.api.device_locale())
+    if AIT.has_api("Device.getAlbumItems.isSupported"):
+        var support := await AIT.invoke_and_wait("Device.getAlbumItems.isSupported", [], 5_000)
+        if bool(support.get("ok", false)) and support.get("result") == true:
+            AIT.api.device_get_album_items({})
+```
+
+새 구독형 경로는 일반 호출 대신 다음 래퍼를 사용합니다. `event_received`·`subscription_failed`로 결과를 받고
+`dispose(구독 번호)`로 해제하는 방식은 기존 `AIT.events`와 같습니다.
+
+| 래퍼 | 공식 경로 | 이벤트 이름 |
+| --- | --- | --- |
+| `AIT.events.device_subscribe_location(options)` | `Device.subscribeLocation` | `device_location` |
+| `AIT.events.promotion_open_contacts_invite(options)` | `Promotion.openContactsInvite` | `promotion_contacts_invite` |
+| `AIT.events.notification_request_agreement(options)` | `Notification.requestAgreement` | `notification_request_agreement` |
 
 ## 기본 호출과 광고 이벤트
 

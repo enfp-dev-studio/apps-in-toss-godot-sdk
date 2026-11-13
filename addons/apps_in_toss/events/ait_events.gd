@@ -1,7 +1,7 @@
 extends RefCounted
 class_name AITEvents
 
-## Unity SDK 3.9.0의 구독형 API와 web-framework 3.10.0 액세서리 버튼 구독에 대응하는 모듈입니다.
+## Unity SDK 3.10.0의 구독형 API와 이전 평면 이름에 대응하는 모듈입니다.
 ## 각 함수는 구독 번호를 돌려줍니다. 이벤트는 event_received, 실패는 subscription_failed로 오고,
 ## 두 신호의 name으로 어느 구독인지 가릅니다. 그만 받을 때는 dispose(구독 번호)를 부르세요.
 ##
@@ -9,8 +9,11 @@ class_name AITEvents
 ## | --- | --- | --- |
 ## | subscribe_home_event | graniteEvent homeEvent | GraniteEventSubscribeHomeEvent |
 ## | subscribe_navigation_accessory_event | tdsEvent navigationAccessoryEvent (3.10 deprecated) | TdsEventSubscribeNavigationAccessoryEvent |
-## | subscribe_accessory_button | NavigationBar.subscribeAccessoryButton (3.10) | (Unity 3.10 미출시) |
-## | start_update_location | startUpdateLocation | StartUpdateLocation |
+## | subscribe_accessory_button | NavigationBar.subscribeAccessoryButton (3.10) | NavigationBarSubscribeAccessoryButton |
+## | device_subscribe_location | Device.subscribeLocation | DeviceSubscribeLocation |
+## | promotion_open_contacts_invite | Promotion.openContactsInvite (deprecated) | PromotionOpenContactsInvite |
+## | notification_request_agreement | Notification.requestAgreement | NotificationRequestAgreement |
+## | start_update_location | startUpdateLocation (deprecated) | StartUpdateLocation |
 ## | contacts_viral | contactsViral | ContactsViral |
 ## | on_visibility_changed_by_transparent_service_web | onVisibilityChangedByTransparentServiceWeb | OnVisibilityChangedByTransparentServiceWeb |
 ## | request_notification_agreement | requestNotificationAgreement | RequestNotificationAgreement |
@@ -42,6 +45,18 @@ func subscribe_accessory_button() -> int:
     return _start("accessory_button", "NavigationBar.subscribeAccessoryButton")
 
 ## 위치 변화를 계속 받습니다. options: { accuracy, timeInterval, distanceInterval }. event: 위치
+func device_subscribe_location(options: Dictionary) -> int:
+    return _start("device_location", "Device.subscribeLocation", options)
+
+## 친구 공유 리워드의 이전 API입니다(deprecated). options: { moduleId }. event: { type, data }
+func promotion_open_contacts_invite(options: Dictionary) -> int:
+    return _start("promotion_contacts_invite", "Promotion.openContactsInvite", options)
+
+## 알림 동의 화면을 띄우고 결과를 받습니다. options: { templateCode }. event: { type }
+func notification_request_agreement(options: Dictionary) -> int:
+    return _start("notification_request_agreement", "Notification.requestAgreement", options)
+
+## 위치 구독의 이전 평면 이름입니다. 새 코드는 device_subscribe_location을 사용하세요.
 func start_update_location(options: Dictionary) -> int:
     return _start("update_location", "startUpdateLocation", options)
 

@@ -48,8 +48,10 @@ npm --prefix addons/apps_in_toss/tools/bridge ci
 `.gitignore`에 `.godot/`, `build/`, `*.ait`, `!.ait/`, `.ait_relay`, `.mcp/` 중 없는 줄을 더합니다.
 있는 파일과 줄은 그대로 둡니다.
 
-`appType`은 `game` 또는 `nongame`입니다. 생성 설정의 `navigationBar` 기본값을 정하고, 매니페스트의
-`navigationBar` 값이 그 위에 덮어씁니다. 없으면 기본값을 넣지 않습니다(이전 버전과 같음).
+`appType`은 `game` 또는 `nongame`입니다. `.ait` 메타데이터도 게임은 `isGame:true`, 비게임은 `false`로 기록합니다.
+생략하면 패키징은 게임으로 처리하므로 비게임은 반드시 `nongame`을 명시하세요.
+`appType`에 따라 생성 설정의 `navigationBar` 기본값을 정하고, 매니페스트의 `navigationBar` 값이 그 위에 덮어씁니다.
+`appType`이 없으면 내비게이션 바 기본값은 넣지 않습니다.
 
 | appType | navigationBar 기본값 | 이유 |
 | --- | --- | --- |
@@ -171,6 +173,8 @@ node addons/apps_in_toss/tools/ait-godot.mjs build
 ```
 
 설정 검사 → Godot Web export → 엔진 JS 패치 → 브리지 주입·검증 → `.ait` 패키징 → 최종 `.ait` 검사 순으로 진행합니다.
+패키징은 내장 CLI 3.10.0·ait-format 1.0.0 조합에서 검증했습니다. 다른 버전은 명확한 오류로 멈춥니다.
+CLI 원본을 수정하지 않는 임시 실행 모듈을 만들므로 CLI 설치 디렉터리에 쓰기 권한이 필요합니다.
 엔진 JS 패치는 검수가 반려하는 `JavaScriptBridge.eval` 구현을 빈 함수로 바꾸고 소리 복구 훅을 넣습니다([Godot Web 주의사항](godot-web-notes.md#eval-없이-dom-쓰기)).
 최종 검사는 `node addons/apps_in_toss/tools/ait-godot.mjs verify-ait`로 따로 실행할 수도 있습니다. 셸에 `GODOT_EXPORT_PRESET`이
 남아 있으면 출시 `build`가 멈춥니다. 테스트 번호를 `AIT_BUILD_LABEL=QR-12`처럼 주면 `AIT.build_info()`로 화면에 보여 줄 수 있습니다.

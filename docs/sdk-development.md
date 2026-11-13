@@ -480,3 +480,33 @@ Sentry Unity 패키지 설치, web-framework 2.x 전용 설정(`bridgeColorMode`
   ([debug-relay-keys.mjs](../addons/apps_in_toss/tools/scripts/debug-relay-keys.mjs)). 설정 창의 그 칸도 뺐습니다.
 - 출력 파일 이름 `ait-debug-console.js`·검사 표식(`__ait_debug_status`, `/ait-attach`)은 새 패키지에도 그대로라 바꾸지 않았습니다.
 
+
+## 2026-11-13: Unity SDK 3.10.0 정식 릴리스 대응
+
+- 기준: 원격 `main` `fcec05f27ebbb857b73e1464e6521ab5ce26b697`의 Unity 3.9.0 고정 커밋
+  `c2892282018b44e1666b364a7a97711a130761d6`부터
+  [공식 `release/v3.10.0`](https://github.com/toss/apps-in-toss-unity-sdk/releases/tag/release/v3.10.0)의 실제 UPM 태그 커밋
+  `b46a21bf6395a4c502e23ccde97b8cd47f5afbf6`까지 패키지 파일을 대조했습니다.
+  릴리스 본문의 생성 원본 `12b4f94e726261d4a5897ff9d09c27acb5b7c7cc`와 UPM 커밋을 구분합니다.
+  Godot 공식 정식 릴리스는 4.7.2가 최신이어서 엔진·feature(4.7)·Compatibility·비스레드 정책은 그대로입니다.
+- 실제 의존성: 공식 BuildConfig의 web-framework·DevTools 및 간접 CLI는 3.10.0입니다.
+  이 저장소의 원격 main은 세 패키지를 이미 3.10.0으로 고정했으므로 양쪽 `package.json`·lockfile을 다시 갱신하지 않습니다.
+  Unity 템플릿은 별도 bridge-core·web-analytics 의존성을 제거하고 Analytics를 web-framework에서 가져옵니다.
+  Godot 브리지는 이미 이 방식을 쓰고 있어 변경이 필요 없습니다. Unity의 TypeScript 7.0.2·Vite 8.3.5·pnpm 11.6.0을
+  엔진 어댑터와 무관한 이 저장소의 도구 버전에 옮기지 않습니다.
+- API: 공식 jslib의 고유 web-framework 경로가 85개에서 231개로 늘었습니다. 옛 평면 API를 호환 경로로 유지하면서
+  `TossAuth`·`TossPay`·`Device`·`Environment`·`Clipboard`·`File`·`Screen`·`User` 등의 새 경로를 제공합니다.
+  속성 읽기 8개는 `get_value`, `.isSupported()` 58개와 메서드별 권한 보조 함수는 실제 함수를 호출합니다.
+  `AIT.has_api()`는 경로 존재 확인이며 기능별 지원 여부 호출과 다릅니다.
+  `Device.subscribeLocation`·`Promotion.openContactsInvite`·`Notification.requestAgreement`는 이벤트·오류·해제를 관리하는 `AIT.events`에 넣습니다.
+- 패키징: 공식 Unity의 새 출력 검사와 설치된 CLI 코드를 대조한 결과, 수정하지 않은 CLI 3.10.0의 `.ait`는
+  `isGame:false`·`runtimeVersion:""`를 기록함을 최소 HTML 빌드로 확인했습니다.
+  공식 Unity는 런타임 값 `0.84.0`과 게임 여부를 CLI 실행 전에 보강합니다. 이 SDK도 같은 메타데이터를 빌드 시점에 넣고
+  실제 `.ait`를 읽어 확인합니다. 공식 CLI 원본이나 완성된 `.ait`를 다시 쓰지 않습니다.
+  `appType:"nongame"`만 `isGame:false`, `game` 및 생략한 경우는 `true`입니다.
+  `runtimeVersion`은 Toss Web 런타임 값이며 Godot 엔진 버전이 아닙니다.
+  설치된 CLI 3.10.0의 deploy 코드에는 이 필드의 로컬 거부 검사가 없으므로, upstream 주석의 배포 게이트 설명은
+  그대로 지원 근거로 삼지 않습니다. 배포 서버 수락 여부는 실제 배포하지 않아 미검증입니다.
+- Unity 전용 변화: PlayerPrefs 복원 순서와 Unity 오디오 복귀 레이어는 Godot 엔진 구현에 그대로 적용하지 않습니다.
+  기존 Godot 저장 미러링과 소리 복구의 지원 범위·실기기 미검증 표시를 유지합니다.
+- 자동 검사와 미검증 범위: [2026-11-13 검사 기록](testing.md#2026-11-13-unity-sdk-3100-정식-대응).

@@ -7,7 +7,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { packageWithMetadata } from './ait-package-metadata.mjs';
 
 const gameDir = path.resolve(process.env.GODOT_PROJECT_DIR ?? process.cwd());
 if (!fs.existsSync(path.join(gameDir, 'apps-in-toss.config.ts'))) {
@@ -48,17 +48,9 @@ const nodePath = [
   bridgeNodeModules,
   process.env.NODE_PATH,
 ].filter(Boolean).join(path.delimiter);
-const result = spawnSync(aitBin, ['build'], {
-  cwd: gameDir,
-  stdio: 'inherit',
-  env: { ...process.env, NODE_PATH: nodePath },
-});
-if (result.error && result.error.code === 'ENOENT') {
-  console.error(
-    '[ait-godot package] ait CLI를 찾을 수 없습니다. 다음 중 하나로 설치하세요:\n' +
-      '  npm i -D @apps-in-toss/web-framework   (게임 리포에 설치 — .bin/ait 제공)\n' +
-      '  또는 AIT_BIN=/path/to/ait 환경변수 지정',
-  );
+try {
+  packageWithMetadata(aitBin, gameDir, { ...process.env, NODE_PATH: nodePath });
+} catch (error) {
+  console.error(`[ait-godot package] ${error.message}`);
   process.exit(1);
 }
-if (result.status !== 0) process.exit(result.status ?? 1);
