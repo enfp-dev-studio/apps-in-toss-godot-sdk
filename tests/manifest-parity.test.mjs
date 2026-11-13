@@ -1,4 +1,4 @@
-// Source/embedded parity + upstream version pins (web-framework 3.10.0, Unity SDK 3.9.0).
+// Source/embedded parity + upstream version pins (web-framework 3.10.0, Unity SDK 3.10.0).
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
@@ -10,6 +10,29 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, '..');
 const read = (p) => fs.readFileSync(path.join(repoRoot, p), 'utf8');
 const readJson = (p) => JSON.parse(read(p));
+
+// Unity retains these deprecated names for the same operation. Godot exposes the canonical API.
+const RENAMED = {
+  'SafeAreaInsets.get': 'SafeArea.get',
+  'SafeAreaInsets.subscribe': 'SafeArea.subscribe',
+  getSafeAreaInsets: 'SafeArea.get',
+  getGameCenterGameProfile: 'Game.getUserProfile',
+  openGameCenterLeaderboard: 'Game.openLeaderboard',
+  submitGameCenterLeaderBoardScore: 'Game.setLeaderboardScore',
+  getTossShareLink: 'Share.createLink',
+};
+
+function missingUnityPaths(paths) {
+  const covered = new Set(readJson('bridge/api-manifest.json').map((entry) => entry.path));
+  const bridge = read('bridge/src/index.ts');
+  for (const match of bridge.matchAll(/startEventSubscription\(subscriptionId, '([^']+)'/g)) covered.add(match[1]);
+  assert.match(bridge, /const iap = getProperty\(namespaces, 'IAP'\)/);
+  for (const match of bridge.matchAll(/startIapOrder\(subscriptionId, '([^']+)'/g)) covered.add(`IAP.${match[1]}`);
+  for (const file of ['events/ait_events.gd', 'navigation/ait_back.gd', 'screen/ait_safe_area.gd', 'game/ait_game.gd']) {
+    for (const match of read(`addons/apps_in_toss/${file}`).matchAll(/"([A-Za-z][\w]*(?:\.[\w]+)*)"/g)) covered.add(match[1]);
+  }
+  return paths.filter((p) => !covered.has(RENAMED[p] ?? p));
+}
 
 describe('bridge source/embedded parity + version pins', () => {
   it('both api-manifest.json copies carry the latest mapped APIs', () => {
@@ -57,16 +80,21 @@ describe('bridge source/embedded parity + version pins', () => {
     );
   });
 
-  it('generated GDScript matches the manifest (81 APIs)', () => {
+  it('generated GDScript matches all 207 callable/property entries', () => {
     const manifest = readJson('bridge/api-manifest.json');
-    assert.equal(manifest.length, 81);
+    assert.equal(manifest.length, 207);
+    assert.equal(new Set(manifest.map((entry) => entry.name)).size, manifest.length);
+    assert.equal(new Set(manifest.map((entry) => entry.path)).size, manifest.length);
     const api = read('addons/apps_in_toss/generated/ait_generated_api.gd');
     const catalog = read('addons/apps_in_toss/generated/ait_generated_catalog.gd');
     assert.ok(api.includes('func iap_get_completed_or_refunded_orders(options: Variant = {}) -> int:'));
     assert.ok(api.includes('_core.invoke("IAP.getCompletedOrRefundedOrders", [options])'));
     for (const entry of manifest) {
       assert.ok(api.includes(`func ${entry.name}(`), `generated api has ${entry.name}`);
-      assert.ok(api.includes(`_core.invoke("${entry.path}"`), `generated api invokes ${entry.path}`);
+      const expression = entry.kind === 'property'
+        ? `_core.get_value("${entry.path}")`
+        : `_core.invoke("${entry.path}"`;
+      assert.ok(api.includes(expression), `generated api dispatches ${entry.path}`);
       assert.ok(catalog.includes(`"name": "${entry.name}"`), `catalog has ${entry.name}`);
     }
   });
@@ -79,18 +107,18 @@ describe('bridge source/embedded parity + version pins', () => {
     }
     const lock = readJson('addons/apps_in_toss/tools/templates/platform.lock.json');
     assert.equal(lock.webFramework.version, '3.10.0');
-    assert.equal(lock.unitySdk.packageVersion, '3.9.0');
-    assert.equal(lock.unitySdk.commit, 'c2892282018b44e1666b364a7a97711a130761d6');
+    assert.equal(lock.unitySdk.packageVersion, '3.10.0');
+    assert.equal(lock.unitySdk.commit, 'b46a21bf6395a4c502e23ccde97b8cd47f5afbf6');
     assert.equal(read('addons/apps_in_toss/plugin.cfg').match(/version="([^"]+)"/)[1], '0.2.0');
     const versionGd = read('addons/apps_in_toss/status/ait_version.gd');
     assert.equal(versionGd.match(/const VERSION := "([^"]+)"/)[1], read('addons/apps_in_toss/plugin.cfg').match(/version="([^"]+)"/)[1], 'AITVersion.VERSION = plugin.cfg');
     assert.equal(versionGd.match(/const WEB_FRAMEWORK := "([^"]+)"/)[1], readJson('bridge/package.json').dependencies['@apps-in-toss/web-framework'], 'AITVersion.WEB_FRAMEWORK = bridge');
   });
 
-  // Unity SDK 3.9.0(c2892282)의 jslib가 부르는 web-framework 경로 85개를 이 SDK가 모두 덮는지 본다.
+  // 기존 Unity SDK 3.9.0(c2892282)의 경로도 호환성 검사로 유지한다.
   // 덮는 곳: 매니페스트(AIT.api), 브리지 전용 메서드(IAP 주문·전면 광고), AIT.events·AIT.back(구독형),
   // 그리고 같은 기능의 새 이름(아래 RENAMED: web-framework가 deprecated·v2 별칭으로 둔 옛 이름).
-  it('covers every web-framework path the Unity SDK 3.9.0 jslib calls', () => {
+  it('retains all 85 Unity SDK 3.9.0 compatibility paths', () => {
     const UNITY_390_PATHS = [
       'Analytics.click', 'Analytics.impression', 'Analytics.screen',
       'GoogleAdMob.isAppsInTossAdMobLoaded', 'GoogleAdMob.loadAppsInTossAdMob', 'GoogleAdMob.showAppsInTossAdMob',
@@ -113,25 +141,40 @@ describe('bridge source/embedded parity + version pins', () => {
       'startUpdateLocation', 'submitGameCenterLeaderBoardScore', 'tdsEvent.addEventListener',
     ];
     assert.equal(UNITY_390_PATHS.length, 85);
-    const RENAMED = {
-      'SafeAreaInsets.get': 'SafeArea.get',
-      'SafeAreaInsets.subscribe': 'SafeArea.subscribe',
-      getGameCenterGameProfile: 'Game.getUserProfile',
-      openGameCenterLeaderboard: 'Game.openLeaderboard',
-      submitGameCenterLeaderBoardScore: 'Game.setLeaderboardScore',
-      getTossShareLink: 'Share.createLink',
-    };
-    const manifestPaths = new Set(readJson('bridge/api-manifest.json').map((e) => e.path));
-    const bridgeSrc = read('bridge/src/index.ts');
-    const modules = ['events/ait_events.gd', 'navigation/ait_back.gd', 'screen/ait_safe_area.gd']
-      .map((f) => read(`addons/apps_in_toss/${f}`)).join('\n');
-    const missing = UNITY_390_PATHS.filter((p) => {
-      const target = RENAMED[p] ?? p;
-      if (manifestPaths.has(target)) return false;
-      const leaf = target.split('.').pop();
-      return !(bridgeSrc.includes(`'${leaf}'`) || modules.includes(`"${target}"`));
-    });
-    assert.deepEqual(missing, []);
+    assert.deepEqual(missingUnityPaths(UNITY_390_PATHS), []);
+  });
+
+  it('covers the exact 231 routes in the official Unity SDK 3.10.0 tag', () => {
+    const fixture = readJson('tests/fixtures/unity-sdk-3.10.0-paths.json');
+    const lock = readJson('addons/apps_in_toss/tools/templates/platform.lock.json');
+    assert.equal(fixture.tag, `release/v${lock.unitySdk.packageVersion}`);
+    assert.equal(fixture.commit, lock.unitySdk.commit);
+    assert.equal(fixture.paths.length, 231);
+    assert.equal(new Set(fixture.paths).size, fixture.paths.length);
+    assert.equal(fixture.paths.filter((p) => p.endsWith('.isSupported')).length, 58);
+    assert.equal(fixture.paths.filter((p) => /\.(getPermission|openPermissionDialog)$/.test(p)).length, 28);
+    assert.deepEqual(missingUnityPaths(fixture.paths), []);
+    const manifest = readJson('bridge/api-manifest.json');
+    assert.deepEqual(manifest.filter((e) => e.kind === 'property').map((e) => e.path).sort(), fixture.properties);
+    for (const route of fixture.paths.filter((p) => /\.(isSupported|getPermission|openPermissionDialog)$/.test(p))) {
+      const entry = manifest.find((e) => e.path === route);
+      assert.ok(entry, `${route} has its own callable wrapper (has_api is only an existence check)`);
+      assert.deepEqual(entry.args, [], route);
+      assert.notEqual(entry.kind, 'property', route);
+    }
+  });
+
+  it('marks property catalog entries so the sample uses get_value, and preserves optional media options', () => {
+    const manifest = readJson('bridge/api-manifest.json');
+    const catalog = read('addons/apps_in_toss/generated/ait_generated_catalog.gd');
+    for (const entry of manifest.filter((e) => e.kind === 'property')) {
+      assert.deepEqual(entry.args, []);
+      assert.ok(catalog.includes(`"path": "${entry.path}", "args": [], "kind": "property"`));
+    }
+    for (const route of ['Device.getPhotos', 'Device.openCamera', 'Device.getAlbumItems']) {
+      assert.deepEqual(manifest.find((e) => e.path === route).defaults, { options: {} });
+    }
+
   });
 
   it('platform.lock apiManifestSha256 matches the embedded manifest', () => {

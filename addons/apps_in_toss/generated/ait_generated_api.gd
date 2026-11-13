@@ -249,3 +249,381 @@ func navigation_bar_add_accessory_button(options: Variant) -> int:
 
 func navigation_bar_remove_accessory_button() -> int:
     return _core.invoke("NavigationBar.removeAccessoryButton", [])
+
+func analytics_log(params: Variant) -> int:
+    return _core.invoke("Analytics.log", [params])
+
+func clipboard_get_text() -> int:
+    return _core.invoke("Clipboard.getText", [])
+
+func clipboard_get_text_get_permission() -> int:
+    return _core.invoke("Clipboard.getText.getPermission", [])
+
+func clipboard_get_text_open_permission_dialog() -> int:
+    return _core.invoke("Clipboard.getText.openPermissionDialog", [])
+
+func clipboard_set_text(text: Variant) -> int:
+    return _core.invoke("Clipboard.setText", [text])
+
+func clipboard_set_text_get_permission() -> int:
+    return _core.invoke("Clipboard.setText.getPermission", [])
+
+func clipboard_set_text_open_permission_dialog() -> int:
+    return _core.invoke("Clipboard.setText.openPermissionDialog", [])
+
+func device_get_album_items(options: Variant = {}) -> int:
+    return _core.invoke("Device.getAlbumItems", [options])
+
+func device_get_album_items_is_supported() -> int:
+    return _core.invoke("Device.getAlbumItems.isSupported", [])
+
+func device_get_contacts(options: Variant) -> int:
+    return _core.invoke("Device.getContacts", [options])
+
+func device_get_contacts_get_permission() -> int:
+    return _core.invoke("Device.getContacts.getPermission", [])
+
+func device_get_contacts_open_permission_dialog() -> int:
+    return _core.invoke("Device.getContacts.openPermissionDialog", [])
+
+func device_get_location(options: Variant) -> int:
+    return _core.invoke("Device.getLocation", [options])
+
+func device_get_location_get_permission() -> int:
+    return _core.invoke("Device.getLocation.getPermission", [])
+
+func device_get_location_open_permission_dialog() -> int:
+    return _core.invoke("Device.getLocation.openPermissionDialog", [])
+
+func device_get_photos(options: Variant = {}) -> int:
+    return _core.invoke("Device.getPhotos", [options])
+
+func device_get_photos_get_permission() -> int:
+    return _core.invoke("Device.getPhotos.getPermission", [])
+
+func device_get_photos_open_permission_dialog() -> int:
+    return _core.invoke("Device.getPhotos.openPermissionDialog", [])
+
+func device_locale() -> Variant:
+    return _core.get_value("Device.locale")
+
+func device_open_camera(options: Variant = {}) -> int:
+    return _core.invoke("Device.openCamera", [options])
+
+func device_open_camera_get_permission() -> int:
+    return _core.invoke("Device.openCamera.getPermission", [])
+
+func device_open_camera_open_permission_dialog() -> int:
+    return _core.invoke("Device.openCamera.openPermissionDialog", [])
+
+func device_open_url(url: Variant) -> int:
+    return _core.invoke("Device.openURL", [url])
+
+func device_os() -> Variant:
+    return _core.get_value("Device.os")
+
+func device_subscribe_location_get_permission() -> int:
+    return _core.invoke("Device.subscribeLocation.getPermission", [])
+
+func device_subscribe_location_open_permission_dialog() -> int:
+    return _core.invoke("Device.subscribeLocation.openPermissionDialog", [])
+
+func device_trigger_haptic(options: Variant) -> int:
+    return _core.invoke("Device.triggerHaptic", [options])
+
+func environment_deployment_id() -> Variant:
+    return _core.get_value("Environment.deploymentId")
+
+func environment_device_id() -> Variant:
+    return _core.get_value("Environment.deviceId")
+
+func environment_environment() -> Variant:
+    return _core.get_value("Environment.environment")
+
+func environment_get_network_status() -> int:
+    return _core.invoke("Environment.getNetworkStatus", [])
+
+func environment_get_server_time() -> int:
+    return _core.invoke("Environment.getServerTime", [])
+
+func environment_get_server_time_is_supported() -> int:
+    return _core.invoke("Environment.getServerTime.isSupported", [])
+
+func environment_group_id() -> Variant:
+    return _core.get_value("Environment.groupId")
+
+func environment_initial_url() -> Variant:
+    return _core.get_value("Environment.initialURL")
+
+func environment_toss_app_version() -> Variant:
+    return _core.get_value("Environment.tossAppVersion")
+
+func file_open_pdf_viewer(params: Variant) -> int:
+    return _core.invoke("File.openPDFViewer", [params])
+
+func file_open_pdf_viewer_is_supported() -> int:
+    return _core.invoke("File.openPDFViewer.isSupported", [])
+
+func file_save_base64(params: Variant) -> int:
+    return _core.invoke("File.saveBase64", [params])
+
+func file_save_base64_is_supported() -> int:
+    return _core.invoke("File.saveBase64.isSupported", [])
+
+func game_get_user_profile_is_supported() -> int:
+    return _core.invoke("Game.getUserProfile.isSupported", [])
+
+func game_open_leaderboard_is_supported() -> int:
+    return _core.invoke("Game.openLeaderboard.isSupported", [])
+
+func game_set_leaderboard_score_is_supported() -> int:
+    return _core.invoke("Game.setLeaderboardScore.isSupported", [])
+
+func google_ad_mob_is_apps_in_toss_ad_mob_loaded_is_supported() -> int:
+    return _core.invoke("GoogleAdMob.isAppsInTossAdMobLoaded.isSupported", [])
+
+func google_ad_mob_load_apps_in_toss_ad_mob_is_supported() -> int:
+    return _core.invoke("GoogleAdMob.loadAppsInTossAdMob.isSupported", [])
+
+func google_ad_mob_show_apps_in_toss_ad_mob_is_supported() -> int:
+    return _core.invoke("GoogleAdMob.showAppsInTossAdMob.isSupported", [])
+
+func iap_complete_product_grant_is_supported() -> int:
+    return _core.invoke("IAP.completeProductGrant.isSupported", [])
+
+func iap_create_one_time_purchase_order_is_supported() -> int:
+    return _core.invoke("IAP.createOneTimePurchaseOrder.isSupported", [])
+
+func iap_create_subscription_purchase_order_is_supported() -> int:
+    return _core.invoke("IAP.createSubscriptionPurchaseOrder.isSupported", [])
+
+func iap_get_completed_or_refunded_orders_is_supported() -> int:
+    return _core.invoke("IAP.getCompletedOrRefundedOrders.isSupported", [])
+
+func iap_get_pending_orders_is_supported() -> int:
+    return _core.invoke("IAP.getPendingOrders.isSupported", [])
+
+func iap_get_product_item_list_is_supported() -> int:
+    return _core.invoke("IAP.getProductItemList.isSupported", [])
+
+func iap_get_subscription_info_is_supported() -> int:
+    return _core.invoke("IAP.getSubscriptionInfo.isSupported", [])
+
+func notification_request_agreement_is_supported() -> int:
+    return _core.invoke("Notification.requestAgreement.isSupported", [])
+
+func promotion_grant_reward(params: Variant) -> int:
+    return _core.invoke("Promotion.grantReward", [params])
+
+func promotion_grant_reward_is_supported() -> int:
+    return _core.invoke("Promotion.grantReward.isSupported", [])
+
+func promotion_open_contacts_invite_is_supported() -> int:
+    return _core.invoke("Promotion.openContactsInvite.isSupported", [])
+
+func review_request() -> int:
+    return _core.invoke("Review.request", [])
+
+func review_request_is_supported() -> int:
+    return _core.invoke("Review.request.isSupported", [])
+
+func screen_close() -> int:
+    return _core.invoke("Screen.close", [])
+
+func screen_set_awake_mode(options: Variant) -> int:
+    return _core.invoke("Screen.setAwakeMode", [options])
+
+func screen_set_ios_swipe_back(options: Variant) -> int:
+    return _core.invoke("Screen.setIosSwipeBack", [options])
+
+func screen_set_orientation(options: Variant) -> int:
+    return _core.invoke("Screen.setOrientation", [options])
+
+func screen_set_orientation_is_supported() -> int:
+    return _core.invoke("Screen.setOrientation.isSupported", [])
+
+func screen_set_secure(options: Variant) -> int:
+    return _core.invoke("Screen.setSecure", [options])
+
+func share_send_message(message: Variant) -> int:
+    return _core.invoke("Share.sendMessage", [message])
+
+func storage_get_items_is_supported() -> int:
+    return _core.invoke("Storage.getItems.isSupported", [])
+
+func storage_set_items_is_supported() -> int:
+    return _core.invoke("Storage.setItems.isSupported", [])
+
+func toss_ads_attach_is_supported() -> int:
+    return _core.invoke("TossAds.attach.isSupported", [])
+
+func toss_ads_attach_banner_is_supported() -> int:
+    return _core.invoke("TossAds.attachBanner.isSupported", [])
+
+func toss_ads_destroy_is_supported() -> int:
+    return _core.invoke("TossAds.destroy.isSupported", [])
+
+func toss_ads_destroy_all_is_supported() -> int:
+    return _core.invoke("TossAds.destroyAll.isSupported", [])
+
+func toss_ads_initialize_is_supported() -> int:
+    return _core.invoke("TossAds.initialize.isSupported", [])
+
+func toss_auth_is_integrated() -> int:
+    return _core.invoke("TossAuth.isIntegrated", [])
+
+func toss_auth_is_integrated_is_supported() -> int:
+    return _core.invoke("TossAuth.isIntegrated.isSupported", [])
+
+func toss_auth_login() -> int:
+    return _core.invoke("TossAuth.login", [])
+
+func toss_auth_sign(params: Variant) -> int:
+    return _core.invoke("TossAuth.sign", [params])
+
+func toss_auth_sign_is_supported() -> int:
+    return _core.invoke("TossAuth.sign.isSupported", [])
+
+func toss_pay_authorize(params: Variant) -> int:
+    return _core.invoke("TossPay.authorize", [params])
+
+func toss_pay_authorize_subscription(params: Variant) -> int:
+    return _core.invoke("TossPay.authorizeSubscription", [params])
+
+func toss_pay_authorize_subscription_is_supported() -> int:
+    return _core.invoke("TossPay.authorizeSubscription.isSupported", [])
+
+func toss_pay_checkout_payment(options: Variant) -> int:
+    return _core.invoke("TossPay.checkoutPayment", [options])
+
+func toss_pay_request_toss_pay_pays_billing(options: Variant) -> int:
+    return _core.invoke("TossPay.requestTossPayPaysBilling", [options])
+
+func toss_pay_request_toss_pay_pays_billing_is_supported() -> int:
+    return _core.invoke("TossPay.requestTossPayPaysBilling.isSupported", [])
+
+func user_get_anonymous_key() -> int:
+    return _core.invoke("User.getAnonymousKey", [])
+
+func user_get_anonymous_key_is_supported() -> int:
+    return _core.invoke("User.getAnonymousKey.isSupported", [])
+
+func user_get_consented_data(options: Variant) -> int:
+    return _core.invoke("User.getConsentedData", [options])
+
+func user_get_consented_data_is_supported() -> int:
+    return _core.invoke("User.getConsentedData.isSupported", [])
+
+func user_get_declared_age_range(params: Variant) -> int:
+    return _core.invoke("User.getDeclaredAgeRange", [params])
+
+func user_get_declared_age_range_is_supported() -> int:
+    return _core.invoke("User.getDeclaredAgeRange.isSupported", [])
+
+func apps_in_toss_sign_toss_cert_is_supported() -> int:
+    return _core.invoke("appsInTossSignTossCert.isSupported", [])
+
+func contacts_viral_is_supported() -> int:
+    return _core.invoke("contactsViral.isSupported", [])
+
+func fetch_album_items_is_supported() -> int:
+    return _core.invoke("fetchAlbumItems.isSupported", [])
+
+func fetch_album_photos_get_permission() -> int:
+    return _core.invoke("fetchAlbumPhotos.getPermission", [])
+
+func fetch_album_photos_open_permission_dialog() -> int:
+    return _core.invoke("fetchAlbumPhotos.openPermissionDialog", [])
+
+func fetch_contacts_get_permission() -> int:
+    return _core.invoke("fetchContacts.getPermission", [])
+
+func fetch_contacts_open_permission_dialog() -> int:
+    return _core.invoke("fetchContacts.openPermissionDialog", [])
+
+func get_anonymous_key_is_supported() -> int:
+    return _core.invoke("getAnonymousKey.isSupported", [])
+
+func get_clipboard_text_get_permission() -> int:
+    return _core.invoke("getClipboardText.getPermission", [])
+
+func get_clipboard_text_open_permission_dialog() -> int:
+    return _core.invoke("getClipboardText.openPermissionDialog", [])
+
+func get_consented_user_data_is_supported() -> int:
+    return _core.invoke("getConsentedUserData.isSupported", [])
+
+func get_current_location_get_permission() -> int:
+    return _core.invoke("getCurrentLocation.getPermission", [])
+
+func get_current_location_open_permission_dialog() -> int:
+    return _core.invoke("getCurrentLocation.openPermissionDialog", [])
+
+func get_declared_age_range_is_supported() -> int:
+    return _core.invoke("getDeclaredAgeRange.isSupported", [])
+
+func get_game_center_game_profile_is_supported() -> int:
+    return _core.invoke("getGameCenterGameProfile.isSupported", [])
+
+func get_is_toss_login_integrated_service_is_supported() -> int:
+    return _core.invoke("getIsTossLoginIntegratedService.isSupported", [])
+
+func get_server_time_is_supported() -> int:
+    return _core.invoke("getServerTime.isSupported", [])
+
+func get_user_key_for_game_is_supported() -> int:
+    return _core.invoke("getUserKeyForGame.isSupported", [])
+
+func grant_promotion_reward_is_supported() -> int:
+    return _core.invoke("grantPromotionReward.isSupported", [])
+
+func grant_promotion_reward_for_game_is_supported() -> int:
+    return _core.invoke("grantPromotionRewardForGame.isSupported", [])
+
+func load_full_screen_ad_is_supported() -> int:
+    return _core.invoke("loadFullScreenAd.isSupported", [])
+
+func open_camera_get_permission() -> int:
+    return _core.invoke("openCamera.getPermission", [])
+
+func open_camera_open_permission_dialog() -> int:
+    return _core.invoke("openCamera.openPermissionDialog", [])
+
+func open_game_center_leaderboard_is_supported() -> int:
+    return _core.invoke("openGameCenterLeaderboard.isSupported", [])
+
+func open_pdf_viewer_is_supported() -> int:
+    return _core.invoke("openPDFViewer.isSupported", [])
+
+func request_notification_agreement_is_supported() -> int:
+    return _core.invoke("requestNotificationAgreement.isSupported", [])
+
+func request_review_is_supported() -> int:
+    return _core.invoke("requestReview.isSupported", [])
+
+func request_toss_pay_pays_billing_is_supported() -> int:
+    return _core.invoke("requestTossPayPaysBilling.isSupported", [])
+
+func save_base64_data_is_supported() -> int:
+    return _core.invoke("saveBase64Data.isSupported", [])
+
+func set_clipboard_text_get_permission() -> int:
+    return _core.invoke("setClipboardText.getPermission", [])
+
+func set_clipboard_text_open_permission_dialog() -> int:
+    return _core.invoke("setClipboardText.openPermissionDialog", [])
+
+func set_device_orientation_is_supported() -> int:
+    return _core.invoke("setDeviceOrientation.isSupported", [])
+
+func show_full_screen_ad_is_supported() -> int:
+    return _core.invoke("showFullScreenAd.isSupported", [])
+
+func start_update_location_get_permission() -> int:
+    return _core.invoke("startUpdateLocation.getPermission", [])
+
+func start_update_location_open_permission_dialog() -> int:
+    return _core.invoke("startUpdateLocation.openPermissionDialog", [])
+
+func submit_game_center_leader_board_score_is_supported() -> int:
+    return _core.invoke("submitGameCenterLeaderBoardScore.isSupported", [])

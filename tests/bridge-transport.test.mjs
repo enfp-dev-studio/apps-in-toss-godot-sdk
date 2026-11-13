@@ -18,7 +18,35 @@ const ts = require(path.join(repoRoot, 'bridge/node_modules/typescript'));
 const FAKE_SOURCE = `
 const calls = [];
 function track(entry) { calls.push(entry); }
+function subscription(path) {
+  return function (params) {
+    track({ path, params, owner: this });
+    return () => { track({ disposed: path }); };
+  };
+}
 module.exports = {
+  Device: {
+    subscribeLocation: subscription('Device.subscribeLocation'),
+    getPhotos: Object.assign(function (options) {
+      track({ path: 'Device.getPhotos', options, owner: this });
+      return Promise.resolve([]);
+    }, {
+      isSupported: function () {
+        track({ path: 'Device.getPhotos.isSupported', args: [...arguments], owner: this });
+        return false;
+      },
+      getPermission: function () {
+        track({ path: 'Device.getPhotos.getPermission', args: [...arguments], owner: this });
+        return Promise.resolve('allowed');
+      },
+      openPermissionDialog: function () {
+        track({ path: 'Device.getPhotos.openPermissionDialog', args: [...arguments], owner: this });
+        return Promise.resolve('denied');
+      },
+    }),
+  },
+  Promotion: { openContactsInvite: subscription('Promotion.openContactsInvite') },
+  Notification: { requestAgreement: subscription('Notification.requestAgreement') },
   __calls: calls,
   NavigationBar: {
     setOptions: function (options) {
@@ -227,6 +255,35 @@ describe('bridge transport (vm + fake WebFramework)', () => {
     assert.ok(fake.__calls.some((c) => c.disposed === 'GoogleAdMob.loadAppsInTossAdMob'));
   });
 
+  for (const [route, options, event] of [
+    ['Device.subscribeLocation', { accuracy: 1, timeInterval: 2000, distanceInterval: 25 }, { latitude: 37.5, longitude: 127 }],
+    ['Promotion.openContactsInvite', { moduleId: 'reward' }, { type: 'rewarded', data: { amount: 10 } }],
+    ['Notification.requestAgreement', { templateCode: 'notice' }, { type: 'agreed' }],
+  ]) {
+    it(`${route} wraps options, routes callbacks, and disposes the canonical subscription`, async () => {
+      const id = 80;
+      const { cb, payloads } = collectCallback();
+      const before = fake.__calls.length;
+      bridge.subscribePath(id, route, JSON.stringify(options), cb);
+      const call = fake.__calls.slice(before).find((entry) => entry.path === route);
+      assert.ok(call, `called the exact path ${route}`);
+      assert.equal(call.owner, fake[route.split('.')[0]]);
+      assert.deepEqual(plain(call.params.options), options);
+      assert.deepEqual(Object.keys(call.params).sort(), ['onError', 'onEvent', 'options']);
+      call.params.onEvent(event);
+      call.params.onError({ code: 'PERMISSION_DENIED', message: 'permission required' });
+      assert.deepEqual(payloads, [], 'callbacks wait until the Godot call returns');
+      await flush();
+      assert.deepEqual(payloads, [
+        { kind: 'subscription_event', subscriptionId: id, event },
+        { kind: 'subscription_error', subscriptionId: id, error: { code: 'PERMISSION_DENIED', message: 'permission required' } },
+      ]);
+      bridge.disposeSubscription(id);
+      bridge.disposeSubscription(id);
+      assert.equal(fake.__calls.slice(before).filter((entry) => entry.disposed === route).length, 1, 'cleanup runs once');
+    });
+  }
+
   it('subscribePathArgs passes leading args before the handlers (graniteEvent backEvent)', async () => {
     assert.equal(bridge.hasBridgeMethod('subscribePathArgs'), true);
     const { cb, payloads } = collectCallback();
@@ -256,6 +313,26 @@ describe('bridge transport (vm + fake WebFramework)', () => {
     assert.equal(payloads[0].kind, 'subscription_error');
     assert.equal(payloads[0].subscriptionId, 22);
     assert.match(payloads[0].error.message, /JSON array/);
+  });
+
+  it('invokes per-function capability and permission helpers with the function as owner', async () => {
+    const { cb, payloads } = collectCallback();
+    assert.equal(bridge.has('Device.getPhotos'), true);
+    assert.equal(bridge.has('Device.getPhotos.isSupported'), true, 'path exists even when capability is false');
+    const before = fake.__calls.length;
+    for (const [i, helper, result] of [
+      [0, 'isSupported', false],
+      [1, 'getPermission', 'allowed'],
+      [2, 'openPermissionDialog', 'denied'],
+    ]) {
+      const route = `Device.getPhotos.${helper}`;
+      bridge.invoke(route, '[]', 90 + i, cb);
+      await flush();
+      assert.deepEqual(payloads.at(-1), { kind: 'request', requestId: 90 + i, ok: true, result });
+      const call = fake.__calls.slice(before).find((entry) => entry.path === route);
+      assert.equal(call.owner, fake.Device.getPhotos, `${route} retains function owner`);
+      assert.deepEqual(plain(call.args), []);
+    }
   });
 
   it('has() is framework-only; hasBridgeMethod() covers bridge methods', () => {

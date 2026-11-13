@@ -7,11 +7,14 @@
 //   node tests/run-minimal-package.mjs
 //   AIT_KEEP_FIXTURE=1 ...  # 디버깅용으로 임시 폴더 유지
 //
-// 종료 코드: .ait 파일이 비어 있지 않게 나오면 0, 아니면 0이 아님.
+// 종료 코드: 실제 .ait의 출력·메타데이터·HTML 항목을 확인하면 0, 아니면 0이 아님.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { createRequire } from 'node:module';
+import assert from 'node:assert/strict';
+import { assertPackageMetadata } from '../addons/apps_in_toss/tools/scripts/ait-package-metadata.mjs';
 import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -50,6 +53,7 @@ function main() {
       fs.readFileSync(path.join(repoRoot, 'addons/apps_in_toss/tools/templates/game.manifest.example.json'), 'utf8'),
     );
     template.gameId = APP_NAME;
+    template.appType = 'game';
     fs.writeFileSync(path.join(fixture, '.ait/game.manifest.json'), JSON.stringify(template, null, 2));
     fs.mkdirSync(path.join(fixture, 'build/godot-web'), { recursive: true });
     fs.writeFileSync(
@@ -78,6 +82,11 @@ function main() {
     if (!stat || !stat.isFile() || stat.size < 1) {
       throw new Error(`.ait 출력이 파일이 아니거나 비었음: ${outFile}`);
     }
+    const { AITReader } = createRequire(path.join(bridgeDir, 'package.json'))('@apps-in-toss/ait-format');
+    const reader = AITReader.fromBuffer(new Uint8Array(fs.readFileSync(outFile)));
+    assertPackageMetadata(reader, true);
+    assert.equal(reader.appName, APP_NAME);
+    assert.ok(reader.listEntries().includes('sources/index.html'));
     console.log(`[pkg-ci] 통과 (${APP_NAME}.ait ${stat.size} bytes)`);
   } finally {
     if (keepFixture) {

@@ -121,11 +121,7 @@ func _on_invoke_pressed() -> void:
 		return
 	_busy = true
 	_call_button.disabled = true
-	var response: Dictionary = await AIT.invoke_and_wait(
-		String(_selected_api.get("path", "")),
-		_argument_for(_selected_api),
-		TEST_TIMEOUT_MS
-	)
+	var response: Dictionary = await _invoke_api(_selected_api, _argument_for(_selected_api))
 	_busy = false
 	_call_button.disabled = false
 	if response.get("ok", false):
@@ -135,6 +131,15 @@ func _on_invoke_pressed() -> void:
 		var error: Variant = response.get("error", {})
 		_detail_label.text = "[b]%s[/b]\n[color=#e42939]실패[/color]\n%s" % [
 			_selected_api.get("name", ""), JSON.stringify(error, "  ", false)]
+
+
+func _invoke_api(api: Dictionary, args: Array) -> Dictionary:
+	var path := String(api.get("path", ""))
+	if api.get("kind", "call") == "property":
+		if not AIT.is_available():
+			return {"ok": false, "error": {"code": "AIT_BRIDGE_UNAVAILABLE"}}
+		return {"ok": true, "result": AIT.get_value(path)}
+	return await AIT.invoke_and_wait(path, args, TEST_TIMEOUT_MS)
 
 
 func _argument_for(_api: Dictionary) -> Array:
@@ -168,7 +173,9 @@ func _run_e2e_suite() -> void:
 		var args: Array = api.get("args", [])
 		if not args.is_empty():
 			continue
-		var response: Dictionary = await AIT.invoke_and_wait(api.path, [], TEST_TIMEOUT_MS)
+		if String(api.get("path", "")) in ["closeView", "Screen.close"]:
+			continue # mock에서도 뷰를 닫으므로 자동 순회에서 제외한다.
+		var response: Dictionary = await _invoke_api(api, [])
 		var state := "OK" if bool(response.get("ok", false)) else "FAIL"
 		_append("%s %s -> %s" % [state, api.name, str(response.get("result", response.get("error", {})))])
 	_append("[b]E2E 자동 점검 완료[/b]")

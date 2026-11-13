@@ -35,8 +35,13 @@ for (const api of manifest) {
     return `${a}: Variant${value}`;
   }).join(', ');
   const args = api.args.join(', ');
-  lines.push(`func ${api.name}(${params}) -> int:`);
-  lines.push(`    return _core.invoke(${JSON.stringify(api.path)}, [${args}])`);
+  if (api.kind === 'property') {
+    lines.push(`func ${api.name}() -> Variant:`);
+    lines.push(`    return _core.get_value(${JSON.stringify(api.path)})`);
+  } else {
+    lines.push(`func ${api.name}(${params}) -> int:`);
+    lines.push(`    return _core.invoke(${JSON.stringify(api.path)}, [${args}])`);
+  }
   lines.push('');
 }
 
@@ -49,7 +54,8 @@ const catalog = [
   'const APIS: Array[Dictionary] = [',
 ];
 for (const api of manifest) {
-  catalog.push(`\t{"name": "${api.name}", "path": "${api.path}", "args": ${JSON.stringify(api.args)}},`);
+  const kind = api.kind === 'property' ? ', "kind": "property"' : '';
+  catalog.push(`\t{"name": "${api.name}", "path": "${api.path}", "args": ${JSON.stringify(api.args)}${kind}},`);
 }
 catalog.push(']', '');
 fs.writeFileSync(path.join(generatedDir, 'ait_generated_catalog.gd'), catalog.join('\n'));

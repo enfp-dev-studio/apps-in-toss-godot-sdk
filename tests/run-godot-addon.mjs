@@ -75,7 +75,7 @@ function main() {
     copyTree(addonSrc, path.join(fixture, 'addons/apps_in_toss'));
 
     fs.mkdirSync(path.join(fixture, 'tests'), { recursive: true });
-    for (const name of ['admob-lifecycle.gd', 'iap-pagination.gd', 'lessons-modules.gd', 'events-subscriptions.gd', 'banner-ad.gd', 'runtime-log.gd', 'sentry.gd', 'user-files.gd', 'editor-tools.gd']) {
+    for (const name of ['admob-lifecycle.gd', 'iap-pagination.gd', 'lessons-modules.gd', 'events-subscriptions.gd', 'sdk-310-api.gd', 'banner-ad.gd', 'runtime-log.gd', 'sentry.gd', 'user-files.gd', 'editor-tools.gd']) {
       fs.copyFileSync(path.join(repoRoot, 'tests/gdscript', name), path.join(fixture, 'tests', name));
     }
 
@@ -127,7 +127,7 @@ function main() {
       throw new Error(`IAP 페이지 조회 검사 성공 마커 없음:\n${paginationOut}`);
     }
     console.log('[godot-ci] IAP 페이지 조회 통과 (기본값·커서·기존 시간제한 호출)');
-    // AIT.events: Unity SDK 3.9.0 구독형 API + web-framework 3.10.0 액세서리 버튼
+    // AIT.events: Unity SDK 3.10.0 정식·호환 구독형 API
     const eventsOut = run(godotBin, ['--headless', '--path', fixture, '--script', 'res://tests/events-subscriptions.gd'], {
       cwd: repoRoot, timeoutMs: 180_000, label: 'events subscriptions',
     });
@@ -135,6 +135,13 @@ function main() {
       throw new Error(`구독형 API 검사 성공 마커 없음:\n${eventsOut}`);
     }
     console.log('[godot-ci] 구독형 API 통과 (경로·인자·이벤트 이름·해제)');
+    const sdk310Out = run(godotBin, ['--headless', '--path', fixture, '--script', 'res://tests/sdk-310-api.gd'], {
+      cwd: repoRoot, timeoutMs: 180_000, label: 'Unity SDK 3.10 API',
+    });
+    if (!sdk310Out.includes('sdk 3.10 api check passed')) {
+      throw new Error(`Unity SDK 3.10 API 검사 성공 마커 없음:\n${sdk310Out}`);
+    }
+    console.log('[godot-ci] Unity SDK 3.10 API 통과 (속성·인자·지원 여부·권한)');
     // AIT.banner·AITBannerAdView: Unity SDK 3.9.0 배너 도우미
     const bannerOut = run(godotBin, ['--headless', '--path', fixture, '--script', 'res://tests/banner-ad.gd'], {
       cwd: repoRoot, timeoutMs: 180_000, label: 'banner ad',

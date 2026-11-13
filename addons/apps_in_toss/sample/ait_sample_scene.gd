@@ -98,7 +98,7 @@ func _run_e2e_suite() -> void:
 	# Unity SDK의 E2E 자동 점검에 대응: 파라미터 없는 API를 순회 호출한다.
 	# close_view는 mock에서도 실제 닫기(history.back)를 수행해 페이지가 사라지므로
 	# 브라우저 E2E에서는 제외한다. 실기기에서는 토스 앱이 뷰를 닫는다.
-	const SKIP_IN_BROWSER_E2E := ["close_view"]
+	const SKIP_IN_BROWSER_E2E := ["close_view", "screen_close"]
 	_status_message("E2E 자동 점검 시작…")
 	var passed := 0
 	var failed := 0
@@ -108,7 +108,11 @@ func _run_e2e_suite() -> void:
 			continue
 		if String(api.get("name", "")) in SKIP_IN_BROWSER_E2E:
 			continue
-		var response := await AIT.invoke_and_wait(String(api.get("path")), [], TEST_TIMEOUT_MS)
+		var response: Dictionary
+		if api.get("kind", "call") == "property":
+			response = {"ok": AIT.is_available(), "result": AIT.get_value(String(api.get("path")))}
+		else:
+			response = await AIT.invoke_and_wait(String(api.get("path")), [], TEST_TIMEOUT_MS)
 		if bool(response.get("ok", false)):
 			passed += 1
 		else:
